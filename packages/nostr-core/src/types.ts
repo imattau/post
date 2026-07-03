@@ -104,6 +104,7 @@ export interface Draft {
   body: string;
   attachments: AttachmentUpload[];
   relayOverrides: string[];
+  replyTo: string | null;
   createdAt: number;
   updatedAt: number;
   savedAt: number | null;

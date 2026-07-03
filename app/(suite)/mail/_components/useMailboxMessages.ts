@@ -1,10 +1,8 @@
 import { useMessagesStore } from "@/lib/stores/messages";
+import { useLabelsStore } from "@/lib/stores/labels";
 import { useMemo } from "react";
 import type { MockMessage, MockContact } from "@/lib/mock/threads";
-
-function isMockMessage(msg: unknown): msg is MockMessage {
-  return msg !== null && typeof msg === "object" && "sender" in (msg as Record<string, unknown>);
-}
+import type { AttachmentRef } from "@/lib/types";
 
 export function useMailboxMessages(mailbox: string): {
   messages: MockMessage[];
@@ -12,6 +10,7 @@ export function useMailboxMessages(mailbox: string): {
 } {
   const byId = useMessagesStore((s) => s.byId);
   const ids = useMessagesStore((s) => s.ids);
+  const labels = useLabelsStore((s) => s.byId);
 
   return useMemo(() => {
     if (ids.length > 0) {
@@ -30,13 +29,17 @@ export function useMailboxMessages(mailbox: string): {
               return m.archived;
             case "spam":
               return m.spam;
+            case "sent":
+              return m.mailbox === "sent";
+            case "drafts":
+              return false;
             default:
               return true;
           }
         })
         .sort((a, b) => b.createdAt - a.createdAt);
 
-      const asMock = filtered.map((m) => realToMock(m));
+      const asMock = filtered.map((m) => realToMock(m, labels));
       return {
         messages: asMock,
         unreadCount: filtered.filter((m) => !m.read).length,
@@ -49,12 +52,13 @@ export function useMailboxMessages(mailbox: string): {
       messages: MESSAGES,
       unreadCount: MESSAGES.filter((m) => !m.read).length,
     };
-  }, [byId, ids, mailbox]);
+  }, [byId, ids, labels, mailbox]);
 }
 
-function realToMock(real: {
+export function realToMock(real: {
   id: string;
   pubkey: string;
+  recipientPubkey?: string;
   subject: string;
   preview: string;
   content: string;
@@ -62,7 +66,10 @@ function realToMock(real: {
   read: boolean;
   starred: boolean;
   labelIds?: string[];
-}): MockMessage {
+  attachments?: AttachmentRef[];
+  isEncrypted?: boolean;
+  relayUrls?: string[];
+}, labels: Record<string, { name: string }> = {}): MockMessage {
   const contact: MockContact = {
     id: real.pubkey,
     name: real.pubkey.slice(0, 8),
@@ -81,10 +88,10 @@ function realToMock(real: {
     createdAt: real.createdAt,
     read: real.read,
     starred: real.starred,
-    labels: [],
-    attachments: [],
-    encrypted: true,
-    relayCount: 3,
+    labels: (real.labelIds ?? []).map((id) => labels[id]?.name ?? id),
+    attachments: real.attachments ?? [],
+    encrypted: real.isEncrypted ?? true,
+    relayCount: real.relayUrls?.length ?? 3,
     threadLength: 1,
   };
 }

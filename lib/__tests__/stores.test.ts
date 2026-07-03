@@ -8,7 +8,7 @@ vi.mock("@/lib/db/schema", () => ({
   },
 }));
 
-vi.mock("@post/nostr-core", async (importOriginal) => {
+vi.mock("@post/nostr-core", async (importOriginal: () => Promise<Record<string, unknown>>) => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -222,6 +222,40 @@ describe("compose store", () => {
     useComposeStore.setState({ status: "failed", error: "test error" });
     useComposeStore.getState().updateBody("Fix body");
     expect(useComposeStore.getState().status).toBe("composing");
+  });
+
+  it("open accepts reply draft context", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open({
+      to: [{ pubkey: "a".repeat(64), npub: "npub1test", name: "Alice", avatarUrl: "", isGroup: false }],
+      subject: "Re: Hello",
+      body: "Reply",
+      replyTo: "root-event",
+    });
+    expect(useComposeStore.getState().draft.replyTo).toBe("root-event");
+    expect(useComposeStore.getState().draft.to[0].pubkey).toBe("a".repeat(64));
+  });
+
+  it("updateAttachment stores upload result for send", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    const file = new File(["hello"], "hello.txt", { type: "text/plain" });
+    const result = {
+      id: "sha256",
+      fileName: "hello.txt",
+      mimeType: "text/plain",
+      sizeBytes: 5,
+      sha256: "abc",
+      url: "https://example.com/abc",
+      storedInDrive: false,
+      encrypted: true,
+    };
+
+    useComposeStore.getState().open();
+    useComposeStore.getState().addAttachment(file);
+    useComposeStore.getState().updateAttachment(file.name, { status: "uploaded", progress: 100, result });
+
+    expect(useComposeStore.getState().uploads[0].status).toBe("uploaded");
+    expect(useComposeStore.getState().uploads[0].result).toEqual(result);
   });
 
   it("scheduleSend sets scheduledFor", async () => {

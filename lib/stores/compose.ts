@@ -11,7 +11,7 @@ interface ComposeState {
   giftWrap: boolean;
   relayOverrides: string[];
   error: string | null;
-  open: (replyTo?: Draft) => void;
+  open: (draft?: Partial<Draft>) => void;
   close: () => void;
   minimize: () => void;
   restore: () => void;
@@ -19,6 +19,7 @@ interface ComposeState {
   updateSubject: (subject: string) => void;
   updateBody: (body: string) => void;
   addAttachment: (file: File) => void;
+  updateAttachment: (fileName: string, patch: Partial<Omit<AttachmentUpload, "file">>) => void;
   removeAttachment: (id: string) => void;
   toggleEncrypted: () => void;
   toggleGiftWrap: () => void;
@@ -42,6 +43,7 @@ function emptyDraft(): Draft {
     body: "",
     attachments: [],
     relayOverrides: [],
+    replyTo: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     savedAt: null,
@@ -58,8 +60,8 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   relayOverrides: [],
   error: null,
 
-  open: (replyTo?: Draft) => {
-    set({ status: "composing", draft: replyTo ?? emptyDraft(), error: null });
+  open: (draft?: Partial<Draft>) => {
+    set({ status: "composing", draft: { ...emptyDraft(), ...draft, updatedAt: Date.now() }, error: null });
   },
 
   close: () => {
@@ -116,6 +118,14 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
     set((state) => ({ uploads: [...state.uploads, upload] }));
   },
 
+  updateAttachment: (fileName, patch) => {
+    set((state) => ({
+      uploads: state.uploads.map((upload) =>
+        upload.file.name === fileName ? { ...upload, ...patch } : upload
+      ),
+    }));
+  },
+
   removeAttachment: (id: string) => {
     set((state) => ({ uploads: state.uploads.filter((u) => u.file.name !== id) }));
   },
@@ -160,7 +170,7 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
         content: draft.body,
         subject: draft.subject || undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
-        replyTo: undefined,
+        replyTo: draft.replyTo ?? undefined,
         relayOverrides: relayOverrides.length > 0 ? relayOverrides : undefined,
         giftWrap,
       });

@@ -16,9 +16,21 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const selectedId = searchParams.get("c");
   const composeOpen = searchParams.get("compose") === "true";
+  const currentMailbox =
+    pathname === "/mail/starred" ? "starred" :
+    pathname === "/mail/snoozed" ? "snoozed" :
+    pathname === "/mail/sent" ? "sent" :
+    pathname === "/mail/drafts" ? "drafts" :
+    pathname === "/mail/archive" ? "archive" :
+    pathname === "/mail/spam" ? "spam" :
+    "inbox";
 
-  const { messages, unreadCount: inboxUnreadCount } = useMailboxMessages("inbox");
-  const selectedMessage = selectedId ? messages.find((m) => m.id === selectedId) ?? null : messages[0] ?? null;
+  const { unreadCount: inboxUnreadCount } = useMailboxMessages("inbox");
+  const { messages: currentMessages } = useMailboxMessages(currentMailbox);
+  const { messages: allMessages } = useMailboxMessages("all");
+  const selectedMessage = selectedId
+    ? currentMessages.find((m) => m.id === selectedId) ?? allMessages.find((m) => m.id === selectedId) ?? null
+    : currentMessages[0] ?? null;
 
   const labels = useLabelsStore((s) => s.byId);
   const labelIds = useLabelsStore((s) => s.allIds);
@@ -27,7 +39,8 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const markRead = useMessagesStore((s) => s.markRead);
   const toggleStar = useMessagesStore((s) => s.toggleStar);
   const toggleArchive = useMessagesStore((s) => s.toggleArchive);
-  const toggleSpam = useMessagesStore((s) => s.toggleSpam);
+  const snooze = useMessagesStore((s) => s.snooze);
+  const deleteMessage = useMessagesStore((s) => s.deleteMessage);
 
   const clearSelection = useCallback(() => {
     router.replace(pathname, { scroll: false });
@@ -39,6 +52,24 @@ export default function MailContent({ children }: { children: React.ReactNode })
     },
     [toggleStar]
   );
+
+  const handleArchive = useCallback(async (id: string) => {
+    await toggleArchive(id);
+    clearSelection();
+  }, [toggleArchive, clearSelection]);
+
+  const handleSnooze = useCallback(async (id: string) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    await snooze(id, tomorrow.getTime());
+    clearSelection();
+  }, [snooze, clearSelection]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    await deleteMessage(id);
+    clearSelection();
+  }, [deleteMessage, clearSelection]);
 
   const closeCompose = useCallback(() => {
     router.replace(pathname, { scroll: false });
@@ -57,6 +88,12 @@ export default function MailContent({ children }: { children: React.ReactNode })
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [selectedMessage, composeOpen, clearSelection]);
+
+  useEffect(() => {
+    if (selectedMessage && !selectedMessage.read) {
+      markRead(selectedMessage.id);
+    }
+  }, [selectedMessage, markRead]);
 
   const relayConnected = Object.values(relayStatuses).some((s) => s.connected);
 
@@ -214,6 +251,9 @@ export default function MailContent({ children }: { children: React.ReactNode })
           starred={selectedMessage.starred}
           onBack={clearSelection}
           onToggleStar={() => handleToggleStar(selectedMessage.id)}
+          onArchive={() => handleArchive(selectedMessage.id)}
+          onSnooze={() => handleSnooze(selectedMessage.id)}
+          onDelete={() => handleDelete(selectedMessage.id)}
         />
       ) : (
         <div className="bg-dock flex items-center justify-center">

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { sendMessage } from "../messages";
 
-const mockWrapEvent = vi.fn(() => ({ id: "wrapped-id", kind: 14, pubkey: "x", content: "encrypted", tags: [], created_at: 0, sig: "y" }));
+const mockWrapEvent = vi.fn((..._args: unknown[]) => ({ id: "wrapped-id", kind: 14, pubkey: "x", content: "encrypted", tags: [], created_at: 0, sig: "y" }));
 const mockPublish = vi.fn(async () => new Map([["wss://relay.damus.io", true], ["wss://nos.lol", true]]));
 
 vi.mock("nostr-tools", () => ({
@@ -28,7 +28,7 @@ describe("sendMessage", () => {
     vi.clearAllMocks();
   });
 
-  const mockPool = {
+  const mockPool: any = {
     publish: mockPublish,
     subscribe: vi.fn(() => vi.fn()),
     connectAll: vi.fn(),
@@ -38,7 +38,7 @@ describe("sendMessage", () => {
     getSyncedAgo: vi.fn(),
   };
 
-  const mockKeys = {
+  const mockKeys: any = {
     load: vi.fn(() => ({
       npub: "npub1test",
       nsec: "nsec1test",

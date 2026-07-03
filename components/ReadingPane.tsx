@@ -13,15 +13,28 @@ export default function ReadingPane({
   starred,
   onBack,
   onToggleStar,
+  onArchive,
+  onSnooze,
+  onDelete,
 }: {
   message: MockMessage;
   starred: boolean;
   onBack: () => void;
   onToggleStar: () => void;
+  onArchive: () => void;
+  onSnooze: () => void;
+  onDelete: () => void;
 }) {
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
-      <ReadingTopBar onBack={onBack} starred={starred} onToggleStar={onToggleStar} />
+      <ReadingTopBar
+        onBack={onBack}
+        starred={starred}
+        onToggleStar={onToggleStar}
+        onArchive={onArchive}
+        onSnooze={onSnooze}
+        onDelete={onDelete}
+      />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-10 pt-[30px]">
         <div>
@@ -68,7 +81,13 @@ export default function ReadingPane({
           </div>
         )}
       </div>
-      <ReplyComposer recipientName={message.sender.name} />
+      <ReplyComposer
+        recipientName={message.sender.name}
+        recipientPubkey={message.sender.id}
+        recipientNpub={message.sender.npub}
+        messageId={message.id}
+        subject={message.subject}
+      />
     </div>
   );
 }

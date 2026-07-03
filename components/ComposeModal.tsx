@@ -32,7 +32,13 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
 
   const updateSubject = useComposeStore((s) => s.updateSubject);
   const updateBody = useComposeStore((s) => s.updateBody);
+  const updateRecipients = useComposeStore((s) => s.updateRecipients);
+  const addAttachment = useComposeStore((s) => s.addAttachment);
+  const updateAttachment = useComposeStore((s) => s.updateAttachment);
+  const removeAttachment = useComposeStore((s) => s.removeAttachment);
   const toggleGiftWrap = useComposeStore((s) => s.toggleGiftWrap);
+  const close = useComposeStore((s) => s.close);
+  const open = useComposeStore((s) => s.open);
   const minimize = useComposeStore((s) => s.minimize);
   const discard = useComposeStore((s) => s.discard);
   const send = useComposeStore((s) => s.send);
@@ -40,8 +46,14 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const retry = useComposeStore((s) => s.retry);
 
   const uploadFile = useBlossomStore((s) => s.uploadFile);
+  const [recipientText, setRecipientText] = useState("");
+  const [recipientError, setRecipientError] = useState<string | null>(null);
 
   const handleAttach = useCallback(() => fileInputRef.current?.click(), []);
+
+  useEffect(() => {
+    if (status === "closed") open();
+  }, [status, open]);
 
   useEffect(() => {
     if (status === "sent") {
@@ -49,6 +61,49 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       return () => clearTimeout(timer);
     }
   }, [status, onClose]);
+
+  const handleClose = useCallback(() => {
+    close();
+    onClose();
+  }, [close, onClose]);
+
+  const handleDiscard = useCallback(() => {
+    discard();
+    onClose();
+  }, [discard, onClose]);
+
+  const addRecipientFromText = useCallback(async () => {
+    const value = recipientText.trim();
+    if (!value) return;
+
+    try {
+      let pubkey = value;
+      let npub = value;
+      if (value.startsWith("npub1")) {
+        const { decode } = await import("nostr-tools/nip19");
+        const decoded = decode(value);
+        if (decoded.type !== "npub") throw new Error("Expected an npub");
+        pubkey = decoded.data;
+      }
+      if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
+        throw new Error("Enter a 64-character pubkey or npub");
+      }
+
+      const recipient = {
+        pubkey,
+        npub,
+        name: value.startsWith("npub1") ? `${value.slice(0, 12)}…` : `${pubkey.slice(0, 8)}…`,
+        avatarUrl: "",
+        isGroup: false,
+      };
+
+      updateRecipients([...draft.to, recipient], draft.cc, draft.bcc);
+      setRecipientText("");
+      setRecipientError(null);
+    } catch (err) {
+      setRecipientError(err instanceof Error ? err.message : "Invalid recipient");
+    }
+  }, [draft.bcc, draft.cc, draft.to, recipientText, updateRecipients]);
 
   const handleFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -67,24 +122,30 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
 
     for (const file of files) {
       const id = crypto.randomUUID();
+      addAttachment(file);
       setUploads((prev) => [...prev, { id, fileName: file.name, sizeBytes: file.size, progress: 0, status: "pending", error: null }]);
       setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, status: "uploading" } : u)));
+      updateAttachment(file.name, { status: "uploading" });
 
       try {
-        await uploadFile(file, sk, (pct) => {
+        const result = await uploadFile(file, sk, (pct) => {
           setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, progress: pct } : u)));
+          updateAttachment(file.name, { progress: pct });
         });
         setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, status: "uploaded", progress: 100 } : u)));
+        updateAttachment(file.name, { status: "uploaded", progress: 100, result });
       } catch (err) {
+        const message = err instanceof Error ? err.message : "Upload failed";
         setUploads((prev) =>
           prev.map((u) =>
-            u.id === id ? { ...u, status: "failed", error: err instanceof Error ? err.message : "Upload failed" } : u
+            u.id === id ? { ...u, status: "failed", error: message } : u
           )
         );
+        updateAttachment(file.name, { status: "failed", error: message });
       }
     }
     if (e.target) e.target.value = "";
-  }, [uploadFile]);
+  }, [addAttachment, updateAttachment, uploadFile]);
 
   const insertFormat = useCallback((prefix: string, suffix: string) => {
     if (!bodyRef.current) return;
@@ -120,8 +181,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       <button onMouseDown={(e) => { e.preventDefault(); insertFormat("[", "](url)"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">⌁</button>
       <button onClick={handleAttach} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">▣</button>
       <button onMouseDown={(e) => { e.preventDefault(); insertFormat("☺", ""); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">☺</button>
-      <button className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">@</button>
-      <button className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">⋯</button>
+      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary text-[13px] rounded cursor-not-allowed opacity-50">@</button>
+      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary text-[13px] rounded cursor-not-allowed opacity-50">⋯</button>
       <span className="text-[10px] text-text-placeholder ml-auto">Markdown supported</span>
     </div>
   );
@@ -141,7 +202,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         </span>
         <span className="text-text-tertiary text-[11px]">{draft.to.length ? `To: ${draft.to[0].name}` : "No recipient"}</span>
         <button
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => { e.stopPropagation(); handleClose(); }}
           className="w-6 h-6 flex items-center justify-center text-text-modal-2 hover:text-text-modal cursor-pointer"
         >×</button>
       </div>
@@ -165,7 +226,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 transition-opacity duration-200" style={{ backgroundColor: "rgba(5,7,11,0.44)" }} onClick={onClose} />
+      <div className="fixed inset-0 z-40 transition-opacity duration-200" style={{ backgroundColor: "rgba(5,7,11,0.44)" }} onClick={handleClose} />
       <div
         className="fixed z-50 animate-[composeOpen_250ms_ease-out]"
         style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 730, height: 784 }}
@@ -191,7 +252,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                   <span className="text-text-modal-2 text-[15px]">–</span>
                 </button>
                 <button
-                  onClick={discard}
+                  onClick={handleDiscard}
                   disabled={isSending}
                   className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
                 >
@@ -204,13 +265,36 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
             <div className="flex items-start gap-3 px-5 py-3 border-b border-modal-stroke">
               <span className="text-[12px] font-medium text-text-modal-2 pt-1">To</span>
               <div className="flex-1 flex flex-wrap items-center gap-1.5">
-                <span className="text-[13px] text-text-placeholder">Add people, npubs or groups</span>
+                {draft.to.map((recipient) => (
+                  <span
+                    key={recipient.pubkey}
+                    className="h-7 px-2.5 rounded-pill bg-surface-active border border-brand text-brand-light text-[12px] font-medium leading-[26px]"
+                  >
+                    {recipient.name}
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  value={recipientText}
+                  onChange={(e) => { setRecipientText(e.target.value); setRecipientError(null); }}
+                  onBlur={() => { void addRecipientFromText(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      void addRecipientFromText();
+                    }
+                  }}
+                  placeholder={draft.to.length === 0 ? "Add npub or pubkey" : "Add another"}
+                  className="min-w-[180px] flex-1 bg-transparent border-none outline-none text-[13px] text-text-modal placeholder-text-placeholder"
+                  disabled={isSending}
+                />
               </div>
               <div className="flex gap-1">
-                <button className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Cc</button>
-                <button className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Bcc</button>
+                <button disabled className="text-[11px] font-medium text-text-tertiary cursor-not-allowed opacity-50">Cc</button>
+                <button disabled className="text-[11px] font-medium text-text-tertiary cursor-not-allowed opacity-50">Bcc</button>
               </div>
             </div>
+            {recipientError && <p className="px-5 pt-1 text-[11px] text-danger">{recipientError}</p>}
 
             {/* Subject field */}
             <div className="flex items-center gap-3 px-5 py-3 border-b border-modal-stroke">
@@ -257,7 +341,13 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                         </div>
                       )}
                     </div>
-                    <button onClick={() => setUploads((prev) => prev.filter((x) => x.id !== u.id))} className="text-text-modal-2 text-[15px] cursor-pointer hover:text-text-modal">×</button>
+                    <button
+                      onClick={() => {
+                        setUploads((prev) => prev.filter((x) => x.id !== u.id));
+                        removeAttachment(u.fileName);
+                      }}
+                      className="text-text-modal-2 text-[15px] cursor-pointer hover:text-text-modal"
+                    >×</button>
                   </div>
                 ))}
               </div>
@@ -278,7 +368,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 {giftWrap ? "Private ✓" : "Private"}
               </button>
               <div className="flex-1" />
-              <button className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Delivery settings</button>
+              <button disabled className="text-[11px] font-medium text-text-tertiary cursor-not-allowed opacity-50">Delivery settings</button>
             </div>
 
             {/* Error message */}
@@ -325,9 +415,9 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 {showSendMenu && (
                   <div className="absolute bottom-full left-0 mb-1 w-44 rounded-pill bg-pill-subtle border border-border shadow-lg overflow-hidden z-10">
                     <button onClick={() => { send(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-primary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Send</button>
-                    <button className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Preview</button>
+                    <button disabled className="w-full px-4 py-2.5 text-[12px] text-text-tertiary text-left cursor-not-allowed opacity-50">Preview</button>
                     <button onClick={() => { useComposeStore.getState().autosave(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Save Draft</button>
-                    <button onClick={() => { discard(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-danger text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Discard</button>
+                    <button onClick={() => { handleDiscard(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-danger text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Discard</button>
                   </div>
                 )}
               </div>
@@ -347,7 +437,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 </button>
               )}
               <div className="flex-1" />
-              <button onClick={discard} disabled={isSending} className="text-[11px] font-medium text-danger cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40">
+              <button onClick={handleDiscard} disabled={isSending} className="text-[11px] font-medium text-danger cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40">
                 Discard
               </button>
             </div>

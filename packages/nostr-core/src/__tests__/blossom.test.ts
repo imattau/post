@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { uploadBlob } from "../blossom";
 
-const mockGetToken = vi.fn(() => "Nostr dG9rZW4=");
+const mockGetToken = vi.fn((..._args: unknown[]) => "Nostr dG9rZW4=");
 
 vi.mock("nostr-tools", () => ({
   nip98: { getToken: (...args: unknown[]) => mockGetToken(...args) },
