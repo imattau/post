@@ -1,0 +1,266 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@/lib/db/schema", () => ({
+  db: {
+    messages: { orderBy: vi.fn(() => ({ reverse: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })), put: vi.fn(), delete: vi.fn(), where: vi.fn(() => ({ count: vi.fn(async () => 0) })) },
+    drafts: { put: vi.fn(), delete: vi.fn() },
+    labels: { put: vi.fn(), delete: vi.fn() },
+  },
+}));
+
+vi.mock("@post/nostr-core", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createKeyStore: vi.fn(() => ({
+      load: vi.fn(() => null),
+      save: vi.fn(),
+      clear: vi.fn(),
+    })),
+    generateKey: vi.fn(() => ({
+      nsec: "nsec1generated",
+      npub: "npub1generated",
+      pubkey: "a".repeat(64),
+    })),
+    importFromNsec: vi.fn(() => ({
+      npub: "npub1imported",
+      pubkey: "b".repeat(64),
+    })),
+    createRelayPool: vi.fn(() => ({
+      connectAll: vi.fn(),
+      disconnectAll: vi.fn(),
+      getStatus: vi.fn(() => [{ url: "wss://relay.damus.io", connected: true, latency: 50, lastEventAt: Date.now(), error: null }]),
+      getHealthPercent: vi.fn(() => 100),
+      getSyncedAgo: vi.fn(() => 0),
+      subscribe: vi.fn(() => vi.fn()),
+      publish: vi.fn(async () => new Map()),
+    })),
+    uploadBlob: vi.fn(async () => ({ id: "sha256", fileName: "test.txt", mimeType: "text/plain", sizeBytes: 100, sha256: "abc", url: "https://example.com/abc", storedInDrive: false, encrypted: true })),
+  };
+});
+
+describe("identity store", () => {
+  it("createOrImport generates a new key when no nsec provided", async () => {
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    const identity = await useIdentityStore.getState().createOrImport();
+    expect(identity).toHaveProperty("npub");
+    expect(identity).toHaveProperty("pubkey");
+    expect(identity.nsec).toBe("nsec1generated");
+  });
+
+  it("createOrImport imports from nsec when provided", async () => {
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    const identity = await useIdentityStore.getState().createOrImport("nsec1test");
+    expect(identity.npub).toBe("npub1imported");
+  });
+
+  it("logout clears identity and keyStore", async () => {
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    await useIdentityStore.getState().createOrImport();
+    useIdentityStore.getState().logout();
+    expect(useIdentityStore.getState().identity).toBeNull();
+    expect(useIdentityStore.getState().keyStore).toBeNull();
+  });
+
+  it("nip07Available is false when window.nostr is undefined", async () => {
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    expect(useIdentityStore.getState().nip07Available).toBe(false);
+  });
+
+  it("connectNip07 reads pubkey from window.nostr", async () => {
+    const mockPubkey = "c".repeat(64);
+    (window as any).nostr = { getPublicKey: vi.fn(async () => mockPubkey), signEvent: vi.fn() };
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    const identity = await useIdentityStore.getState().connectNip07();
+    expect(identity.pubkey).toBe(mockPubkey);
+    expect(useIdentityStore.getState().usingNip07).toBe(true);
+    delete (window as any).nostr;
+  });
+});
+
+describe("relays store", () => {
+  it("connect creates pool and updates statuses", async () => {
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+    await useRelaysStore.getState().connect();
+    expect(useRelaysStore.getState().connected).toBe(true);
+    expect(useRelaysStore.getState().pool).not.toBeNull();
+  });
+
+  it("disconnect clears pool and state", async () => {
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+    await useRelaysStore.getState().connect();
+    useRelaysStore.getState().disconnect();
+    expect(useRelaysStore.getState().connected).toBe(false);
+    expect(useRelaysStore.getState().pool).toBeNull();
+  });
+
+  it("addRelay adds to relay list", async () => {
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+    const initial = useRelaysStore.getState().relays.length;
+    useRelaysStore.getState().addRelay({ url: "wss://test.relay", read: true, write: true });
+    expect(useRelaysStore.getState().relays).toHaveLength(initial + 1);
+  });
+
+  it("removeRelay removes from relay list", async () => {
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+    useRelaysStore.getState().removeRelay("wss://relay.damus.io");
+    const urls = useRelaysStore.getState().relays.map((r: { url: string }) => r.url);
+    expect(urls).not.toContain("wss://relay.damus.io");
+  });
+});
+
+describe("messages store", () => {
+  it("selectMessage sets selectedId", async () => {
+    const { useMessagesStore } = await import("@/lib/stores/messages");
+    useMessagesStore.getState().selectMessage("msg-1");
+    expect(useMessagesStore.getState().selectedId).toBe("msg-1");
+  });
+
+  it("selectMessage(null) clears selectedId", async () => {
+    const { useMessagesStore } = await import("@/lib/stores/messages");
+    useMessagesStore.getState().selectMessage(null);
+    expect(useMessagesStore.getState().selectedId).toBeNull();
+  });
+
+  it("ingestFromRelay adds message to store", async () => {
+    const { useMessagesStore } = await import("@/lib/stores/messages");
+    const msg: any = { id: "new-msg", kind: 14, pubkey: "x", content: "hello", createdAt: Date.now(), mailbox: "inbox" };
+    useMessagesStore.getState().ingestFromRelay(msg);
+    expect(useMessagesStore.getState().byId["new-msg"]).toBeDefined();
+    expect(useMessagesStore.getState().ids).toContain("new-msg");
+  });
+
+  it("ingestFromRelay deduplicates", async () => {
+    const { useMessagesStore } = await import("@/lib/stores/messages");
+    const msg: any = { id: "dup", kind: 14, pubkey: "x", content: "hello", createdAt: Date.now(), mailbox: "inbox" };
+    useMessagesStore.getState().ingestFromRelay(msg);
+    const ids1 = useMessagesStore.getState().ids.length;
+    useMessagesStore.getState().ingestFromRelay(msg);
+    const ids2 = useMessagesStore.getState().ids.length;
+    expect(ids2).toBe(ids1);
+  });
+});
+
+describe("mailboxes store", () => {
+  it("navigate sets current tab", async () => {
+    const { useMailboxStore } = await import("@/lib/stores/mailboxes");
+    useMailboxStore.getState().navigate("starred");
+    expect(useMailboxStore.getState().current).toBe("starred");
+  });
+
+  it("setFilter updates filter", async () => {
+    const { useMailboxStore } = await import("@/lib/stores/mailboxes");
+    useMailboxStore.getState().setFilter("unread");
+    expect(useMailboxStore.getState().filter).toBe("unread");
+  });
+});
+
+describe("labels store", () => {
+  it("createLabel returns id and persists to store", async () => {
+    const { useLabelsStore } = await import("@/lib/stores/labels");
+    const id = await useLabelsStore.getState().createLabel("Test", "#FF0000");
+    expect(id).toBeTruthy();
+    expect(useLabelsStore.getState().byId[id].name).toBe("Test");
+  });
+
+  it("assignLabel adds messageId to label", async () => {
+    const { useLabelsStore } = await import("@/lib/stores/labels");
+    const id = await useLabelsStore.getState().createLabel("Work", "#60A5FA");
+    await useLabelsStore.getState().assignLabel("msg-1", id);
+    expect(useLabelsStore.getState().byId[id].messageIds).toContain("msg-1");
+  });
+});
+
+describe("compose store", () => {
+  it("status starts as closed", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    expect(useComposeStore.getState().status).toBe("closed");
+  });
+
+  it("open transitions to composing", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    expect(useComposeStore.getState().status).toBe("composing");
+  });
+
+  it("minimize blocks when draft is empty", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    useComposeStore.getState().minimize();
+    expect(useComposeStore.getState().status).toBe("composing");
+  });
+
+  it("minimize works when draft has content", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    useComposeStore.getState().updateSubject("Test");
+    useComposeStore.getState().minimize();
+    expect(useComposeStore.getState().status).toBe("minimized");
+  });
+
+  it("restore returns to composing", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    useComposeStore.getState().updateSubject("Test");
+    useComposeStore.getState().minimize();
+    useComposeStore.getState().restore();
+    expect(useComposeStore.getState().status).toBe("composing");
+  });
+
+  it("updateSubject with content transitions failed→composing", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    // Manually set to failed to test transition
+    useComposeStore.setState({ status: "failed", error: "test error" });
+    useComposeStore.getState().updateSubject("Fix");
+    expect(useComposeStore.getState().status).toBe("composing");
+  });
+
+  it("updateBody with content transitions failed→composing", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    useComposeStore.setState({ status: "failed", error: "test error" });
+    useComposeStore.getState().updateBody("Fix body");
+    expect(useComposeStore.getState().status).toBe("composing");
+  });
+
+  it("scheduleSend sets scheduledFor", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    const future = Date.now() + 86400000;
+    await useComposeStore.getState().scheduleSend(future);
+    expect(useComposeStore.getState().status).toBe("scheduled");
+    expect(useComposeStore.getState().draft.scheduledFor).toBe(future);
+  });
+
+  it("discard resets draft and closes", async () => {
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    useComposeStore.getState().open();
+    useComposeStore.getState().updateSubject("Test");
+    useComposeStore.getState().discard();
+    expect(useComposeStore.getState().status).toBe("closed");
+    expect(useComposeStore.getState().draft.subject).toBe("");
+  });
+});
+
+describe("blossom store", () => {
+  it("setServerUrl persists to localStorage", async () => {
+    const { useBlossomStore } = await import("@/lib/stores/blossom");
+    useBlossomStore.getState().setServerUrl("https://blossom.example.com");
+    expect(useBlossomStore.getState().serverUrl).toBe("https://blossom.example.com");
+    expect(localStorage.setItem).toHaveBeenCalledWith("blossom-server-url", "https://blossom.example.com");
+  });
+
+  it("uploadFile throws when no server configured", async () => {
+    const { useBlossomStore } = await import("@/lib/stores/blossom");
+    useBlossomStore.getState().setServerUrl("");
+    await expect(useBlossomStore.getState().uploadFile(new File([], "test.txt"), new Uint8Array(32))).rejects.toThrow("No Blossom server");
+  });
+
+  it("loadBlossomConfig restores from localStorage", async () => {
+    const { loadBlossomConfig, useBlossomStore } = await import("@/lib/stores/blossom");
+    (localStorage.getItem as any).mockReturnValueOnce("https://restored.example.com");
+    loadBlossomConfig();
+    expect(useBlossomStore.getState().serverUrl).toBe("https://restored.example.com");
+  });
+});

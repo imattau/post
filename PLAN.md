@@ -722,10 +722,409 @@ Optimistic UX: list renders from local cache; new events streamed in from relays
 
 ## 12. Testing strategy
 
-- **Unit** — Vitest covers `nostr-core` (encrypt/decrypt round-trip, relay pool mocks), formatters, store selectors, attachment crypto.
-- **Components** — React Testing Library + Playwright component snapshots for §5 primitives.
-- **E2E** — Playwright: full send→receive flow between two ephemeral keys in headless, against a local test relay (`tyer.dev/nostr-test-relay` or self-hosted `strfry`).
-- **Visual** — Storybook per §5 component for design review; optional Percy/Chromatic.
+### 12.0 Tooling setup
+
+```
+devDependencies to install:
+  vitest, @vitejs/plugin-react, jsdom, @testing-library/react,
+  @testing-library/jest-dom, @testing-library/user-event,
+  @playwright/test, msw
+```
+
+Config files: `vitest.config.ts` (React plugin, jsdom, path aliases), `playwright.config.ts` (headless Chromium, localhost:3000 base URL). Test script entries in `package.json`: `"test": "vitest run"`, `"test:watch": "vitest"`, `"test:e2e": "playwright test"`.
+
+### 12.1 Phase 1 — Unit tests (Vitest, pure logic, no DOM)
+
+#### `packages/nostr-core/src/keys.ts`
+
+| Test | What it verifies |
+|------|-----------------|
+| `generateKey()` | Returns `{ nsec, npub, pubkey }` with valid bech32 nsec/npub + 64-char hex pubkey |
+| `generateKey()` determinism | Different calls produce different keys |
+| `importFromNsec(nsec)` | Returns correct npub + pubkey for a known nsec |
+| `importFromNsec(invalid)` | Returns `Error` for garbage string, wrong-length hex |
+| `importFromNpub(npub)` | Returns correct pubkey |
+| `importFromNpub(invalid)` | Returns `Error` for invalid npub |
+| `formatNpub(npub)` | Returns `npub1first…last4` truncated form |
+| `formatNpub(invalid)` | Returns input unchanged |
+| `KeyStore.load()` | Returns null when localStorage is empty |
+| `KeyStore.save()` | Persists identity to localStorage |
+| `KeyStore.clear()` | Removes identity from localStorage |
+
+#### `packages/nostr-core/src/messages.ts`
+
+Mocks: `nostr-tools` (NIP-17 `wrapEvent`, NIP-44), pool.publish.
+
+| Test | What it verifies |
+|------|-----------------|
+| `sendMessage()` | Calls pool.publish with wrapped event, returns `SendResult` |
+| `sendMessage()` — no key | Throws when `keys.load()` returns null |
+| `sendMessage()` — no nsec | Throws when identity has no nsec |
+| `sendMessage()` — delivery count | `delivered` property counts successful relay publishes |
+| `replyToThread()` | Calls `sendMessage` with `replyTo` set to `rootEventId` |
+| `decryptEvent()` | Decrypts `event.content` using NIP-44 conversation key |
+| `decryptEvent()` — bad key | Throws on decryption failure |
+| `decryptIncoming()` | Returns `AsyncGenerator` that yields `Message` objects from kind 14 events |
+
+#### `packages/nostr-core/src/relays.ts`
+
+Mocks: `SimplePool` via `vi.mock("nostr-tools/pool")`.
+
+| Test | What it verifies |
+|------|-----------------|
+| `DEFAULT_RELAYS` | Contains 5 relay configs with correct URLs |
+| `createRelayPool()` | Returns object with all `RelayPool` methods |
+| `connectAll()` | Calls `ensureRelay` for each URL, tracks connected/latency |
+| `connectAll()` — partial failure | One relay fails, others still tracked as connected |
+| `getStatus()` | Returns correct `RelayStatus[]` after connect |
+| `getHealthPercent()` | 100 when all connected, 0 when none, correct fraction |
+| `getSyncedAgo()` | Returns seconds since last event |
+| `subscribe()` | Delegates to `simplePool.subscribeMany`, returns unsubscribe |
+| `publish()` | Returns `Map<url, boolean>` with per-relay success/failure |
+| `disconnectAll()` | Calls `pool.destroy()`, clears all state |
+
+#### `packages/nostr-core/src/profiles.ts`
+
+| Test | What it verifies |
+|------|-----------------|
+| `fetchProfile()` | Subscribes to kind 0, parses event.content as Profile |
+| `fetchProfile()` — timeout | Resolves null if no event within 5s |
+| `fetchProfile()` — bad JSON | Resolves null gracefully |
+| `resolveNip05("user@domain")` | Calls `nip05.queryProfile`, returns pubkey |
+| `resolveNip05("invalid")` | Returns null |
+| `searchProfiles()` | Subscribes to kind 0 with search filter, returns `Contact[]` |
+| `batchFetchProfiles()` | Subscribes to kind 0 for multiple pubkeys, returns `Map` |
+
+#### `packages/nostr-core/src/blossom.ts`
+
+| Test | What it verifies |
+|------|-----------------|
+| `uploadBlob()` | Sends PUT with `Authorization` header via `nip98.getToken` |
+| `uploadBlob()` — progress | Calls `onProgress` with 0, interim, 100 |
+| `uploadBlob()` — response | Parses `sha256`, `url` from response JSON |
+| `uploadBlob()` — HTTP error | Rejects with error message |
+| `downloadBlob()` | Fetches blob with auth header, returns `ArrayBuffer` |
+| `deleteBlob()` | Sends DELETE with auth header |
+| `deleteBlob()` — HTTP error | Rejects |
+
+#### `lib/stores/*` (Zustand)
+
+Pattern: create store via the exported `use*Store` function, call actions, assert state changes. Dexie calls are mocked with `vi.mock("@/lib/db/schema")`.
+
+| Store | Tests |
+|-------|-------|
+| **identity** | `createOrImport()` generates key + saves to KeyStore; `logout()` clears identity; `connectNip07()` reads `window.nostr.getPublicKey()`; `nip07Available` true when `window.nostr` exists; `getSigner()` returns signing function in NIP-07 mode |
+| **relays** | `connect()` creates pool + updates statuses; `addRelay()` / `removeRelay()` mutates relay list; `disconnect()` clears pool + statuses; `updateStatuses()` refreshes health/syncedAgo from pool |
+| **messages** | `loadFromCache()` hydrates from Dexie; `selectMessage(id)` sets `selectedId`; `markRead()` flips read flag + persists; `toggleStar()` / `toggleArchive()` / `toggleSpam()` flip boolean + derive mailbox; `snooze(id, until)` sets `snoozedUntil`; `deleteMessage()` removes from store + Dexie; `ingestFromRelay()` dedup inserts |
+| **mailboxes** | `navigate(tab)` sets `current`; `setFilter(filter)` updates; `refreshUnreadCounts()` queries Dexie |
+| **labels** | `createLabel()` returns id + persists; `deleteLabel()` removes from store + Dexie; `assignLabel()` adds messageId to label's `messageIds`; `removeLabel()` removes messageId |
+| **compose** | State machine: `closed→composing→minimized→composing→sending→sent→closed` with all §20 transitions; `failed→composing` on edit; `scheduleSend()` sets scheduledFor; `autosave()` writes to Dexie with `savedAt` timestamp; `discard()` clears draft + deletes from Dexie; guard: send button disabled during sending; guard: minimize blocked with empty draft |
+| **blossom** | `setServerUrl(url)` persists to localStorage; `uploadFile()` calls `uploadBlob` with decoded sk; `loadBlossomConfig()` restores from localStorage |
+
+#### `lib/sync.ts`
+
+| Test | What it verifies |
+|------|-----------------|
+| `startSync()` | Subscribes to kind 14 events for user's pubkey |
+| `startSync()` — no pool | No-ops gracefully |
+| `startSync()` — no identity | No-ops gracefully |
+| `stopSync()` | Unsubscribes existing subscription |
+| `loadCachedMessages()` | Loads messages from Dexie into zustand `byId` / `ids` |
+| `searchMessages(query)` | Returns messages matching subject, preview, content, or pubkey |
+| `searchMessages("")` | Returns all messages when query empty |
+| `getMailboxMessages("inbox")` | Filters: not archived, not spam, not snoozed |
+| `getMailboxMessages("starred")` | Filters: `starred: true` |
+| `getMailboxMessages("archive")` | Filters: `archived: true` |
+
+#### `lib/db/schema.ts`
+
+| Test | What it verifies |
+|------|-----------------|
+| `PostDB` | Creates Dexie instance with name `"PostDB"` |
+| Version 1 stores | Exists with tables: messages, drafts, labels, contacts, relayConfigs |
+| Messages indexes | Indexes on `id, pubkey, recipientPubkey, createdAt, read, starred, archived, spam, mailbox, *labelIds` |
+
+### 12.2 Phase 2 — Component tests (Vitest + React Testing Library + JSDOM)
+
+All components rendered with mock props. User interactions via `@testing-library/user-event`.
+
+#### Avatar
+
+| Test | What it verifies |
+|------|-----------------|
+| Renders initials | Pass `initials="AL"` → text "AL" visible |
+| Deterministic color | Same initials → same background colour class |
+| Size prop | `size={46}` → rendered element has correct pixel dimensions |
+| Font size | Scales proportionally to `size` |
+
+#### EmptyState
+
+| Test | What it verifies |
+|------|-----------------|
+| All props | Icon + title + description + action rendered |
+| Optional props | Renders without icon, description, or action |
+| Action slot | Action node is clickable |
+
+#### MessageRow
+
+| Test | What it verifies |
+|------|-----------------|
+| Unread state | Sender + subject use `font-semibold`, unread dot 7×7 visible |
+| Read state | Sender + subject use `font-medium`, dot hidden |
+| Selected state | Background `bg-sidebar`, 3px left `border-brand` |
+| Default state | Border-bottom divider, transparent bg |
+| Click | Calls `onClick()` with message id |
+| Label pills | Each label rendered as 52×28 pill with text |
+| Timestamp format | "now", "5m", "3h", "Jan 5" depending on age |
+
+#### MessageListView
+
+| Test | What it verifies |
+|------|-----------------|
+| Empty state | Shows EmptyState with "No messages yet" |
+| Message list | Renders `MessageRow` for each message in array |
+| Search filters | Typing in search reduces visible rows |
+| Filter chips | Clicking "Unread" shows only unread; "Starred" shows starred |
+| Keyboard nav | ArrowDown/ArrowUp changes selection via router |
+
+#### SubjectPills
+
+| Test | What it verifies |
+|------|-----------------|
+| Label pills | Each label name rendered with correct colour dot |
+| Encrypted pill | Green text `#34D399`, border `#272D3A` |
+| Relay count pill | Neutral text `#949BAA`, shows "3 relays" |
+| Empty labels | No pills rendered |
+
+#### SenderBlock
+
+| Test | What it verifies |
+|------|-----------------|
+| Name + npub | Both rendered |
+| Recipient | Shows "to {recipientName}" |
+| Verified | Shows "✓ verified" in `#34D399` when true; hidden when false |
+| Timestamp | Formatted as "Jan 5, 3:45 PM" |
+| Avatar | 46px rendered via Avatar component |
+
+#### MessageBody
+
+| Test | What it verifies |
+|------|-----------------|
+| Bold text | `**text**` renders as `<strong>text</strong>` |
+| Bullet list | Lines starting with `•` render with 6×6 purple dot |
+| Numbered list | Lines starting with `1.` render with counter |
+| Empty lines | Render as 8px spacers |
+| Plain paragraphs | Rendered as `<p>` with regular text |
+
+#### AttachmentCard
+
+| Test | What it verifies |
+|------|-----------------|
+| File info | Filename + formatted size rendered |
+| Encrypted meta | Shows " / encrypted" when `encrypted={true}` |
+| Preview button | Only shown when `mimeType.startsWith("image/")` |
+| Drive link | Links to `/coming-soon?app=D&blob={sha256}` |
+| Size formatting | < 1 MB shows KB; ≥ 1 MB shows "X.X MB" |
+
+#### ReadingTopBar
+
+| Test | What it verifies |
+|------|-----------------|
+| Back button | Click calls `onBack()` |
+| Star toggle | Click calls `onToggleStar()`; star is `☆` |
+| Starred state | Star uses `text-warn` when `starred={true}`, muted when false |
+| Action pills | Archive, Snooze, Delete buttons present |
+| More button | `⋮` button present |
+
+#### ReplyComposer
+
+| Test | What it verifies |
+|------|-----------------|
+| Placeholder | Shows "Reply to {name}…" |
+| Format buttons | B, I, ⌁, ☺ present |
+| Send button | Present, calls nothing on click (no callback prop) |
+
+#### ReadingPane
+
+| Test | What it verifies |
+|------|-----------------|
+| Integrates sub-components | All sub-components visible with correct props |
+| Attachments | AttachmentCard rendered for each attachment |
+| Reply | ReplyComposer at bottom |
+| Scroll | Container has `overflow-y-auto` |
+
+#### IconDock
+
+| Test | What it verifies |
+|------|-----------------|
+| Logo tile | 40×40 purple bg, "N" text |
+| Post tile | Active: `bg-surface-active` + `border-brand`, "M" |
+| Inactive tiles | D, C, N, P — border only, muted letter |
+| Search tile | `⌕` glyph |
+| Help tile | `?` glyph |
+| Avatar | 36×36 ellipse, initials, presence dot |
+| Tile click | Opens AppSwitcher popover |
+| Avatar click | Opens IdentityDialog |
+
+#### AppSwitcher
+
+| Test | What it verifies |
+|------|-----------------|
+| 3×2 grid | Six app tiles (M/D/C/N/P/T) rendered |
+| Post tile link | Navigates to `/mail/inbox` |
+| Contacts tile link | Navigates to `/contacts` |
+| Coming-soon tiles | D, C, N, T link to `/coming-soon?app=X` |
+| Escape closes | Press Escape → calls `onClose()` |
+| Click outside | Mousedown outside → calls `onClose()` |
+| Footer text | "Shared identity · unified search · private by default" |
+
+#### IdentityDialog
+
+| Test | What it verifies |
+|------|-----------------|
+| npub display | Shows identity.npub |
+| Auth method | Shows "Local Key Store" or "NIP-07 Browser Extension" |
+| nsec (local mode) | Shows truncated nsec + Copy + Download buttons |
+| NIP-07 mode | Shows explanation text instead of nsec buttons |
+| Copy button | Copies nsec to clipboard, shows "Copied!" feedback |
+| Download button | Triggers file download |
+| Disconnect | Calls `logout()` + `onClose()` |
+| Close × | Calls `onClose()` |
+
+#### ComposeModal
+
+| Test | What it verifies |
+|------|-----------------|
+| Composing state | Full modal visible with all fields |
+| Subject input | Typing updates subject in store |
+| Body input | Typing updates body in store |
+| Minimize → closed | Click – → store.minimize() called; minimized bar renders |
+| Minimized bar | Shows subject + recipient, click restores, × closes |
+| Sent state | "Message sent" success card, auto-closes after 1.5s |
+| Sending state | Send button disabled with spinner |
+| Failed state | Error message + Retry button visible |
+| Split send menu | Click chevron → dropdown with Send/Preview/Save Draft/Discard |
+| Schedule send | Click → date/time inputs → Schedule button |
+| Attach file | Click ▣ → file input triggered |
+| Format toolbar | B, I, U, ⌁, ▣, ☺, @, ⋯ buttons present |
+| Status pills | Encrypted (green), 3 relays (neutral), Private (toggle) |
+| Private pill | Click toggles giftWrap, shows "Private ✓" when active |
+| Close × | Calls discard() + onClose() |
+| Disabled states | Send disabled when no recipient; Spinner when sending |
+
+#### UploadProgress
+
+| Test | What it verifies |
+|------|-----------------|
+| Header | "Uploading N files" + "X of Y complete" |
+| File rows | Each file: name, size, progress bar visible |
+| Uploading colour | Amber `#FBBF24` progress bar + percentage text |
+| Complete colour | Green `#34D399` progress bar + "Complete" text |
+| Failed colour | Red `#FB7185` progress bar + "Failed" text |
+| Pending state | No progress bar shown |
+| Footer | "Encrypting before upload · N providers selected" |
+| Hide button | Click → calls `onHide()` |
+
+#### Settings page
+
+| Test | What it verifies |
+|------|-----------------|
+| 5 sidebar tabs | General, Identity, Relays, Privacy, Notifications — clickable, active state |
+| General tab | Two toggles visible |
+| Identity tab | Avatar card, NIP-05 input+verify, signing method pills, export button |
+| Relays tab | Auto-select toggle, relay count badge, connected relay list, add relay input, delivery toggles |
+| Privacy tab | Three toggles visible |
+| Notifications tab | Four toggles visible |
+| Toggle interaction | Each toggle flips ON/OFF with pill switch animation |
+
+#### Contacts page
+
+| Test | What it verifies |
+|------|-----------------|
+| 4 sidebar tabs | Overview, Following, Muted, Blocked |
+| Overview stats | 4 stat cards (328/14/6/9) with labels |
+| Contact card | Avatar 36×36, name, @handle, npub, bio, status chip, timestamp, ⋮ |
+| Status chip colours | Following=purple, Muted=yellow, Blocked=red |
+| Profile detail | Click contact card → 88×88 avatar header + status actions |
+| Back button | "← Back to contacts" returns to list |
+| Search | Filters contacts by name |
+| Tab filter | Following/Muted/Blocked tabs show only matching contacts |
+
+### 12.3 Phase 3 — E2E tests (Playwright, headless browser)
+
+#### Navigation & layout
+
+| Test | Steps |
+|------|-------|
+| App loads inbox | Navigate to `/` → redirects to `/mail/inbox`; Dock, sidebar, message list, reading pane visible |
+| Mailbox navigation | Click Inbox → `/mail/inbox`; Click Starred → `/mail/starred`; Click Sent → `/mail/sent`; each shows correct header |
+| Message selection | Click message row → reading pane opens; URL has `?c=<eventId>` |
+| Escape clears | Escape → reading pane shows "Select a message to read"; URL has no `?c=` |
+| Keyboard nav | ArrowDown/ArrowUp cycles through messages |
+| Compose modal open | Click Compose CTA → modal visible; Click × → modal closed |
+| Contacts page | Navigate to `/contacts` → sidebar tabs + contact list visible |
+| Settings page | Navigate to `/settings` → 5 sidebar tabs, content area |
+
+#### Compose flow
+
+| Test | Steps |
+|------|-------|
+| Subject | Type in subject → value updates in store |
+| Minimize/restore | Click – → minimized bar; Click bar → restores |
+| Split send menu | Click chevron → dropdown with 4 items |
+| Schedule send | Click "Schedule send" → date/time inputs; Fill → Schedule |
+| Attach file | Click ▣ → file picker → upload progress overlay shows |
+
+#### Reading pane actions
+
+| Test | Steps |
+|------|-------|
+| Star | Click ☆ → active state (warn colour) |
+| Back | Click ← → `?c=` removed, empty pane |
+
+#### Identity dialog
+
+| Test | Steps |
+|------|-------|
+| Open | Click avatar in dock → dialog opens |
+| Close | Click Done → dialog closes |
+| Copy nsec | Click Copy nsec → "Copied!" feedback |
+
+#### Settings toggles
+
+| Test | Steps |
+|------|-------|
+| Toggle all | Each toggle clickable, visual ON/OFF state changes |
+
+#### Contacts interaction
+
+| Test | Steps |
+|------|-------|
+| Tab switch | Click Muted → only muted contacts shown |
+| Search | Type in search → list filters |
+| Card click | Click contact → profile detail with 88×88 avatar + actions |
+
+### 12.4 Phase 4 — Visual / Snapshot tests (optional)
+
+- Storybook stories for all 15 components in `components/` covering: default, hover, active, disabled, selected, read/unread states
+- Snapshot tests for key visual variants:
+  - `MessageRow`: read / unread / selected / active card variant
+  - `SubjectPills`: with labels / encrypted only / empty
+  - `EmptyState`: with all props / icon+title only / action present
+  - `ComposeModal`: composing / sending (spinner) / sent (success) / minimized bar / failed (error+retry)
+  - `UploadProgress`: mixed state (uploading+complete) / all complete / single file / empty
+  - `Settings page`: each of the 5 tabs rendered in isolation
+  - `Contacts page`: Overview with stats / Following list / profile detail
+
+### 12.5 Priority order
+
+1. **`nostr-core` unit tests** — highest risk surface (crypto, relay pool, messaging) — 30 tests
+2. **Store unit tests** — state machines control all app behaviour; bugs here cause drift — 40 tests
+3. **Component integration tests** — `ComposeModal` (18 scenarios), `MessageRow` (6), `UploadProgress` (6) — 50 tests
+4. **E2E navigation** — validates routing and panel layout — 10 tests
+5. **E2E compose/reading-pane flow** — critical path for the app's primary function — 10 tests
+
+Total: ~140 tests across all phases.
 
 ## 13. Risks & open questions
 
