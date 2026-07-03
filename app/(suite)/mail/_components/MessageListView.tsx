@@ -52,7 +52,7 @@ export default function MessageListView({
   }, [messages, activeFilter, searchQuery]);
 
   return (
-    <div className="flex flex-col h-full" role="region" aria-label={title}>
+    <div className="flex flex-col h-full" role="region" aria-label={title} suppressHydrationWarning>
       <div className="flex items-center justify-between px-6 pt-5 pb-2">
         <div>
           <h2 className="text-[22px] font-semibold text-white" tabIndex={-1}>{title}</h2>
