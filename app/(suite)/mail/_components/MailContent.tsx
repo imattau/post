@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { useMessagesStore } from "@/lib/stores/messages";
@@ -48,6 +48,16 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const connectedCount = Object.values(relayStatuses).filter((s) => s.connected).length;
   const totalCount = Object.keys(relayStatuses).length;
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedMessage && !composeOpen) clearSelection();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [selectedMessage, composeOpen, clearSelection]);
+
+  const relayConnected = Object.values(relayStatuses).some((s) => s.connected);
+
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [newLabelName, setNewLabelName] = useState("");
 
@@ -63,6 +73,19 @@ export default function MailContent({ children }: { children: React.ReactNode })
   return (
     <>
       {composeOpen && <ComposeModal onClose={closeCompose} />}
+      {totalCount > 0 && !relayConnected && (
+        <div className="absolute top-0 left-0 right-0 z-30 h-9 bg-danger/20 border-b border-danger/30 flex items-center justify-center">
+          <span className="text-danger text-[12px] font-medium">
+            Unable to connect to relays. Check your network connection.
+          </span>
+          <button
+            onClick={() => useRelaysStore.getState().connect()}
+            className="ml-3 text-[11px] font-semibold text-white bg-danger/40 px-2.5 py-0.5 rounded cursor-pointer hover:bg-danger/60 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div className="flex-1 grid grid-cols-[248px_448px_1fr] divide-x divide-border">
       {/* Sidebar */}
       <div className="bg-sidebar flex flex-col p-4 gap-1 overflow-y-auto">

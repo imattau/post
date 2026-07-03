@@ -8,6 +8,8 @@ import { loadBlossomConfig } from "@/lib/stores/blossom";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const createOrImport = useIdentityStore((s) => s.createOrImport);
+  const connectNip07 = useIdentityStore((s) => s.connectNip07);
+  const nip07Available = useIdentityStore((s) => s.nip07Available);
   const connect = useRelaysStore((s) => s.connect);
 
   useEffect(() => {
@@ -15,7 +17,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       const { createKeyStore } = await import("@post/nostr-core");
       const keyStore = createKeyStore();
       const existing = keyStore.load();
-      if (!existing) {
+
+      if (existing) {
+        // Already have an identity
+      } else if (nip07Available) {
+        try {
+          await connectNip07();
+        } catch {
+          await createOrImport();
+        }
+      } else {
         await createOrImport();
       }
 
