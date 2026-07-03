@@ -15,21 +15,21 @@ export default function SubjectPills({
   relayCount: number;
 }) {
   return (
-    <div className="flex items-center gap-2 px-6 pt-1 pb-1">
+    <div className="flex items-center gap-2">
       {labels.map((label) => (
         <span
           key={label}
-          className="h-[26px] px-3 rounded-pill bg-surface-active border border-brand text-brand-light text-[11px] font-medium leading-[26px]"
+          className="h-[28px] px-3 rounded-pill bg-surface-active border border-brand text-brand-light text-[12px] font-medium leading-[28px]"
         >
           {label}
         </span>
       ))}
       {encrypted && (
-        <span className="h-[26px] px-3 rounded-pill border border-border text-ok text-[11px] font-medium leading-[26px]">
+        <span className="h-[28px] px-3 rounded-pill bg-sidebar border border-border text-ok text-[12px] font-medium leading-[28px]">
           Encrypted
         </span>
       )}
-      <span className="h-[26px] px-3 rounded-pill border border-border text-text-secondary text-[11px] font-medium leading-[26px]">
+      <span className="h-[28px] px-3 rounded-pill bg-sidebar border border-border text-text-secondary text-[12px] font-medium leading-[28px]">
         {relayCount} relays
       </span>
     </div>

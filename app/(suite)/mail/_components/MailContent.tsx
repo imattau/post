@@ -91,9 +91,9 @@ export default function MailContent({ children }: { children: React.ReactNode })
       <div className="flex-1 min-h-0 grid grid-cols-[248px_448px_1fr] divide-x divide-border">
       {/* Sidebar */}
       <div className="bg-sidebar flex flex-col min-h-0 pl-6 pr-4 pt-[25px] pb-4 gap-1 overflow-y-auto">
-        <div className="mb-5">
+        <div className="mb-[10px]">
           <h1 className="text-text-near-white text-[21px] font-semibold">N Mail</h1>
-          <p className="text-text-secondary text-[11px]">Private messaging for Nostr</p>
+          <p className="text-text-secondary text-[11px] mt-[5px]">Private messaging for Nostr</p>
         </div>
 
         <a
@@ -119,7 +119,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
               <a
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-3 h-[38px] pl-5 pr-3 rounded-[10px] no-underline transition-all duration-150 ${
+                className={`-ml-2 flex h-[38px] w-[216px] items-center gap-3 rounded-[10px] pl-4 pr-3 no-underline transition-all duration-150 ${
                   isActive
                     ? "bg-surface-active text-white"
                     : "text-text-secondary hover:text-text-near-white hover:brightness-110"
@@ -137,7 +137,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="flex items-center justify-between mt-[52px] mb-2 px-3">
+        <div className="flex items-center justify-between mt-[30px] mb-2">
           <p className="text-text-tertiary text-[10px] font-semibold tracking-wider">LABELS</p>
           <button
             onClick={() => setShowLabelInput(true)}
@@ -184,7 +184,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
         </div>
 
         <div className="flex-1" />
-        <div className="border border-border rounded-pill bg-dock p-4">
+        <div className="-ml-2 mb-6 h-[142px] w-[216px] border border-border rounded-pill bg-dock p-4">
           <p className="text-[12px] font-semibold text-white">Network</p>
           <div className="flex items-center gap-1.5 mt-1">
             <div className={`w-2 h-2 rounded-full ${connectedCount > 0 ? "bg-ok" : "bg-danger"}`} />

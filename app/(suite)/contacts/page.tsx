@@ -69,7 +69,7 @@ export default function ContactsPage() {
   return (
     <div className="flex-1 grid grid-cols-[248px_1fr] divide-x divide-border">
       {/* Sidebar */}
-      <div className="bg-sidebar p-4">
+      <div className="bg-sidebar pl-6 pr-4 pt-4 pb-4">
         <div className="mb-5">
           <h1 className="text-text-near-white text-[21px] font-semibold">Contacts</h1>
         </div>
@@ -78,7 +78,7 @@ export default function ContactsPage() {
             <button
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setSelectedContact(null); }}
-              className={`flex items-center gap-3 h-10 px-3 rounded-[10px] transition-all duration-150 cursor-pointer ${
+              className={`flex items-center gap-3 h-10 pl-2 pr-3 rounded-[10px] transition-all duration-150 cursor-pointer ${
                 activeTab === tab.id
                   ? "bg-surface-active text-white"
                   : "text-text-secondary hover:text-text-near-white hover:brightness-110"

@@ -26,23 +26,17 @@ export default function SenderBlock({
   createdAt: number;
 }) {
   return (
-    <div className="flex items-center gap-4 px-6 py-4">
+    <div className="flex items-start gap-4">
       <Avatar initials={avatarInitials} size={46} />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[14px] font-semibold text-text-primary">{name}</span>
-          <span className="text-[11px] text-text-tertiary truncate">{npub}</span>
-          <span className="text-[11px] text-text-tertiary">to {recipientName}</span>
-        </div>
-        {verified && (
-          <div className="flex items-center gap-1 mt-0.5">
-            <span className="text-[10px] font-medium text-ok">✓ verified</span>
-          </div>
-        )}
+        <p className="text-[14px] font-semibold text-text-near-white">{name}</p>
+        <p className="mt-1 truncate text-[11px] text-text-tertiary">{npub}</p>
+        <p className="mt-1 text-[11px] text-text-tertiary">to {recipientName}</p>
       </div>
-      <span className="text-[11px] text-text-tertiary flex-shrink-0">
-        {formatMessageDate(createdAt)}
-      </span>
+      <div className="flex-shrink-0 text-right">
+        <p className="text-[11px] text-text-tertiary">{formatMessageDate(createdAt)}</p>
+        {verified && <p className="mt-1 text-[10px] font-medium text-ok">✓ verified</p>}
+      </div>
     </div>
   );
 }

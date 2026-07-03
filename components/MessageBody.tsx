@@ -49,5 +49,5 @@ function renderLine(line: string, i: number) {
 
 export default function MessageBody({ body }: { body: string }) {
   const lines = body.split("\n");
-  return <div className="pl-8 pr-6 pt-3 pb-2">{lines.map(renderLine)}</div>;
+  return <div className="max-w-[570px]">{lines.map(renderLine)}</div>;
 }

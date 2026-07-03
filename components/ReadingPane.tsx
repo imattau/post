@@ -23,14 +23,14 @@ export default function ReadingPane({
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
       <ReadingTopBar onBack={onBack} starred={starred} onToggleStar={onToggleStar} />
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="px-6 pt-5">
-          <h1 className="text-[26px] font-semibold text-text-primary leading-tight">
+      <div className="flex-1 min-h-0 overflow-y-auto px-10 pt-[30px]">
+        <div>
+          <h1 className="max-w-[560px] text-[25px] font-semibold leading-tight text-text-near-white">
             {message.subject}
           </h1>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-[13px]">
           <SubjectPills
             labels={message.labels}
             encrypted={message.encrypted}
@@ -38,7 +38,7 @@ export default function ReadingPane({
           />
         </div>
 
-        <div className="mt-1.5">
+        <div className="mt-[22px]">
           <SenderBlock
             name={message.sender.name}
             npub={message.sender.npub}
@@ -49,12 +49,12 @@ export default function ReadingPane({
           />
         </div>
 
-        <div className="mt-1">
+        <div className="mt-[24px]">
           <MessageBody body={message.body} />
         </div>
 
         {message.attachments.length > 0 && (
-          <div className="flex flex-wrap gap-3 px-6 pt-2 pb-3">
+          <div className="flex flex-wrap gap-3 pt-8 pb-3">
             {message.attachments.map((att) => (
               <AttachmentCard
                 key={att.id}

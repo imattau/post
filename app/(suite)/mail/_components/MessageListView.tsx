@@ -20,6 +20,7 @@ export default function MessageListView({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("c");
+  const effectiveSelectedId = selectedId ?? messages[0]?.id ?? null;
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("Primary");
 
@@ -31,7 +32,7 @@ export default function MessageListView({
   );
 
   const filteredIds = useMemo(() => messages.map((m) => m.id), [messages]);
-  useKeyboardNav(filteredIds, selectedId, handleSelect, [filteredIds, selectedId]);
+  useKeyboardNav(filteredIds, effectiveSelectedId, handleSelect, [filteredIds, effectiveSelectedId]);
 
   const filtered = useMemo(() => {
     let result = messages;
@@ -53,16 +54,16 @@ export default function MessageListView({
 
   return (
     <div className="flex flex-col h-full min-h-0" role="region" aria-label={title} suppressHydrationWarning>
-      <div className="flex items-center justify-between px-6 pt-5 pb-2">
+      <div className="flex items-center justify-between px-6 pt-[25px] pb-0">
         <div>
-          <h2 className="text-[22px] font-semibold text-white leading-none" tabIndex={-1}>{title}</h2>
-          <p className="text-text-secondary text-[12px] mt-1">{subtitle}</p>
+          <h2 className="text-[22px] font-semibold leading-none text-text-near-white" tabIndex={-1}>{title}</h2>
+          <p className="mt-[7px] text-[11px] text-text-secondary">{subtitle}</p>
         </div>
       </div>
 
-      <div className="px-6 py-2">
-        <div className="flex items-center gap-2 h-[42px] px-3 bg-sidebar border border-border rounded-[12px] max-w-[400px]">
-          <span className="text-text-tertiary text-[15px]" aria-hidden="true">⌕</span>
+      <div className="px-6 pt-[21px]">
+        <div className="flex h-[42px] w-[400px] max-w-full items-center gap-[18px] rounded-[12px] border border-border bg-sidebar px-4">
+          <span className="text-[15px] text-text-secondary" aria-hidden="true">⌕</span>
           <input
             type="text"
             value={searchQuery}
@@ -74,7 +75,7 @@ export default function MessageListView({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 px-6 py-2 overflow-x-auto" role="tablist" aria-label="Filter messages">
+      <div className="flex items-center gap-2 overflow-x-auto px-6 pt-4" role="tablist" aria-label="Filter messages">
         {["Primary", "Unread", "Starred", "Attachments"].map((chip) => (
           <button
             key={chip}
@@ -93,7 +94,7 @@ export default function MessageListView({
         <button className="text-text-secondary text-[18px] font-semibold ml-1 cursor-pointer" aria-label="More filters">⋮</button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pt-3 pb-2" role="list" aria-label="Message list">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-2" role="list" aria-label="Message list">
         {messages.length === 0 ? (
           <EmptyState icon="▣" title="No messages yet" description="Start by composing a new message." />
         ) : filtered.length === 0 && searchQuery ? (
@@ -105,7 +106,7 @@ export default function MessageListView({
             <MessageRow
               key={msg.id}
               message={msg}
-              selected={selectedId === msg.id}
+              selected={effectiveSelectedId === msg.id}
               onClick={() => handleSelect(msg.id)}
             />
           ))
