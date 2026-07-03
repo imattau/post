@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState, useMemo } from "react";
 import type { MockMessage } from "@/lib/mock/threads";
 import MessageRow from "@/components/MessageRow";
 
@@ -18,6 +18,8 @@ export default function MessageListView({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("c");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("Primary");
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -25,6 +27,28 @@ export default function MessageListView({
     },
     [router, pathname]
   );
+
+  const filtered = useMemo(() => {
+    let result = messages;
+
+    if (activeFilter === "Unread") {
+      result = result.filter((m) => !m.read);
+    } else if (activeFilter === "Starred") {
+      result = result.filter((m) => m.starred);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (m) =>
+          m.subject.toLowerCase().includes(q) ||
+          m.preview.toLowerCase().includes(q) ||
+          m.sender.name.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [messages, activeFilter, searchQuery]);
 
   return (
     <>
@@ -38,7 +62,13 @@ export default function MessageListView({
       <div className="px-5 py-2">
         <div className="flex items-center gap-2 h-[42px] px-3 bg-sidebar border border-border rounded-pill">
           <span className="text-text-tertiary text-[15px]">⌕</span>
-          <span className="text-text-placeholder text-[13px]">Search messages, people or npubs</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search messages, people or npubs"
+            className="flex-1 bg-transparent border-none outline-none text-[13px] text-text-primary placeholder-text-placeholder"
+          />
         </div>
       </div>
 
@@ -46,8 +76,9 @@ export default function MessageListView({
         {["Primary", "Unread", "Starred", "Attachments"].map((chip) => (
           <button
             key={chip}
+            onClick={() => setActiveFilter(chip)}
             className={`h-[30px] px-3 rounded-pill text-[12px] font-medium border transition-all duration-150 cursor-pointer whitespace-nowrap ${
-              chip === "Primary"
+              chip === activeFilter
                 ? "bg-surface-active border-brand text-brand-light"
                 : "bg-sidebar border-border text-text-secondary hover:border-brand/50"
             }`}
@@ -59,12 +90,12 @@ export default function MessageListView({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {messages.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-text-tertiary text-[13px]">No messages yet</p>
           </div>
         ) : (
-          messages.map((msg) => (
+          filtered.map((msg) => (
             <MessageRow
               key={msg.id}
               message={msg}

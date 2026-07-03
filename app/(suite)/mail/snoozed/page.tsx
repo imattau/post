@@ -1,11 +1,15 @@
+"use client";
+
+import { useMailboxMessages } from "../_components/useMailboxMessages";
 import MessageListView from "../_components/MessageListView";
 
 export default function SnoozedPage() {
+  const { messages } = useMailboxMessages("snoozed");
   return (
     <MessageListView
-      messages={[]}
+      messages={messages}
       title="Snoozed"
-      subtitle="No snoozed messages"
+      subtitle="Snoozed messages"
     />
   );
 }

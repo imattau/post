@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
+import { startSync, loadCachedMessages } from "@/lib/sync";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const createOrImport = useIdentityStore((s) => s.createOrImport);
@@ -14,9 +15,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       const keyStore = createKeyStore();
       const existing = keyStore.load();
       if (!existing) {
-        createOrImport();
+        await createOrImport();
       }
-      connect();
+
+      await loadCachedMessages();
+      await connect();
+      startSync();
     })();
   }, []);
 

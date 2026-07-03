@@ -1,13 +1,15 @@
-import { MESSAGES } from "@/lib/mock/threads";
+"use client";
+
+import { useMailboxMessages } from "../_components/useMailboxMessages";
 import MessageListView from "../_components/MessageListView";
 
 export default function StarredPage() {
-  const starred = MESSAGES.filter((m) => m.starred);
+  const { messages } = useMailboxMessages("starred");
   return (
     <MessageListView
-      messages={starred}
+      messages={messages}
       title="Starred"
-      subtitle={`${starred.length} starred`}
+      subtitle={`${messages.length} starred`}
     />
   );
 }

@@ -1,3 +1,5 @@
+"use client";
+
 import MessageListView from "../_components/MessageListView";
 
 export default function DraftsPage() {
@@ -5,7 +7,7 @@ export default function DraftsPage() {
     <MessageListView
       messages={[]}
       title="Drafts"
-      subtitle="No draft messages"
+      subtitle="Draft messages"
     />
   );
 }

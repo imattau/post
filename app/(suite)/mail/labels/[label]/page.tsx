@@ -1,7 +1,11 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import MessageListView from "../../_components/MessageListView";
 
-export default async function LabelPage({ params }: { params: Promise<{ label: string }> }) {
-  const { label } = await params;
+export default function LabelPage() {
+  const params = useParams();
+  const label = params.label as string;
   return (
     <MessageListView
       messages={[]}

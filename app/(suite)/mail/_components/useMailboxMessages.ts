@@ -1,0 +1,90 @@
+import { useMessagesStore } from "@/lib/stores/messages";
+import { useMemo } from "react";
+import type { MockMessage, MockContact } from "@/lib/mock/threads";
+
+function isMockMessage(msg: unknown): msg is MockMessage {
+  return msg !== null && typeof msg === "object" && "sender" in (msg as Record<string, unknown>);
+}
+
+export function useMailboxMessages(mailbox: string): {
+  messages: MockMessage[];
+  unreadCount: number;
+} {
+  const byId = useMessagesStore((s) => s.byId);
+  const ids = useMessagesStore((s) => s.ids);
+
+  return useMemo(() => {
+    if (ids.length > 0) {
+      const filtered = ids
+        .map((id) => byId[id])
+        .filter((m): m is NonNullable<typeof m> => m != null)
+        .filter((m) => {
+          switch (mailbox) {
+            case "inbox":
+              return !m.archived && !m.spam && m.snoozedUntil === null;
+            case "starred":
+              return m.starred;
+            case "snoozed":
+              return m.snoozedUntil !== null && m.snoozedUntil > Date.now();
+            case "archive":
+              return m.archived;
+            case "spam":
+              return m.spam;
+            default:
+              return true;
+          }
+        })
+        .sort((a, b) => b.createdAt - a.createdAt);
+
+      const asMock = filtered.map((m) => realToMock(m));
+      return {
+        messages: asMock,
+        unreadCount: filtered.filter((m) => !m.read).length,
+      };
+    }
+
+    // Fall back to mock data
+    const { MESSAGES } = require("@/lib/mock/threads") as { MESSAGES: MockMessage[] };
+    return {
+      messages: MESSAGES,
+      unreadCount: MESSAGES.filter((m) => !m.read).length,
+    };
+  }, [byId, ids, mailbox]);
+}
+
+function realToMock(real: {
+  id: string;
+  pubkey: string;
+  subject: string;
+  preview: string;
+  content: string;
+  createdAt: number;
+  read: boolean;
+  starred: boolean;
+  labelIds?: string[];
+}): MockMessage {
+  const contact: MockContact = {
+    id: real.pubkey,
+    name: real.pubkey.slice(0, 8),
+    npub: `${real.pubkey.slice(0, 10)}…`,
+    avatarInitials: real.pubkey.slice(0, 2).toUpperCase(),
+    verified: false,
+  };
+
+  return {
+    id: real.id,
+    sender: contact,
+    recipientName: "me",
+    subject: real.subject || "(no subject)",
+    preview: real.preview || real.content.slice(0, 120),
+    body: real.content,
+    createdAt: real.createdAt,
+    read: real.read,
+    starred: real.starred,
+    labels: [],
+    attachments: [],
+    encrypted: true,
+    relayCount: 3,
+    threadLength: 1,
+  };
+}

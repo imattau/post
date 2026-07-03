@@ -1,11 +1,13 @@
-import { MESSAGES } from "@/lib/mock/threads";
+"use client";
+
+import { useMailboxMessages } from "../_components/useMailboxMessages";
 import MessageListView from "../_components/MessageListView";
 
 export default function InboxPage() {
-  const unreadCount = MESSAGES.filter((m) => !m.read).length;
+  const { messages, unreadCount } = useMailboxMessages("inbox");
   return (
     <MessageListView
-      messages={MESSAGES}
+      messages={messages}
       title="Inbox"
       subtitle={`${unreadCount} unread`}
     />
