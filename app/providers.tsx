@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { startSync, loadCachedMessages } from "@/lib/sync";
+import { loadBlossomConfig } from "@/lib/stores/blossom";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const createOrImport = useIdentityStore((s) => s.createOrImport);
@@ -18,6 +19,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         await createOrImport();
       }
 
+      loadBlossomConfig();
       await loadCachedMessages();
       await connect();
       startSync();

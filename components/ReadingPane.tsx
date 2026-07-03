@@ -49,7 +49,14 @@ export default function ReadingPane({
       {message.attachments.length > 0 && (
         <div className="flex flex-wrap gap-3 px-5 py-3">
           {message.attachments.map((att) => (
-            <AttachmentCard key={att.id} attachment={att} />
+            <AttachmentCard
+              key={att.id}
+              fileName={att.fileName}
+              sizeBytes={att.sizeBytes}
+              encrypted={att.encrypted}
+              sha256={att.sha256}
+              mimeType={att.mimeType}
+            />
           ))}
         </div>
       )}

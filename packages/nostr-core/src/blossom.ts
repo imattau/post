@@ -1,28 +1,40 @@
+import { nip98 } from "nostr-tools";
+import { finalizeEvent } from "nostr-tools/pure";
 import type { AttachmentRef } from "./types";
 
 export interface BlossomServer {
   url: string;
 }
 
+function getSigner(sk: Uint8Array) {
+  return (t: { kind: number; tags: string[][]; content: string; created_at: number }) =>
+    finalizeEvent(t, sk);
+}
+
 export async function uploadBlob(
   server: BlossomServer,
   file: File,
-  pubkey: string,
+  sk: Uint8Array,
   onProgress?: (percent: number) => void
 ): Promise<AttachmentRef> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const xhr = new XMLHttpRequest();
-  xhr.open("PUT", `${server.url}/upload`);
-
-  if (onProgress) {
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-  }
+  const authToken = await nip98.getToken(
+    `${server.url}/upload`,
+    "PUT",
+    getSigner(sk),
+    true
+  );
 
   return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", `${server.url}/upload`);
+    xhr.setRequestHeader("Authorization", authToken);
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
+
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
@@ -45,12 +57,25 @@ export async function uploadBlob(
       }
     };
     xhr.onerror = () => reject(new Error("Upload failed"));
-    xhr.send(formData);
+    xhr.send(file);
   });
 }
 
-export async function downloadBlob(ref: AttachmentRef): Promise<ArrayBuffer> {
-  const response = await fetch(ref.url);
+export async function downloadBlob(
+  ref: AttachmentRef,
+  sk: Uint8Array,
+  serverUrl: string
+): Promise<ArrayBuffer> {
+  const authToken = await nip98.getToken(
+    `${serverUrl}/${ref.sha256}`,
+    "GET",
+    getSigner(sk),
+    true
+  );
+
+  const response = await fetch(`${serverUrl}/${ref.sha256}`, {
+    headers: { Authorization: authToken },
+  });
   if (!response.ok) throw new Error(`Download failed with status ${response.status}`);
   return response.arrayBuffer();
 }
@@ -58,8 +83,18 @@ export async function downloadBlob(ref: AttachmentRef): Promise<ArrayBuffer> {
 export async function deleteBlob(
   server: BlossomServer,
   sha256: string,
-  pubkey: string
+  sk: Uint8Array
 ): Promise<void> {
-  const response = await fetch(`${server.url}/${sha256}`, { method: "DELETE" });
+  const authToken = await nip98.getToken(
+    `${server.url}/${sha256}`,
+    "DELETE",
+    getSigner(sk),
+    true
+  );
+
+  const response = await fetch(`${server.url}/${sha256}`, {
+    method: "DELETE",
+    headers: { Authorization: authToken },
+  });
   if (!response.ok) throw new Error(`Delete failed with status ${response.status}`);
 }
