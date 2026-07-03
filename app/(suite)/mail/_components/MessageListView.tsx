@@ -61,7 +61,7 @@ export default function MessageListView({
       </div>
 
       <div className="px-5 py-2">
-        <div className="flex items-center gap-2 h-[42px] px-3 bg-sidebar border border-border rounded-pill">
+        <div className="flex items-center gap-2 h-[42px] px-3 bg-sidebar border border-border rounded-pill max-w-[400px]">
           <span className="text-text-tertiary text-[15px]" aria-hidden="true">⌕</span>
           <input
             type="text"
@@ -81,11 +81,11 @@ export default function MessageListView({
             onClick={() => setActiveFilter(chip)}
             role="tab"
             aria-selected={chip === activeFilter}
-            className={`h-[30px] px-3 rounded-pill text-[12px] font-medium border transition-all duration-150 cursor-pointer whitespace-nowrap ${
-              chip === activeFilter
-                ? "bg-surface-active border-brand text-brand-light"
-                : "bg-sidebar border-border text-text-secondary hover:border-brand/50"
-            }`}
+              className={`h-[28px] px-3 rounded-pill text-[12px] font-medium border transition-all duration-150 cursor-pointer whitespace-nowrap ${
+               chip === activeFilter
+                 ? "bg-surface-active border-brand text-brand-light"
+                 : "bg-sidebar border-border text-text-secondary hover:border-brand/50"
+             }`}
           >
             {chip}
           </button>

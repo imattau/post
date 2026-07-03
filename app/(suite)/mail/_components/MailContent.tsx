@@ -5,6 +5,7 @@ import { useCallback, useState, useEffect } from "react";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { useMessagesStore } from "@/lib/stores/messages";
+import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { useMailboxMessages } from "../_components/useMailboxMessages";
 import ReadingPane from "@/components/ReadingPane";
 import ComposeModal from "@/components/ComposeModal";
@@ -21,6 +22,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
 
   const labels = useLabelsStore((s) => s.byId);
   const labelIds = useLabelsStore((s) => s.allIds);
+  const unreadCounts = useMailboxStore((s) => s.unreadCounts);
 
   const markRead = useMessagesStore((s) => s.markRead);
   const toggleStar = useMessagesStore((s) => s.toggleStar);
@@ -96,19 +98,19 @@ export default function MailContent({ children }: { children: React.ReactNode })
 
         <a
           href="/mail/inbox?compose=true"
-          className="w-full h-12 bg-brand rounded-pill flex items-center gap-2 justify-center no-underline hover:brightness-110 active:scale-[0.97] transition-all duration-150"
+          className="w-[200px] h-12 bg-brand rounded-pill flex items-center gap-2 justify-center no-underline hover:brightness-110 active:scale-[0.97] transition-all duration-150"
         >
           <span className="text-white text-[15px]">＋</span>
-          <span className="text-white text-[13px] font-semibold">Compose</span>
+          <span className="text-white text-[14px] font-semibold">Compose</span>
         </a>
 
         <nav className="flex flex-col gap-0.5 mt-6">
           {[
-            { icon: "▣", label: "Inbox", count: null, href: "/mail/inbox" },
+            { icon: "▣", label: "Inbox", count: unreadCounts.inbox, href: "/mail/inbox" },
             { icon: "☆", label: "Starred", count: null, href: "/mail/starred" },
             { icon: "◷", label: "Snoozed", count: null, href: "/mail/snoozed" },
             { icon: "➤", label: "Sent", count: null, href: "/mail/sent" },
-            { icon: "▤", label: "Drafts", count: null, href: "/mail/drafts" },
+            { icon: "▤", label: "Drafts", count: unreadCounts.drafts, href: "/mail/drafts" },
             { icon: "⌁", label: "Archive", count: null, href: "/mail/archive" },
             { icon: "!", label: "Spam", count: null, href: "/mail/spam" },
           ].map((item) => {
@@ -123,10 +125,13 @@ export default function MailContent({ children }: { children: React.ReactNode })
                     : "text-text-secondary hover:text-text-near-white hover:brightness-110"
                 }`}
               >
-                <span className="text-[15px]">{item.icon}</span>
-                <span className={`flex-1 text-[13px] ${isActive ? "font-semibold" : "font-medium"}`}>
+                <span className={`text-[15px] ${isActive ? "text-brand-light" : ""}`}>{item.icon}</span>
+                <span className={`flex-1 text-[13px] ${isActive ? "font-semibold text-white" : "font-medium text-text-secondary"}`}>
                   {item.label}
                 </span>
+                {item.count != null && (
+                  <span className="text-brand-light text-[12px] font-semibold">{item.count}</span>
+                )}
               </a>
             );
           })}
@@ -136,7 +141,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
           <p className="text-text-tertiary text-[10px] font-semibold tracking-wider">LABELS</p>
           <button
             onClick={() => setShowLabelInput(true)}
-            className="text-text-tertiary text-[14px] cursor-pointer hover:text-text-secondary"
+            className="text-text-tertiary text-[14px] cursor-pointer hover:text-text-secondary hover:brightness-110 transition-all duration-150"
           >
             ＋
           </button>
@@ -157,7 +162,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
                     : "text-text-secondary hover:text-text-near-white"
                 }`}
               >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
+                <span className="w-[10px] h-[10px] rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
                 <span className="text-[13px] font-medium">{label.name}</span>
               </a>
             );
@@ -188,7 +193,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
             </span>
           </div>
           <p className="text-[10px] text-text-tertiary mt-1">Delivery health</p>
-          <div className="w-full h-[3px] bg-pill-subtle rounded-progress mt-1">
+          <div className="w-[184px] h-[6px] bg-pill-subtle rounded-progress mt-1">
             <div className="h-full bg-ok rounded-progress" style={{ width: `${healthPercent}%` }} />
           </div>
           <p className="text-[10px] text-text-tertiary mt-1">

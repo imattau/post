@@ -54,7 +54,7 @@ export default function IconDock() {
           onClick={toggleSwitcher}
           className="w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
         >
-          <span className="text-text-secondary text-[17px] font-bold">{tile.letter}</span>
+          <span className="text-text-secondary text-[17px] font-semibold">{tile.letter}</span>
         </button>
       ))}
 

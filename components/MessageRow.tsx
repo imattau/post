@@ -29,10 +29,10 @@ export default function MessageRow({
   return (
     <div
       onClick={onClick}
-      className={`flex gap-3 px-5 py-4 cursor-pointer transition-all duration-150 ${
+      className={`flex gap-3 px-4 py-4 mx-5 my-1 border border-border rounded-pill bg-sidebar cursor-pointer transition-all duration-150 ${
         selected
-          ? "bg-sidebar border-l-[3px] border-brand"
-          : "border-b border-border hover:bg-sidebar/60"
+          ? "ring-1 ring-brand"
+          : "hover:bg-sidebar/80"
       }`}
     >
       <Avatar initials={message.sender.avatarInitials} size={40} />
@@ -47,7 +47,7 @@ export default function MessageRow({
           >
             {message.sender.name}
           </span>
-          {!message.read && <div className="w-[7px] h-[7px] rounded-full bg-brand-light flex-shrink-0" />}
+          {!message.read && <div className="w-[9px] h-[9px] rounded-full bg-brand-light flex-shrink-0" />}
           <span className="ml-auto text-[11px] flex-shrink-0 text-text-tertiary">
             {formatTime(message.createdAt)}
           </span>
@@ -65,7 +65,7 @@ export default function MessageRow({
             {message.labels.map((label) => (
               <span
                 key={label}
-                className="h-[22px] px-2.5 rounded-pill bg-pill-subtle text-text-secondary text-[10px] font-medium leading-[22px]"
+                className="h-[28px] px-3 rounded-pill bg-pill-subtle text-text-secondary text-[10px] font-medium leading-[28px]"
               >
                 {label}
               </span>

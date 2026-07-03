@@ -1,6 +1,6 @@
 export default function ReplyComposer({ recipientName }: { recipientName: string }) {
   return (
-    <div className="mx-5 mb-5 mt-2 h-[130px] border border-border rounded-pill bg-sidebar flex flex-col">
+    <div className="mx-5 mb-5 mt-2 h-[130px] max-w-[560px] border border-border rounded-pill bg-sidebar flex flex-col">
       <div className="flex items-center gap-2 px-4 pt-3 pb-1">
         <span className="text-[12px] text-text-secondary font-medium">{recipientName}</span>
       </div>

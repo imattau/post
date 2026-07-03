@@ -41,7 +41,7 @@ const DAY = 86400_000;
 export const CONTACTS: Record<string, MockContact> = {
   alice: {
     id: "alice",
-    name: "Alice",
+    name: "Alice Nguyen",
     npub: "npub1alice…x9k2",
     avatarInitials: "A",
     verified: true,
