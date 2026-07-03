@@ -1,5 +1,11 @@
-import MailboxPage from "@/components/MailboxPage";
+import MessageListView from "../_components/MessageListView";
 
 export default function SentPage() {
-  return <MailboxPage title="Sent" subtitle="Sent messages" />;
+  return (
+    <MessageListView
+      messages={[]}
+      title="Sent"
+      subtitle="No sent messages"
+    />
+  );
 }

@@ -1,5 +1,11 @@
-import MailboxPage from "@/components/MailboxPage";
+import MessageListView from "../_components/MessageListView";
 
 export default function DraftsPage() {
-  return <MailboxPage title="Drafts" subtitle="Draft messages" />;
+  return (
+    <MessageListView
+      messages={[]}
+      title="Drafts"
+      subtitle="No draft messages"
+    />
+  );
 }

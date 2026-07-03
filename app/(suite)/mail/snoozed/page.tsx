@@ -1,5 +1,11 @@
-import MailboxPage from "@/components/MailboxPage";
+import MessageListView from "../_components/MessageListView";
 
 export default function SnoozedPage() {
-  return <MailboxPage title="Snoozed" subtitle="Snoozed messages" />;
+  return (
+    <MessageListView
+      messages={[]}
+      title="Snoozed"
+      subtitle="No snoozed messages"
+    />
+  );
 }

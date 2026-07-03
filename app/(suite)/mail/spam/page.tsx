@@ -1,5 +1,11 @@
-import MailboxPage from "@/components/MailboxPage";
+import MessageListView from "../_components/MessageListView";
 
 export default function SpamPage() {
-  return <MailboxPage title="Spam" subtitle="Spam messages" />;
+  return (
+    <MessageListView
+      messages={[]}
+      title="Spam"
+      subtitle="No spam messages"
+    />
+  );
 }

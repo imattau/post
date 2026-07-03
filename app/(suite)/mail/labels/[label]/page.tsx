@@ -1,6 +1,12 @@
-import MailboxPage from "@/components/MailboxPage";
+import MessageListView from "../../_components/MessageListView";
 
 export default async function LabelPage({ params }: { params: Promise<{ label: string }> }) {
   const { label } = await params;
-  return <MailboxPage title={`Label: ${label}`} subtitle={`Messages labeled "${label}"`} />;
+  return (
+    <MessageListView
+      messages={[]}
+      title={`Label: ${label}`}
+      subtitle={`Messages labeled "${label}"`}
+    />
+  );
 }

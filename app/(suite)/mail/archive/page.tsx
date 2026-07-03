@@ -1,5 +1,11 @@
-import MailboxPage from "@/components/MailboxPage";
+import MessageListView from "../_components/MessageListView";
 
 export default function ArchivePage() {
-  return <MailboxPage title="Archive" subtitle="Archived messages" />;
+  return (
+    <MessageListView
+      messages={[]}
+      title="Archive"
+      subtitle="No archived messages"
+    />
+  );
 }
