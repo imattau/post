@@ -33,7 +33,7 @@ export default function IconDock() {
   const colorClass = AVATAR_COLORS[hashInitials(avatarInitial) % AVATAR_COLORS.length];
 
   return (
-    <div className="w-[72px] h-dvh flex-shrink-0 bg-dock flex flex-col items-center pt-[18px]">
+    <div className="w-[72px] h-dvh flex-shrink-0 bg-dock border-r border-border flex flex-col items-center pt-[18px]">
       {/* Logo — always "N" */}
       <div className="w-10 h-10 rounded-tile bg-brand flex items-center justify-center flex-shrink-0">
         <span className="text-white text-[17px] font-bold">N</span>

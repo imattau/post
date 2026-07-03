@@ -8,14 +8,14 @@ export default function ReadingTopBar({
   onToggleStar: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-6 py-3 border-b border-border">
+    <div className="flex items-center gap-3 px-6 py-3 border-b border-border">
       <button
         onClick={onBack}
         className="text-text-secondary text-[20px] font-medium cursor-pointer hover:text-text-near-white transition-colors duration-150"
       >
         ←
       </button>
-      <div className="flex gap-2 ml-2">
+      <div className="flex gap-2 ml-1">
         {["Archive", "Snooze", "Delete"].map((label) => (
           <button
             key={label}

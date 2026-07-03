@@ -29,7 +29,7 @@ export default function MessageRow({
   return (
     <div
       onClick={onClick}
-      className={`flex gap-4 px-4 py-4 mx-3 my-1 border border-border rounded-pill bg-sidebar cursor-pointer transition-all duration-150 ${
+      className={`flex gap-4 px-4 py-4 mx-3 my-[3px] border border-border rounded-pill bg-sidebar cursor-pointer transition-all duration-150 min-h-[104px] ${
         selected
           ? "ring-1 ring-brand"
           : "hover:bg-sidebar/80"
@@ -39,7 +39,7 @@ export default function MessageRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span
-            className={`truncate text-[13px] ${
+            className={`truncate text-[14px] ${
               !message.read
                 ? "font-semibold text-text-primary"
                 : "font-medium text-text-near-white"
@@ -47,25 +47,25 @@ export default function MessageRow({
           >
             {message.sender.name}
           </span>
-          {!message.read && <div className="w-[9px] h-[9px] rounded-full bg-brand-light flex-shrink-0" />}
+          {!message.read && <div className="w-[7px] h-[7px] rounded-full bg-brand-light flex-shrink-0" />}
           <span className={`ml-auto text-[11px] flex-shrink-0 ${!message.read ? "font-semibold text-white" : "text-text-tertiary"}`}>
             {formatTime(message.createdAt)}
           </span>
         </div>
         <p
-          className={`truncate text-[12px] mt-2 ${
+          className={`truncate text-[13px] mt-2 ${
             !message.read ? "font-semibold text-text-primary" : "font-medium text-text-near-white"
           }`}
         >
           {message.subject}
         </p>
-        <p className="text-[11px] text-text-tertiary truncate mt-[7px]">{message.preview}</p>
+        <p className="text-[12px] text-text-tertiary truncate mt-[7px]">{message.preview}</p>
         {message.labels.length > 0 && (
           <div className="flex gap-1.5 mt-1.5">
             {message.labels.map((label) => (
               <span
                 key={label}
-                className="h-[28px] px-3 rounded-pill bg-pill-subtle text-text-secondary text-[10px] leading-[28px]"
+                className="h-[28px] px-3 rounded-pill bg-pill-subtle text-text-secondary text-[10px] font-normal leading-[28px]"
               >
                 {label}
               </span>

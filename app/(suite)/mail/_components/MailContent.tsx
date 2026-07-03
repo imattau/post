@@ -17,12 +17,12 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const selectedId = searchParams.get("c");
   const composeOpen = searchParams.get("compose") === "true";
 
-  const { messages } = useMailboxMessages("inbox");
+  const { messages, unreadCount: inboxUnreadCount } = useMailboxMessages("inbox");
   const selectedMessage = selectedId ? messages.find((m) => m.id === selectedId) ?? null : messages[0] ?? null;
 
   const labels = useLabelsStore((s) => s.byId);
   const labelIds = useLabelsStore((s) => s.allIds);
-  const unreadCounts = useMailboxStore((s) => s.unreadCounts);
+  const draftCount = useMailboxStore((s) => s.unreadCounts.drafts);
 
   const markRead = useMessagesStore((s) => s.markRead);
   const toggleStar = useMessagesStore((s) => s.toggleStar);
@@ -88,9 +88,9 @@ export default function MailContent({ children }: { children: React.ReactNode })
           </button>
         </div>
       )}
-      <div className="flex-1 grid grid-cols-[248px_448px_1fr] divide-x divide-border">
+      <div className="flex-1 min-h-0 grid grid-cols-[248px_448px_1fr] divide-x divide-border">
       {/* Sidebar */}
-      <div className="bg-sidebar flex flex-col pl-6 pr-4 pt-[25px] pb-4 gap-1 overflow-y-auto">
+      <div className="bg-sidebar flex flex-col min-h-0 pl-6 pr-4 pt-[25px] pb-4 gap-1 overflow-y-auto">
         <div className="mb-5">
           <h1 className="text-text-near-white text-[21px] font-semibold">N Mail</h1>
           <p className="text-text-secondary text-[11px]">Private messaging for Nostr</p>
@@ -106,11 +106,11 @@ export default function MailContent({ children }: { children: React.ReactNode })
 
         <nav className="flex flex-col gap-[6px] mt-6">
           {[
-            { icon: "▣", label: "Inbox", count: unreadCounts.inbox, href: "/mail/inbox" },
+            { icon: "▣", label: "Inbox", count: inboxUnreadCount, href: "/mail/inbox" },
             { icon: "☆", label: "Starred", count: null, href: "/mail/starred" },
             { icon: "◷", label: "Snoozed", count: null, href: "/mail/snoozed" },
             { icon: "➤", label: "Sent", count: null, href: "/mail/sent" },
-            { icon: "▤", label: "Drafts", count: unreadCounts.drafts, href: "/mail/drafts" },
+            { icon: "▤", label: "Drafts", count: draftCount, href: "/mail/drafts" },
             { icon: "⌁", label: "Archive", count: null, href: "/mail/archive" },
             { icon: "!", label: "Spam", count: null, href: "/mail/spam" },
           ].map((item) => {
@@ -137,7 +137,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="flex items-center justify-between mt-[45px] mb-2 px-3">
+        <div className="flex items-center justify-between mt-[52px] mb-2 px-3">
           <p className="text-text-tertiary text-[10px] font-semibold tracking-wider">LABELS</p>
           <button
             onClick={() => setShowLabelInput(true)}
@@ -203,7 +203,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
       </div>
 
       {/* Message List panel */}
-      <div className="bg-canvas flex flex-col overflow-hidden">
+      <div className="bg-canvas flex flex-col min-h-0 overflow-hidden">
         {children}
       </div>
 

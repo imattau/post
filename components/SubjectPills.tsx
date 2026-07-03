@@ -15,7 +15,7 @@ export default function SubjectPills({
   relayCount: number;
 }) {
   return (
-    <div className="flex items-center gap-2 px-6 pt-1 pb-2">
+    <div className="flex items-center gap-2 px-6 pt-1 pb-1">
       {labels.map((label) => (
         <span
           key={label}

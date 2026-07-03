@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
+import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { startSync, loadCachedMessages } from "@/lib/sync";
 import { loadBlossomConfig } from "@/lib/stores/blossom";
 import { isTauri, createTauriKeyStore } from "@/lib/tauri";
@@ -32,6 +33,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
       loadBlossomConfig();
       await loadCachedMessages();
+      await useMailboxStore.getState().refreshUnreadCounts();
       await connect();
       startSync();
     })();

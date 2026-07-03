@@ -52,11 +52,11 @@ export default function MessageListView({
   }, [messages, activeFilter, searchQuery]);
 
   return (
-    <div className="flex flex-col h-full" role="region" aria-label={title} suppressHydrationWarning>
+    <div className="flex flex-col h-full min-h-0" role="region" aria-label={title} suppressHydrationWarning>
       <div className="flex items-center justify-between px-6 pt-5 pb-2">
         <div>
-          <h2 className="text-[22px] font-semibold text-white" tabIndex={-1}>{title}</h2>
-          <p className="text-text-secondary text-[11px]">{subtitle}</p>
+          <h2 className="text-[22px] font-semibold text-white leading-none" tabIndex={-1}>{title}</h2>
+          <p className="text-text-secondary text-[12px] mt-1">{subtitle}</p>
         </div>
       </div>
 
@@ -93,7 +93,7 @@ export default function MessageListView({
         <button className="text-text-secondary text-[18px] font-semibold ml-1 cursor-pointer" aria-label="More filters">⋮</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto pt-3" role="list" aria-label="Message list">
+      <div className="flex-1 min-h-0 overflow-y-auto pt-3 pb-2" role="list" aria-label="Message list">
         {messages.length === 0 ? (
           <EmptyState icon="▣" title="No messages yet" description="Start by composing a new message." />
         ) : filtered.length === 0 && searchQuery ? (

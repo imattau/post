@@ -35,7 +35,8 @@ export const useMailboxStore = create<MailboxState>((set) => ({
   async refreshUnreadCounts() {
     const { db } = await import("@/lib/db/schema");
     const inbox = await db.messages.where({ mailbox: "inbox", archived: 0, spam: 0 }).count();
-    set({ unreadCounts: { ...get().unreadCounts, inbox } });
+    const drafts = await db.drafts.count();
+    set({ unreadCounts: { ...get().unreadCounts, inbox, drafts } });
   },
 }));
 
