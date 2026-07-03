@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCallback, useState } from "react";
 import { MESSAGES } from "@/lib/mock/threads";
+import { useRelaysStore } from "@/lib/stores/relays";
 import ReadingPane from "@/components/ReadingPane";
 import ComposeModal from "@/components/ComposeModal";
 
@@ -33,6 +34,12 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const closeCompose = useCallback(() => {
     router.replace(pathname, { scroll: false });
   }, [router, pathname]);
+
+  const relayStatuses = useRelaysStore((s) => s.statuses);
+  const healthPercent = useRelaysStore((s) => s.healthPercent);
+  const syncedAgo = useRelaysStore((s) => s.syncedAgo);
+  const connectedCount = Object.values(relayStatuses).filter((s) => s.connected).length;
+  const totalCount = Object.keys(relayStatuses).length;
 
   return (
     <>
@@ -111,14 +118,18 @@ export default function MailContent({ children }: { children: React.ReactNode })
         <div className="border border-border rounded-pill bg-dock p-3">
           <p className="text-[12px] font-semibold text-white">Network</p>
           <div className="flex items-center gap-1.5 mt-1">
-            <div className="w-2 h-2 rounded-full bg-ok" />
-            <span className="text-[11px] text-text-secondary">0 relays connected</span>
+            <div className={`w-2 h-2 rounded-full ${connectedCount > 0 ? "bg-ok" : "bg-danger"}`} />
+            <span className="text-[11px] text-text-secondary">
+              {connectedCount}/{totalCount} relays connected
+            </span>
           </div>
           <p className="text-[10px] text-text-tertiary mt-1">Delivery health</p>
           <div className="w-full h-[3px] bg-pill-subtle rounded-progress mt-1">
-            <div className="h-full bg-ok rounded-progress" style={{ width: "0%" }} />
+            <div className="h-full bg-ok rounded-progress" style={{ width: `${healthPercent}%` }} />
           </div>
-          <p className="text-[10px] text-text-tertiary mt-1">Synced — ago</p>
+          <p className="text-[10px] text-text-tertiary mt-1">
+            Synced {syncedAgo > 0 ? `${syncedAgo}s ago` : "— ago"}
+          </p>
         </div>
       </div>
 

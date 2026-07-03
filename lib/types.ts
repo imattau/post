@@ -1,0 +1,16 @@
+export type {
+  Profile,
+  Identity,
+  RelayConfig,
+  RelayStatus,
+  MailboxKind,
+  AttachmentRef,
+  AttachmentUpload,
+  Message,
+  Label,
+  RecipientEntry,
+  Draft,
+  Contact,
+  SendResult,
+  SendOptions,
+} from "@post/nostr-core";
