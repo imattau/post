@@ -14,7 +14,7 @@ const APPS: AppTile[] = [
   { letter: "D", name: "Drive", color: "var(--color-info)", route: "/coming-soon?app=D" },
   { letter: "C", name: "Calendar", color: "var(--color-teal)", route: "/coming-soon?app=C" },
   { letter: "N", name: "Notes", color: "var(--color-warn)", route: "/coming-soon?app=N" },
-  { letter: "P", name: "Contacts", color: "var(--color-danger)", route: "/coming-soon?app=P" },
+  { letter: "P", name: "Contacts", color: "var(--color-danger)", route: "/contacts" },
   { letter: "T", name: "Tasks", color: "var(--color-teal)", route: "/coming-soon?app=T" },
 ];
 

@@ -746,11 +746,197 @@ Optimistic UX: list renders from local cache; new events streamed in from relays
 - Compose modal: draft autosave, recipient pills, Cc/Bcc, encryption + relay pills, markdown toolbar best effort, Send + Schedule send.
 - App builds as web (`pnpm build`) — desktop shell punted to P7.
 
-## 15. Interaction specification
+## 15. Settings screen (extracted from Figma Frame #9)
+
+A full-page settings panel accessed from the app switcher popover (via the active dock tile or the "All apps" link) or directly via `/suite/settings`. Replaces the three-pane mail layout entirely — same 72px icon dock persists on the left.
+
+### 15.1 Layout
+
+| Region | x | width | bg |
+|--------|---|-------|----|
+| Icon Dock | 0–72 | 72 | `#11141B` |
+| Settings sidebar | 72–320 | 248 | `#151922` |
+| Settings content | 320–1440 | 1120 | `#0B0D12` |
+
+### 15.2 Settings sidebar tabs
+
+Five tab items, 216×40 pill `#2B2146` radius 10 when active, same layout as mailbox rows:
+
+| Icon | Tab | Description |
+|------|-----|-------------|
+| `⌘` | General | Core behaviour for Post and shared suite features. |
+| `◎` | Identity | Manage your Nostr identity, profile metadata and signing method. |
+| `◉` | Relays | Control how Post discovers, publishes and retrieves events. |
+| `◆` | Privacy | Encryption, metadata exposure and local data controls. |
+| `●` | Notifications | Choose what appears in the suite notification centre. |
+
+### 15.3 General tab
+
+- **Default post privacy** — toggle: "Choose whether new posts begin as private, public or remember your last choice."
+- **Use built-in reader** — toggle: "Use the built-in reader where possible."
+
+### 15.4 Identity tab
+
+- **Current identity card** — avatar (88×88 `#1B202B` radius 18, deterministic colour per §2.1 avatar palette, white initials Semi Bold 25), name, @handle, npub truncated
+- **NIP-05** — input field + verify button
+- **Signing method** — NIP-07 extension / Local Key Store / NIP-46 bunker selector
+- **Profile metadata** — name, display name, about, picture, banner, website, Lightning address
+- **Export identity** — "Identity backup.json" button
+
+### 15.5 Relays tab
+
+| Component | Spec |
+|-----------|------|
+| **Automatic relay selection** | Toggle ON/OFF. Subtitle: "Use contact lists and event hints to select relays." |
+| **Minimum relay count** | Picker with badge "3 relays". Subtitle: "Send private posts to at least three healthy relays." |
+| **Connected relays** | Section header `#F3F5F7`. List of relay rows (e.g. `relay.damus.io`, `relay.nostr.band`) with latency + connected status dot. Show/hide toggle for URL. 82×28 "Remove" button. |
+| **Add relay** | Input field + "Add" button (brand). |
+| **Show relay delivery preview** | Toggle. Subtitle: "Display the relay set before sending." |
+| **Download profile metadata** | Toggle. Subtitle: "Download profile metadata, relay list and contact graph." |
+| **Prefer recipient relay lists** | Toggle. Subtitle: "Prefer recipient relay lists when delivering private posts." |
+
+### 15.6 Privacy tab
+
+| Toggle | Subtitle |
+|--------|----------|
+| Encrypt direct posts | Use supported Nostr encryption for private communication. |
+| Encrypt attachments | Encrypt files before uploading to Drive or Blossom. |
+| Hide notification content | Do not show content in desktop notifications. |
+
+### 15.7 Notifications tab
+
+| Toggle | Subtitle |
+|--------|----------|
+| New private posts | Notify for new private posts. |
+| Mentions and replies | Notify when someone mentions or replies to you. |
+| Digest summaries | Bundle low-priority activity into summaries. |
+| Delivery failure alerts | Alert when a post cannot reach its target relays. |
+
+## 16. Contacts / People screen (extracted from Figma Frame #13)
+
+A full-page contacts manager, replacing the three-pane mail layout. Same left icon dock.
+
+### 16.1 Layout
+
+| Region | x | width |
+|--------|---|-------|
+| Icon Dock | 0–72 | 72 |
+| Contacts sidebar | 72–320 | 248 |
+| Contacts content | 320–1440 | 1120 |
+
+### 16.2 Contacts sidebar tabs
+
+Four tab items, 216×40 pill `#2B2146` radius 10 when active:
+
+| Icon | Tab | Description |
+|------|-----|-------------|
+| `◎` | Overview | Summary stats + all contacts |
+| `✓` | Following | People and identities currently in your contact list |
+| `–` | Muted | Muted people. Can still message you; hidden from notifications |
+| `×` | Blocked | Blocked identities |
+
+### 16.3 Stats bar (Overview tab)
+
+Four stat cards in a row (744×132 card, `#151922` stroke `#272D3A` radius 14):
+
+| Stat | Value | Label |
+|------|-------|-------|
+| Following | 328 | Semi Bold 28 white |
+| Muted | 14 | Semi Bold 28 white |
+| Blocked | 6 | Semi Bold 28 white |
+| Groups | 9 | Semi Bold 28 white |
+
+Each stat has a subtitle in Regular 11 `#949BAA`.
+
+### 16.4 Contact card (in list)
+
+| Spec | Value |
+|------|-------|
+| Avatar | 36×36 ellipse, deterministic colour from npub hash, initials |
+| Name | Semi Bold 15 `#F3F5F7` |
+| @handle | Medium 11 `#A78BFA` |
+| npub | Regular 10 `#6F7787` truncated (e.g. `npub1alice…x9k2`) |
+| Bio | Regular 10 `#6F7787` (e.g. "Designer · Melbourne") |
+| Status chip | 82×28 radius 14 pill. Following=`#2B2146` stroke `#8B5CF6` text `#A78BFA`. Muted=`#FBBF24`. Blocked=`#FB7185`. |
+| Timestamp | Regular 10 `#6F7787` right-aligned (Today, Yesterday, Friday, etc.) |
+| More | `⋮` Semi Bold 16 `#949BAA` opens actions menu |
+| Search | 400×42 `#151922` stroke `#272D3A` radius 12 at top of content area |
+
+### 16.5 Contact detail (profile header)
+
+When a contact is selected, the content area shows a profile header with:
+- 88×88 avatar (radius 18)
+- Name, @handle, npub
+- Status actions: Following (active purple pill) / Mute / Block
+- Message timeline below
+
+### 16.6 Route
+
+The contacts screen lives at `/suite/contacts` in the route table, accessed via the dock "P" tile or the app switcher.
+
+## 17. File upload progress overlay (extracted from Figma Frame #12 overlay)
+
+An overlay panel that appears during compose modal attachment uploads. Positioned at (886, 594) relative to canvas, width 500, height 340.
+
+### 17.1 Overlay spec
+
+| Property | Value |
+|----------|-------|
+| Scrim | `rgba(5, 7, 11, 0.35)` full-screen |
+| Panel bg | `#11141B` |
+| Stroke | `#272D3A`, 1px |
+| Radius | 18px |
+| Width | 500px |
+| Height | 340px |
+| Position | x: 886, y: 594 (centred-bottom-right) |
+
+### 17.2 Header
+
+- "Uploading 3 files" — Semi Bold 16 `#F5F7FA` at (910, 616)
+- "2 of 3 complete" — Medium 11 `#949BAA` right-aligned at (1260, 620)
+
+### 17.3 File progress rows
+
+Each row is a 452×60 card (`#151922` stroke `#272D3A` radius 12) with:
+
+| Element | Spec |
+|---------|------|
+| Thumbnail | 36×36 `#1B202B` radius 9, bold 14 coloured letter |
+| Filename | Semi Bold 12 `#F3F5F7` (e.g. "Product-demo.mp4") |
+| Size | Regular 10 `#6F7787` (e.g. "284 MB") |
+| Progress | Percentage right-aligned (e.g. "72%" in `#FBBF24` for in-progress, "Complete" in `#34D399` for done) |
+| Progress bar | 288×4 track `#1B202B` radius 2, fill `#FBBF24` (uploading) or `#34D399` (complete) |
+
+Three file cards shown in the Figma:
+1. Product-demo.mp4 (284 MB, 72%) — amber progress bar
+2. Research-pack.pdf (18.4 MB, Complete) — green
+3. Notes-export.md (84 KB, Complete) — green
+
+### 17.4 Footer
+
+- "Encrypting before upload · 3 providers selected" — Regular 10 `#949BAA` at (910, 902)
+- "Hide" — Medium 11 `#A78BFA` right-aligned, closes the overlay
+
+### 17.5 State variants
+
+| State | Progress bar colour | Percentage text |
+|-------|-------------------|-----------------|
+| Pending | None | — |
+| Uploading (0–99%) | `#FBBF24` (amber) | `#FBBF24` e.g. "72%" |
+| Complete | `#34D399` (green) | "Complete" in `#34D399` |
+| Failed | `#FB7185` (red) | "Failed" in `#FB7185` |
+
+### 17.6 Interaction
+
+- "Hide" link dismisses the overlay; upload continues in background
+- Overlay auto-closes when all files complete
+- Re-open from compose modal attachment area
+
+## 18. Interaction specification
 
 Every interactive component must implement the states below. Use Tailwind `group`/`peer` variants or CSS classes. Transition duration: `150ms ease-in-out` for micro-interactions, `200ms` for panel slides, `250ms` for modal open/close.
 
-### 15.1 Button / clickable base
+### 18.1 Button / clickable base
 
 | State | Change | Tailwind equivalent |
 |-------|--------|---------------------|
@@ -760,7 +946,7 @@ Every interactive component must implement the states below. Use Tailwind `group
 | Focus-visible | 2px `#8B5CF6` ring, offset 2px | `focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0D12]` |
 | Disabled | Opacity 0.4, cursor not-allowed | `disabled:opacity-40 disabled:cursor-not-allowed` |
 
-### 15.2 MailboxRow (sidebar nav)
+### 18.2 MailboxRow (sidebar nav)
 
 | State | Change |
 |-------|--------|
@@ -768,7 +954,7 @@ Every interactive component must implement the states below. Use Tailwind `group
 | Hover (inactive) | Icon + label `#F3F5F7` at 60% |
 | Selected (active mailbox) | 216×38 pill `#2B2146` radius 10, icon `#A78BFA`, label white, count `#A78BFA` |
 
-### 15.3 MessageRow (message list)
+### 18.3 MessageRow (message list)
 
 | State | Change |
 |-------|--------|
@@ -778,7 +964,7 @@ Every interactive component must implement the states below. Use Tailwind `group
 | Unread dot | 7×7 `#A78BFA` ellipse visible |
 | Read (after click) | Sender / subject switch from Semi Bold to Medium weight, unread dot hidden |
 
-### 15.4 FilterChip (message list header)
+### 18.4 FilterChip (message list header)
 
 | State | Change |
 |-------|--------|
@@ -786,7 +972,7 @@ Every interactive component must implement the states below. Use Tailwind `group
 | Hover (inactive) | stroke `#8B5CF6` at 50% opacity |
 | Inactive default | bg `#151922`, stroke `#272D3A`, text `#949BAA` |
 
-### 15.5 Reading pane pills (Work / Encrypted / 3 relays)
+### 18.5 Reading pane pills (Work / Encrypted / 3 relays)
 
 | State | Change |
 |-------|--------|
@@ -795,7 +981,7 @@ Every interactive component must implement the states below. Use Tailwind `group
 | 3 relays (neutral) | bg transparent, stroke `#272D3A`, text `#949BAA` |
 | Hover (any pill) | `brightness-110` |
 
-### 15.6 IconDock tiles
+### 18.6 IconDock tiles
 
 | State | Change |
 |-------|--------|
@@ -804,14 +990,14 @@ Every interactive component must implement the states below. Use Tailwind `group
 | Hover (inactive) | bg `#11141B` (same as dock bg, but let colour shine 50% brighter via `brightness-125`) |
 | Logo tile (always "N") | bg `#8B5CF6`, radius 13, white letter — no interactive states |
 
-### 15.7 Avatar (message row + reading pane)
+### 18.7 Avatar (message row + reading pane)
 
 | State | Change |
 |-------|--------|
 | Default | Ellipse with deterministic fill, white initials |
 | Hover | `brightness-110`, cursor pointer (click opens npub profile sidebar in phase 2) |
 
-### 15.8 Compose modal transitions
+### 18.8 Compose modal transitions
 
 | Action | Animation |
 |--------|----------|
@@ -821,7 +1007,7 @@ Every interactive component must implement the states below. Use Tailwind `group
 | Restore | Reverse of minimize, 200ms ease-in-out |
 | Scrim | Opacity 0 → `rgba(5,7,11,0.44)` over 200ms on open, reverse on close |
 
-### 15.9 AppSwitcher popover
+### 18.9 AppSwitcher popover
 
 The popover is a 280×300 card (`#1B202B`, radius 18, stroke `#272D3A`, drop shadow) positioned at (1112,74) relative to the canvas, overlapping the reading pane's top-right corner. It is rendered within a z-index layer above all panels.
 
@@ -839,7 +1025,7 @@ The popover is a 280×300 card (`#1B202B`, radius 18, stroke `#272D3A`, drop sha
 
 Keyboard: Arrow keys navigate tiles in grid order (left/right/up/down). Enter/Space selects.
 
-## 16. Responsive behavior
+## 19. Responsive behavior
 
 The reference canvas is 1440×1024. Below are the breakpoints and what changes at each. Note: responsive desktop mail apps typically do not support mobile widths; the minimum supported width is **900px** for MVP. Mobile-first responsive is phase 2.
 
@@ -852,7 +1038,7 @@ The reference canvas is 1440×1024. Below are the breakpoints and what changes a
 
 Implementation approach: use CSS `@container` queries where possible so the reading pane self-manages its collapsed state independently of viewport width. The `MailLayout` component reads a `useWindowSize()` or CSS container query to toggle between `layout: 'three-pane'` and `layout: 'overlay-pane'`.
 
-## 17. Compose state machine
+## 20. Compose state machine
 
 The compose modal has a defined lifecycle. AI must implement exactly the transitions below; any other transition is a bug.
 

@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useBlossomStore } from "@/lib/stores/blossom";
+import UploadProgress from "./UploadProgress";
 
 interface UploadItem {
   id: string;
@@ -21,6 +22,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [showUploadOverlay, setShowUploadOverlay] = useState(false);
 
   const status = useComposeStore((s) => s.status);
   const draft = useComposeStore((s) => s.draft);
@@ -51,6 +53,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const handleFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
+    setShowUploadOverlay(true);
 
     const { createKeyStore } = await import("@post/nostr-core");
     const keyStore = createKeyStore();
@@ -352,6 +355,22 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
+      {showUploadOverlay && uploads.length > 0 && (
+        <UploadProgress
+          files={uploads.map((u) => ({
+            id: u.id,
+            name: u.fileName,
+            sizeBytes: u.sizeBytes,
+            progress: u.progress,
+            status: u.status === "uploaded" ? "complete" as const : u.status as "pending" | "uploading" | "failed",
+            letter: u.fileName.charAt(0).toUpperCase(),
+            color: "var(--color-info)",
+          }))}
+          totalComplete={uploads.filter((u) => u.status === "uploaded").length}
+          totalCount={uploads.length}
+          onHide={() => setShowUploadOverlay(false)}
+        />
+      )}
       <input ref={fileInputRef} type="file" multiple onChange={handleFiles} className="hidden" />
     </>
   );
