@@ -1,0 +1,949 @@
+# Post — Project Plan
+
+A Nostr-based, email-styled private messaging app. First app of the "Nostr Suite"; built on a shared Suite shell so sibling apps (Drive, Calendar, Notes, Contacts, Tasks) can plug in later.
+
+## 1. Decisions (locked)
+
+| Area | Decision |
+|------|----------|
+| Stack | Next.js (App Router) + React + TypeScript + Tailwind CSS |
+| Nostr | Real NIP-17 (DMs) + NIP-44 (encryption) from day one; NIP-59 (gift-wrap) as a follow-up phase |
+| Identity | `nostr-tools` key management; npub primary identity, NIP-05 verification as a badge |
+| Relays | Relay pool with health monitoring, multi-relay delivery, latency alerts |
+| Attachments | Blossom media-server protocol with "Stored in Drive" cross-app stub |
+| Deploy | Web first; Tauri desktop wrapper added as a later phase |
+| Scope | Post/Mail fully built; shared Suite shell (icon dock, app switcher, identity/relay state, theme tokens) reusable for future apps |
+| MVP | Inbox + read + compose + all mailboxes (Starred/Snoozed/Sent/Drafts/Archive/Spam) + Labels + relay health + Blossom attachments |
+
+## 2. Design system (extracted from Figma)
+
+### 2.1 Color tokens (proposed Tailwind theme — `@theme` in `globals.css`)
+
+```
+/* Canvas */
+--bg-canvas:        #0B0D12;  /* frame + message-list panel */
+--bg-dock:          #11141B;  /* icon dock + reading pane + network card */
+--bg-sidebar:       #151922;  /* sidebar + search + active row card + pills */
+--bg-pill-subtle:   #1B202B;  /* label pills + progress track + attachment thumb #2 */
+--bg-modal-2:       #202632;  /* secondary buttons / window controls */
+--border-hairline:  #272D3A;  /* all 1px dividers + inactive strokes */
+--surface-active:   #2B2146;  /* active mailbox pill + active chip + recipient pill */
+--bg-modal-card:    #171B24;  /* compose modal inner card (modal-only) */
+--bg-modal-attach:  #11151C;  /* compose attachment card (modal-only) */
+--bg-modal-stroke:  #303744;  /* modal hairlines (modal-only) */
+
+/* Brand — purple */
+--brand:            #8B5CF6;  /* logo, Compose CTA, Send, active tile stroke */
+--brand-light:      #A78BFA;  /* selected letter, counts, icons, bullets, links */
+
+/* Semantic */
+--ok:               #34D399;  /* presence, relay status, verified, encrypted text, draft saved */
+--info:             #60A5FA;  /* Work label, Drive tile */
+--warn:             #FBBF24;  /* Projects label, Notes tile */
+--danger:           #FB7185;  /* Receipts label, Contacts tile, Discard */
+--teal:             #14B8A6;  /* Tasks tile */
+
+/* Text */
+--text-primary:     #FFFFFF;
+--text-near-white:   #F3F5F7;  /* warm-white for inbox sidebar + body */
+--text-modal:        #F5F7FA;  /* cool-white inside compose modal */
+--text-secondary:    #949BAA;  /* standard muted (app) */
+--text-modal-2:     #9CA4B3;  /* muted (inside modal) */
+--text-tertiary:    #6F7787;  /* placeholders, captions, timestamps */
+--text-placeholder: #717A8A;  /* placeholders (inside modal) */
+
+/* Avatar palette (deterministic by npub hash) */
+--avatar-1: #7C3AED;  --avatar-2: #2563EB;  --avatar-3: #059669;
+--avatar-4: #DB2777; --avatar-5: #D97706;  --avatar-6: #475569;  --avatar-7: #0891B2;
+```
+
+### 2.2 Typography — Inter only
+
+Set `Inter` as the global font (next/font). Type ramp (sizes in px):
+
+| Style   | Sizes | Use |
+|---------|-------|-----|
+| Regular 400 | 10, 11, 12, 13, 14, 15, 19 | body, preview, captions, glyph icons |
+| Medium 500 | 10–21 | mailbox labels (mixed), chips, read-row senders, format toolbar, recipient name |
+| Semi Bold 600 | 10–25 | brand, mailbox active, app names, subjects (unread), sender (unread), timestamps (unread), subject (reading pane), modal title |
+| Bold 700 | 15, 17, 18, 21 | dock logo "N", app letters, attachment thumb glyphs |
+
+### 2.3 Layout grid (1440×1024 reference)
+
+Four vertical panels with 1px `#272D3A` hairlines between them:
+
+| Panel | x | width | bg |
+|-------|---|-------|----|
+| Icon Dock       | 0–72   | 72  | `#11141B` |
+| Sidebar         | 72–320 | 248 | `#151922` |
+| Message List    | 320–768| 448 | `#0B0D12` |
+| Reading Pane    | 768–1440| 672 | `#11141B` |
+
+Implementation: CSS grid `grid-cols-[72px_249px_449px_1fr]` with `divide-x divide-[#272D3A]`. Heights fill the viewport (`100dvh`); horizontal overflow hidden; reading pane scrolls internally.
+
+### 2.4 Radius scale
+
+| Token | px | Use |
+|-------|----|-----|
+| `radius-tile`   | 13 | dock logo |
+| `radius-tile-2` | 12 | dock tiles |
+| `radius-pill`   | 14 | CTA, chips, pills, cards, search bar, attachment cards |
+| `radius-progress` | 3 | network progress |
+| `radius-modal`  | 20 | compose modal inner card |
+| `radius-modal-shadow` | 24 | modal shadow wrapper |
+
+### 2.5 Icons — Unicode glyphs initially, swap to icon set later
+
+Figma uses Unicode glyphs (`＋ ⌕ ⋮ ← ☆ ⌁ ▣ ◷ ➤ ▤ ! ⌁ …`) for everything. v1 renders these as text nodes with Tailwind classes for color/size; phase 2 swaps to a real icon library (lucide-react) once UX iteration settles. Tracked in `ICONS.md`.
+
+## 3. Project structure (proposed)
+
+```
+post/
+├─ app/
+│  ├─ layout.tsx                 # root: providers, theme, font
+│  ├─ page.tsx                   # redirects to /mail/inbox (or onboarding)
+│  ├─ (suite)/
+│  │  └─ layout.tsx              # SuiteShell: icon dock + app switcher + relay/identity context, fills viewport
+│  │  └─ mail/
+│  │     ├─ layout.tsx           # MailLayout: sidebar + message list + reading pane
+│  │     ├─ inbox/page.tsx
+│  │     ├─ starred/page.tsx
+│  │     ├─ sent/page.tsx
+│  │     ├─ drafts/page.tsx
+│  │     ├─ archive/page.tsx
+│  │     ├─ spam/page.tsx
+│  │     └─ labels/[label]/page.tsx
+│  └─ onboarding/page.tsx        # key generation / import (out-of-MVP scope, stub)
+├─ packages/
+│  ├─ suite-shell/               # reusable shell for future Suite apps (out of /app for portability)
+│  ├─ nostr-core/                # nostr service: key store, relay pool, NIP-17/44, NIP-59
+│  └─ ui/                        # shared primitives (Pill, Avatar, Button, Card, etc.)
+├─ lib/
+│  ├─ stores/                    # zustand: messages, mailboxes, relays, identity
+│  ├─ db/                        # IndexedDB (Dexie) message/event cache + drafts
+│  └─ utils/                     # color/avatar/npub formatters
+├─ public/fonts/                 # Inter (next/font local)
+├─ tailwind.config.ts / globals.css  # design tokens → @theme
+├─ PLAN.md  (this file)
+├─ ICONS.md
+└─ AGENTS.md
+```
+
+## 4. Shared Suite shell
+
+The shell is a separate concern so Drive/Calendar/etc. can reuse it later. It provides:
+
+- **`SuiteShellProvider`** — owns identity, relay pool, theme tokens via Context.
+- **`IconDock`** — 72px vertical rail:
+  - 40×40 logo (purple `#8B5CF6`, radius 13, "N" Bold 17 white).
+  - Active app tile (radius 12, fill `#2B2146`, stroke `#8B5CF6`, letter in `#A78BFA`) — Post is active (`M`).
+  - Inactive app tiles `D, C, N, P` (stroke `#272D3A`, letter `#949BAA`). Clicking opens app-switcher popover or routes to placeholder "coming soon".
+  - Hairline divider, then `⌕` search and `?` help tiles.
+  - User avatar (36×36 ellipse, initials, presence dot at bottom-right corner).
+- **`AppSwitcher`** — 280×300 popover (`#1B202B`, radius 18, drop shadow):
+  - "Nostr Suite" heading + "All apps" link.
+  - 3×2 grid of 64×64 tiles (radius 16, stroke `#272D3A`), each with bold colored letter + caption (`#949BAA`): M Post / D Drive / C Calendar / N Notes / P Contacts / T Tasks. Color codes per §2.1.
+  - Footer caption "Shared identity · unified search · private by default".
+- **Theme tokens** exported from `globals.css` via Tailwind `@theme` so all apps inherit the same palette.
+- **Identity + relay context** — single source of truth (nsec/npub, relay list, presence), consumed by Post now and future apps later.
+
+## 4.5 Data models
+
+These TypeScript types define every entity in the system. All components, stores, and nostr-core functions reference these types. Deviating from them constitutes drift.
+
+```typescript
+// ─── Identity ───
+interface Identity {
+  npub: string;             // Bech32-encoded public key
+  nsec: string | null;      // Bech32-encoded secret key (null if readonly / NIP-07)
+  pubkey: string;           // Hex public key (32 bytes)
+  nip05: string | null;     // NIP-05 identifier e.g. "alice@example.com"
+  nip05Verified: boolean;   // NIP-05 verification check result
+  profile: Profile | null;  // Cached kind 0 metadata
+}
+
+interface Profile {
+  name: string;
+  displayName: string;
+  about: string;
+  picture: string;
+  banner: string;
+  website: string;
+  nip05: string;
+  lud06: string;   // LNURL
+  lud16: string;   // Lightning address
+}
+
+// ─── Relays ───
+interface RelayConfig {
+  url: string;              // wss://relay.damus.io
+  read: boolean;
+  write: boolean;
+}
+
+interface RelayStatus {
+  url: string;
+  connected: boolean;
+  latency: number;          // ms, -1 if unknown
+  lastEventAt: number;      // Unix timestamp ms
+  error: string | null;
+}
+
+// ─── Messages ───
+type MailboxKind = 'inbox' | 'starred' | 'snoozed' | 'sent' | 'drafts' | 'archive' | 'spam';
+
+interface Message {
+  id: string;               // Nostr event id (hex)
+  kind: number;             // 14 (NIP-17 DM) or 1059 (NIP-59 gift-wrap)
+  pubkey: string;           // Sender pubkey (hex)
+  recipientPubkey: string;  // Recipient pubkey (hex)
+  content: string;          // Decrypted plaintext (NIP-44)
+  raw: string;              // Encrypted ciphertext (for re-encryption on re-import)
+  createdAt: number;        // Unix timestamp seconds
+  tags: string[][];         // Raw event tags
+  subject: string;          // Extracted from tags or first line
+  preview: string;          // First ~120 chars of content
+  read: boolean;
+  starred: boolean;
+  archived: boolean;
+  snoozedUntil: number | null;  // Unix timestamp ms, null = not snoozed
+  spam: boolean;
+  mailbox: MailboxKind;     // Derived classification
+  labelIds: string[];       // References Label.id
+  replyTo: string | null;   // Parent event id (NIP-10 root)
+  relayUrls: string[];      // Relays this event was published to
+  attachments: AttachmentRef[];
+  isEncrypted: boolean;     // true = NIP-44 applied
+  isGiftWrapped: boolean;   // true = NIP-59
+  deliveryStatus: 'pending' | 'sent' | 'delivered' | 'failed';
+}
+
+// ─── Attachments ───
+interface AttachmentRef {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;                  // Blossom required
+  url: string;                     // Blossom server URL
+  storedInDrive: boolean;          // true if uploaded to Drive
+  encrypted: boolean;              // Blob-level encryption applied
+}
+
+interface AttachmentUpload {
+  file: File;
+  progress: number;                // 0–100 upload progress
+  status: 'pending' | 'uploading' | 'uploaded' | 'failed';
+  error: string | null;
+  result: AttachmentRef | null;
+}
+
+// ─── Labels ───
+interface Label {
+  id: string;                      // uuid
+  name: string;                    // e.g. "Work", "Friends"
+  color: string;                   // hex e.g. "#60A5FA"
+  messageIds: string[];            // References Message.id
+}
+
+// ─── Drafts ───
+interface Draft {
+  id: string;                      // uuid
+  to: RecipientEntry[];
+  cc: RecipientEntry[];
+  bcc: RecipientEntry[];
+  subject: string;
+  body: string;
+  attachments: AttachmentUpload[];
+  relayOverrides: string[];        // Custom relays for this draft
+  createdAt: number;               // Unix timestamp ms
+  updatedAt: number;               // Unix timestamp ms
+  savedAt: number | null;          // Last autosave timestamp
+  scheduledFor: number | null;     // Unix timestamp ms (schedule send)
+}
+
+interface RecipientEntry {
+  pubkey: string;
+  npub: string;
+  name: string;                    // Resolved profile name or npub truncation
+  avatarUrl: string;
+  isGroup: boolean;                // true if group inbox (NIP-17 group)
+}
+
+// ─── Contacts ───
+interface Contact {
+  pubkey: string;
+  npub: string;
+  name: string;                    // Resolved profile display name
+  about: string;
+  picture: string;
+  nip05: string;
+  nip05Verified: boolean;
+  lastMessageAt: number;           // Unix timestamp ms
+  relayRecommended: string;        // Their preferred relay
+}
+```
+
+## 5. Post app — component inventory (mapped to Figma)
+
+Each component below maps 1:1 to the Figma element; class names (radius/fill/text) come from §2 tokens. Live in `packages/ui` (if reusable across Suite apps) or `app/(suite)/mail/_components` (mail-specific).
+
+### 5.1 Sidebar
+
+| Component | Spec |
+|-----------|------|
+| `SidebarBrand`            | "N Mail" Semi Bold 21 `#F3F5F7`; tagline "Private messaging for Nostr" Regular 11 `#949BAA`. |
+| `ComposeCTA`              | 200×48 purple `#8B5CF6`, radius 14, glyph `＋` + "Compose" white. Opens compose modal. |
+| `MailboxRow`              | Active: 216×38 pill `#2B2146` radius 10, icon purple, label white, count purple right. Inactive: icon + label `#949BAA`, optional count. Icons: `▣ Inbox, ☆ Starred, ◷ Snoozed, ➤ Sent, ▤ Drafts, ⌁ Archive, ! Spam`. |
+| `LabelSectionHeader`      | "LABELS" Semi Bold 10 `#6F7787`. |
+| `LabelRow`                | `●` dot colored by label, name `#949BAA`. Work=`#60A5FA`, Friends=`#34D399`, Projects=`#FBBF24`, Receipts=`#FB7185`. |
+| `NetworkStatusCard`       | 216×142 `#11141B` stroke `#272D3A` radius 14. "Network" Semi Bold 12 white; 8px green dot + "N relays connected"; "Delivery health" caption; progress bar (track `#1B202B`, fill `#34D399` = green ratio); "Synced X sec ago" `#6F7787`. Wired to live relay pool. |
+
+### 5.2 Message list
+
+| Component | Spec |
+|-----------|------|
+| `ListHeaderBar`           | Title Semi Bold 22 white ("Inbox"); subtitle Regular 11 `#949BAA` ("12 unread"). |
+| `SearchBar`              | 400×42 `#151922`, stroke `#272D3A`, radius 12. `⌕` Regular 15 + placeholder "Search messages, people or npubs" `#6F7787`. |
+| `FilterChip`             | Active: `#2B2146` stroke `#8B5CF6` text `#A78BFA`. Inactive: `#151922` stroke `#272D3A` text `#949BAA`. Chips: Primary / Unread / Starred / Attachments. Row overflows horizontally with `overflow-x: auto` hidden scrollbar; More button (`⋮`) reveals additional filters or a dropdown. |
+| `MoreButton`             | `⋮` Semi Bold 18 `#949BAA`. |
+| `MessageRow`             | 424×104 card `#151922` stroke `#272D3A` radius 14 (active variant only; rows otherwise stack with 1px dividers). 40×40 avatar ellipse with deterministic color + initials (Semi Bold 11.2 white). Sender Semi Bold 13 (unread) / Medium 13 (read). Time Semi Bold 11 white (unread) / Regular 11 `#6F7787` (read). Subject Semi Bold 12 (unread) / Medium 12 (read). Preview Regular 11 `#6F7787`. LabelPill 52×28 `#1B202B` radius 14 text `#949BAA`. Unread dot 7×7 `#A78BFA`. |
+| `MessageList scroll`     | The entire message list panel scrolls vertically (`overflow-y: auto`) when content exceeds the viewport. On selection via `?c=`, the selected `MessageRow` scrolls into view (`scrollIntoView({ block: 'nearest' })`). |
+| `Avatar`                 | ellipse, fill = avatar palette index derived from `hash(npub) mod 7`, initials from name. |
+
+### 5.3 Reading pane
+
+| Component | Spec |
+|-----------|------|
+| `ReadingTopBar`           | `←` back (Regular 20); pill buttons Archive/Snooze/Delete 82×36 radius 10 `#151922` stroke `#272D3A` text `#949BAA`. Hover: stroke brightens to `#8B5CF6` at 50% opacity, cursor pointer. `☆` star toggle Semi Bold 19; `⋮` more Semi Bold 19. |
+| `SubjectLine`             | Semi Bold 25 white. |
+| `SubjectPills`            | Work `#2B2146` stroke `#8B5CF6` text `#A78BFA`; Encrypted neutral pill green text `#34D399`; "3 relays" neutral pill `#949BAA`. |
+| `SenderBlock`             | 46×46 avatar; sender Semi Bold 14 white; npub truncated `npub1…x9k2` Regular 11 `#6F7787`; "to Matt"; timestamp Right-aligned Regular 11; "✓ verified" Medium 10 right-aligned `#34D399`. |
+| `MessageBody`            | Regular 14 paragraphs; bulleted list with 6×6 purple dots + Regular 13 lines. Renders markdown-lite (subset: bold, italic, lists, links). |
+| `AttachmentCard`          | 274×88 `#151922` stroke `#272D3A` radius 12. Thumbnail 48×56 tinted; filename Semi Bold 12 white; meta "X MB · Blossom / encrypted" Regular 10 `#6F7787`; action link "Open in Drive" / "Preview" Medium 10 purple. |
+| `ReplyComposer`           | 560×130 `#151922` stroke `#272D3A` radius 14; recipient "Alice"; placeholder "Reply to Alice…"; divider; toolbar glyphs B/I/`⌁`/☺; Send 90×34 `#8B5CF6` radius 10 "Send" Semi Bold 12 white. |
+
+### 5.4 Compose modal
+
+| Component | Spec |
+|-----------|------|
+| `ComposeModal`            | Scrim `rgba(5,7,11,0.44)`; shadow wrapper 730×784 radius 24 with `0 20 40 0 rgba(0,0,0,0.5)`; inner card `#171B24` stroke `#303744` radius 20. |
+| `ComposeHeader`           | "New message" Semi Bold 16 `#F5F7FA`; "Draft saved" Medium 11 right-aligned `#34D399`; 30×30 minimize/close (`#202632`, stroke `#303744`, glyphs `–`/`×` `#9CA4B3`). |
+| `RecipientField`          | "To" label Medium 12 `#9CA4B3`; recipient pill 210×34 radius 17 `#2B2146` stroke `#8B5CF6` with 22×22 avatar + name + `×` remove; placeholder "Add people, npubs or groups" `#717A8A`; "Cc  Bcc" link Medium 11 purple. |
+| `SubjectField`           | "Subject" Medium 12; value Regular 13 `#F5F7FA`. |
+| `ComposeBody`             | Regular 14 `#F5F7FA`, full markdown-lite (subset). Autorecipients NIP-44 encryption on send. |
+| `ComposeAttachmentCard`   | 326×74 `#11151C` stroke `#303744` radius 12; thumbnail; filename; meta "X MB · encrypted"; "Stored in Drive" Medium 10 `#34D399`; `×` remove. |
+| `StatusPills`             | "Encrypted" `#2B2146` stroke `#8B5CF6` green text `#34D399`; "N relays" neutral `#9CA4B3`; "Private" neutral `#9CA4B3`; "Delivery settings" link Medium 11 purple. |
+| `FormatToolbar`           | glyphs B I U `⌁` `▣` `☺` `@` `⋯` Semi Bold 13 `#9CA4B3`; "Markdown supported" Regular 10 `#717A8A`. |
+| `ComposeFooter`           | `SendButton` split: primary 112×40 `#8B5CF6` radius 12 + 34×40 dropdown `⌄`; "Schedule send" 126×40 `#202632` stroke `#303744` `#9CA4B3`; "Discard" text-only Medium 11 `#FB7185`. |
+| `FloatingComposeAnnotation`| (annotation only — drop in production; document the draggable/resizable/minimizable/autosaves drafts requirements in `ICONS.md` or a UX doc and implement as v2 polish). |
+
+## 6. Screens & states
+
+### 6.1 Route table
+
+The app uses Next.js App Router under `(suite)/mail/`. The `layout.tsx` in `(suite)/mail/` renders `<MailLayout />` (three-pane shell) which reads `selectedConversationId` from the URL search params to populate the reading pane.
+
+| Route | Mailbox filter | Reading pane | Notes |
+|-------|---------------|--------------|-------|
+| `/mail/inbox` | `mailbox: 'inbox'`, not archived, not spam, not snoozed | Nothing selected (empty state) | Default redirect from `/` |
+| `/mail/inbox?c=<eventId>` | Same as above | `Message` with `eventId` | Reading pane driven by query param, not path segment |
+| `/mail/starred` | `starred: true` | Nothing or `?c=` |
+| `/mail/snoozed` | `snoozedUntil > now` | Nothing or `?c=` |
+| `/mail/sent` | `pubkey === identity.pubkey` | Nothing or `?c=` |
+| `/mail/drafts` | From `drafts` Dexie table | Nothing or `?c=` | Opens compose modal if creating new |
+| `/mail/archive` | `archived: true` | Nothing or `?c=` |
+| `/mail/spam` | `spam: true` | Nothing or `?c=` |
+| `/mail/labels/[labelId]` | `labelIds.includes(labelId)` | Nothing or `?c=` |
+| `/?compose=true` | Current mailbox | Current or none | Floating compose modal overlay; preserved across mailbox nav |
+
+The `?c=` query param approach means the reading pane selection is not part of the path — refreshing the page preserves the open message without requiring nested route segments.
+
+### 6.2 State list
+
+1. **Inbox + open message** — default route. Three-pane mail layout; reading pane shows one selected thread; an "All apps" popover (dismissable) demonstrates the Suite shell.
+2. **Compose (floating modal)** — overlays a scrim + centered 710×760 card on the inbox.
+3. **Other mailboxes** — Starred, Snoozed, Sent, Drafts, Archive, Spam, and per-label pages reuse the same `MailLayout` with different filtered `MessageList` sources.
+4. **Empty state** (not in Figma) — defined as part of MVP polish for "no messages" lists and "no message selected" reading pane.
+
+## 7. Nostr core service (`packages/nostr-core`)
+
+Built on `nostr-tools`. Surfaces a framework-agnostic API consumed via Zustand stores / React context.
+
+Every exported function has a typed signature below. Implementations must match these exactly.
+
+### 7.1 Key store
+
+```typescript
+// packages/nostr-core/src/keys.ts
+
+export function generateKey(): { nsec: string; npub: string; pubkey: string };
+
+export function importFromNsec(nsec: string): { npub: string; pubkey: string } | Error;
+
+export function importFromNpub(npub: string): { pubkey: string } | Error;
+
+export function formatNpub(npub: string): string;
+// Returns truncated form e.g. "npub1alice…x9k2"
+
+export interface KeyStore {
+  load(): Identity | null;
+  save(identity: Identity): void;
+  clear(): void;
+}
+```
+
+- `KeyStore` stores plaintext session in-memory; future: NIP-07 extension, nsec backups (NIP-46 bunker remote-signer optional).
+- `Identity` type per §4.5.
+- `formatNpub(npub)` → `npub1alice…x9k2` truncation (first 10 chars + `…` + last 4 chars of hex after bech32 decode).
+
+### 7.2 Relays
+
+```typescript
+// packages/nostr-core/src/relays.ts
+
+export function createRelayPool(relays: RelayConfig[]): RelayPool;
+
+export interface RelayPool {
+  connectAll(): Promise<void>;
+  disconnectAll(): void;
+  getStatus(): RelayStatus[];
+  subscribe(filters: NostrFilter[], cb: (event: NostrEvent) => void): () => void;
+  // Returns unsubscribe function
+  publish(event: NostrEvent, targetRelays?: string[]): Promise<Map<string, boolean>>;
+  // Returns map of relayUrl → success/fail
+  getHealthPercent(): number;
+  // Returns 0–100 based on connected count / total
+  getSyncedAgo(): number;
+  // Seconds since last event received across any relay
+}
+
+// Default seed relays
+export const DEFAULT_RELAYS: RelayConfig[] = [
+  { url: 'wss://relay.damus.io', read: true, write: true },
+  { url: 'wss://relay.nostr.band', read: true, write: true },
+  { url: 'wss://nos.lol', read: true, write: true },
+  { url: 'wss://relay.snort.social', read: true, write: true },
+  { url: 'wss://purplepag.es', read: true, write: false },
+];
+```
+
+- `RelayMonitor` message producer — emulates the "Relay Monitor" sender delivering `One relay is responding slowly / relay.damus.io latency is above your preferred threshold` warnings (real telemetry from the pool → wrapped as a system message with kind 14).
+- `RelayConfig`, `RelayStatus` types per §4.5.
+
+### 7.3 Messaging — NIP-17 + NIP-44
+
+```typescript
+// packages/nostr-core/src/messages.ts
+
+export interface SendOptions {
+  to: string;                    // Recipient pubkey (hex)
+  content: string;               // Plaintext
+  subject?: string;
+  attachments?: AttachmentRef[];
+  replyTo?: string;              // Parent event id
+  relayOverrides?: string[];     // Override default relay set
+  giftWrap?: boolean;            // NIP-59 (phase 2)
+}
+
+export interface SendResult {
+  eventId: string;
+  published: Map<string, boolean>;  // relayUrl → published
+  delivered: number;                 // Count of successful relay publishes
+}
+
+export function sendMessage(
+  pool: RelayPool,
+  keys: KeyStore,
+  opts: SendOptions
+): Promise<SendResult>;
+
+export function replyToThread(
+  pool: RelayPool,
+  keys: KeyStore,
+  rootEventId: string,
+  content: string,
+  attachments?: AttachmentRef[]
+): Promise<SendResult>;
+
+export function decryptEvent(
+  event: NostrEvent,
+  keys: KeyStore
+): Promise<string>;
+// Decrypts NIP-44 content with the recipient's key
+
+export function decryptIncoming(
+  pool: RelayPool,
+  keys: KeyStore
+): AsyncGenerator<Message>;
+// Subscribes to kind 14 events addressed to keys.pubkey,
+// decrypts each, yields Message objects
+```
+
+- DMs per NIP-17 (kind 14) using NIP-44 encryption (v2 cipher).
+- NIP-10 tags for threading: `["e", <rootEventId>, <relayUrl>, "root"]` on root, `["e", <parentEventId>, <relayUrl>, "reply"]` on replies.
+- `GiftWrap` (NIP-59) — sealed sender mode offered as a UX toggle ("Private" pill); exposed via `opts.giftWrap` in phase 2.
+
+### 7.4 Profile resolution
+
+```typescript
+// packages/nostr-core/src/profiles.ts
+
+export function fetchProfile(
+  pool: RelayPool,
+  pubkey: string
+): Promise<Profile | null>;
+// Subscribes to kind 0, returns parsed metadata
+
+export function resolveNip05(
+  nip05: string
+): Promise<{ pubkey: string; verified: boolean } | null>;
+
+export function searchProfiles(
+  pool: RelayPool,
+  query: string
+): Promise<Contact[]>;
+// Searches kind 0 events by name/displayName via relay search
+
+export function batchFetchProfiles(
+  pool: RelayPool,
+  pubkeys: string[]
+): Promise<Map<string, Profile>>;
+```
+
+### 7.5 Blossom
+
+```typescript
+// packages/nostr-core/src/blossom.ts
+
+export interface BlossomServer {
+  url: string;    // e.g. https://blossom.example.com
+}
+
+export function uploadBlob(
+  server: BlossomServer,
+  file: File,
+  pubkey: string,
+  onProgress?: (percent: number) => void
+): Promise<AttachmentRef>;
+// Uses NIP-98 HTTP auth (Authorization: Nostr <event>)
+// Returns server-generated sha256 + url
+
+export function downloadBlob(
+  ref: AttachmentRef
+): Promise<ArrayBuffer>;
+
+export function deleteBlob(
+  server: BlossomServer,
+  sha256: string,
+  pubkey: string
+): Promise<void>;
+```
+
+### 7.6 Encryption UX
+
+"Encrypted" pill required on every outgoing message (NIP-44 baseline); "Private" pill adds NIP-59 gift-wrap when toggled; "N relays" pill shows current pool size to recipient; "Delivery settings" opens relay selection for that send.
+
+## 8. Attachment storage — Blossom
+
+- Implemented via `packages/nostr-core/src/blossom.ts` — exports `uploadBlob`, `downloadBlob`, `deleteBlob` (signatures in §7.5).
+- Attachments become references (`AttachmentRef`) stored as encrypted NIP-44 content with the blob descriptor (sha256, url, mime, size).
+- "Stored in Drive" link opens the blob in the (local) Nostr Drive app — for v1 this is a stub URL `mailto:.../drive?blob=<sha256>` that no-ops.
+- Encryption: encrypt blob descriptor (and optionally the bytes stream — phase 2) before announcing.
+- Reading pane shows the cached blob via local URL.
+
+## 9. Persistence
+
+### 9.1 Dexie schema (IndexedDB)
+
+```typescript
+// lib/db/schema.ts
+import Dexie, { type EntityTable } from 'dexie';
+
+export class PostDB extends Dexie {
+  messages!: EntityTable<Message, 'id'>;
+  drafts!: EntityTable<Draft, 'id'>;
+  labels!: EntityTable<Label, 'id'>;
+  contacts!: EntityTable<Contact, 'pubkey'>;
+  relayConfigs!: EntityTable<RelayConfig, 'url'>;
+
+  constructor() {
+    super('PostDB');
+    this.version(1).stores({
+      messages: 'id, pubkey, recipientPubkey, createdAt, read, starred, archived, spam, mailbox, *labelIds',
+      drafts: 'id, updatedAt, scheduledFor',
+      labels: 'id, name',
+      contacts: 'pubkey, name, lastMessageAt',
+      relayConfigs: 'url',
+    });
+  }
+}
+
+export const db = new PostDB();
+```
+
+Indexes enable efficient mailbox queries:
+- Inbox: `db.messages.where({ mailbox: 'inbox', archived: 0, spam: 0 })`
+- Starred: `db.messages.where({ starred: 1 })`
+- Snoozed: chain `.filter(m => m.snoozedUntil !== null && m.snoozedUntil > Date.now())`
+- Sent: `db.messages.where({ pubkey: identity.pubkey })`
+- By label: `db.messages.where('labelIds').equals(labelId)`
+
+### 9.2 Zustand store shapes
+
+```typescript
+// lib/stores/messages.ts
+interface MessagesState {
+  byId: Record<string, Message>;
+  ids: string[];                                    // Ordered by createdAt desc
+  selectedId: string | null;                        // Currently open in reading pane
+  loading: boolean;
+  error: string | null;
+
+  // Derived from dexie via sync
+  loadFromCache: () => Promise<void>;
+  selectMessage: (id: string | null) => void;       // Updates selectedId + URL ?c=
+  markRead: (id: string) => Promise<void>;
+  toggleStar: (id: string) => Promise<void>;
+  toggleArchive: (id: string) => Promise<void>;
+  toggleSpam: (id: string) => Promise<void>;
+  snooze: (id: string, until: number) => Promise<void>;
+  delete: (id: string) => Promise<void>;
+  ingestFromRelay: (message: Message) => void;     // Dedup + insert
+}
+
+// lib/stores/mailboxes.ts
+type MailboxTab = 'inbox' | 'starred' | 'snoozed' | 'sent' | 'drafts' | 'archive' | 'spam';
+
+interface MailboxState {
+  current: MailboxTab;
+  unreadCounts: Record<MailboxTab, number>;
+  filter: 'primary' | 'unread' | 'starred' | 'attachments';
+  navigate: (tab: MailboxTab) => void;              // Updates URL
+  setFilter: (filter: string) => void;
+  refreshUnreadCounts: () => Promise<void>;
+}
+
+// lib/stores/labels.ts
+interface LabelsState {
+  byId: Record<string, Label>;
+  allIds: string[];
+  createLabel: (name: string, color: string) => Promise<string>;
+  deleteLabel: (id: string) => Promise<void>;
+  assignLabel: (messageId: string, labelId: string) => Promise<void>;
+  removeLabel: (messageId: string, labelId: string) => Promise<void>;
+}
+
+// lib/stores/relays.ts
+interface RelaysState {
+  relays: RelayConfig[];
+  statuses: Record<string, RelayStatus>;
+  healthPercent: number;
+  syncedAgo: number;                                // Seconds
+  addRelay: (config: RelayConfig) => void;
+  removeRelay: (url: string) => void;
+  updateStatuses: () => Promise<void>;
+}
+
+// lib/stores/identity.ts
+interface IdentityState {
+  identity: Identity | null;
+  keyStore: KeyStore | null;
+  createOrImport: (nsec?: string) => Promise<Identity>;
+  logout: () => void;
+  refreshProfile: () => Promise<void>;
+}
+
+// lib/stores/compose.ts
+type ComposeStatus = 'closed' | 'composing' | 'minimized' | 'sending' | 'scheduled';
+
+interface ComposeState {
+  status: ComposeStatus;
+  draft: Draft;
+  uploads: AttachmentUpload[];
+  encrypted: boolean;
+  giftWrap: boolean;
+  relayOverrides: string[];
+  open: (replyTo?: Message) => void;
+  close: () => void;
+  minimize: () => void;
+  restore: () => void;
+  updateRecipients: (to: RecipientEntry[], cc: RecipientEntry[], bcc: RecipientEntry[]) => void;
+  updateSubject: (subject: string) => void;
+  updateBody: (body: string) => void;
+  addAttachment: (file: File) => void;
+  removeAttachment: (id: string) => void;
+  toggleEncrypted: () => void;
+  toggleGiftWrap: () => void;
+  setRelayOverrides: (relays: string[]) => void;
+  send: () => Promise<SendResult>;
+  scheduleSend: (at: number) => Promise<void>;
+  autosave: () => Promise<void>;                    // On keystroke debounce (1s)
+  discard: () => void;
+  resetDraft: () => void;                           // Clear after send
+}
+```
+
+### 9.3 Sync flow
+
+```
+RelayPool.subscribe(filters) ──> decryptIncoming() ──> messages.ingestFromRelay()
+                                                              │
+                                                              ▼
+                                                         db.messages.put()
+                                                              │
+                                                              ▼
+                                                      UI re-renders via Zustand selector
+```
+
+Optimistic UX: list renders from local cache; new events streamed in from relays in background. Outgoing messages written to Dexie immediately (`deliveryStatus: 'pending'`), then updated to `'sent'`/`'failed'` based on publish results.
+
+## 10. Tauri desktop (later phase)
+
+- `src-tauri/` → single Rust binary wrapping the Next.js static export.
+- Native window controls align with compose modal's minimize/close styling.
+- Secure nsec storage in OS keychain via Tauri plugin.
+- Offline-first: relays reconnect when network returns; drafts encrypted at rest.
+
+## 11. Build phases & milestones
+
+| Phase | Outcome | Status check |
+|------|---------|--------------|
+| **P0 — Scaffold** | Next.js + TS + Tailwind v4 + ESLint + Prettier + Vitest + Playwright; design tokens in `globals.css`; `SuiteShell` skeleton (icon dock + app switcher stub). Route `/mail/inbox` renders empty three-pane grid. | `pnpm dev` shows the four-pane layout with dock + switcher popover. |
+| **P1 — Static mail UI** | All §5 components implemented with hardcoded mock data matching the Figma (seven sample threads matching the Figma: Alice, Jonas, Sofia, Nostr Photos, Daniel, Relay Monitor, Lena Chen; Alice open message, compose modal wired open/close). Static pixel review against Figma. | Lighthouse a11y > 90; visual diff signoff. |
+| **P2 — nostr-core v1** | `KeyStore`, `RelayPool`, NIP-17 + NIP-44 send/receive; `NetworkStatusCard` driven by real relay stats; npub resolution to profiles (NIP-05). | Send a real DM between two npubs; receive in a fresh browser session. |
+| **P3 — Real inbox** | Dexie persistence; relays stream into `messages` store; mailboxes filter; reply thread; search across messages/people/npubs. | Live inbox populated only from real events; drafts autosave. |
+| **P4 — Blossom attachments** | `BlossomClient` upload with NIP-98 auth; encrypted blob descriptor; AttachmentCard renders + "Stored in Drive" stub; download/decrypt in reading pane. | Send 2 MB attachment; recipient opens in reading pane. |
+| **P5 — Labels & filters** | Full mailbox nav (Starred/Snoozed/Sent/Drafts/Archive/Spam) backed by Dexie flags; Labels CRUD; per-label pages; filter chips wired to store queries. | Every nav path returns the right subset; labels persist. |
+| **P6 — Compose polish + NIP-59** | Floating/draggable/minimizable modal; markdown formatting toolbar; Send split-button with Send/Preview/Save/Cancel; Schedule send via local scheduler; NIP-59 gift-wrap "Private" pill. | Modal minimized → restored with content intact; scheduled send fires offline. |
+| **P7 — Tauri desktop** | Export Next as static + Tauri wrapper; OS keychain nsec; tray presence; auto-update. | Installable `.dmg`/`.AppImage`/`.msi` build working and signed. |
+| **P8 — Hardening** | E2E tests; i18n; keyboard a11y; empty/error states; latency/relay-loss UX; NIP-07 extension support; backup/export nsec. | Test suite green; release-ready. |
+
+## 12. Testing strategy
+
+- **Unit** — Vitest covers `nostr-core` (encrypt/decrypt round-trip, relay pool mocks), formatters, store selectors, attachment crypto.
+- **Components** — React Testing Library + Playwright component snapshots for §5 primitives.
+- **E2E** — Playwright: full send→receive flow between two ephemeral keys in headless, against a local test relay (`tyer.dev/nostr-test-relay` or self-hosted `strfry`).
+- **Visual** — Storybook per §5 component for design review; optional Percy/Chromatic.
+
+## 13. Risks & open questions
+
+1. **NIP-59 vs NIP-17 default** — Figma shows both "Encrypted" and "Private" pills. Recommend NIP-44/17 baseline, NIP-59 opt-in. Confirm UX priority.
+2. **Nsec custody** — web-only web apps can't safely hold nsec long-term. For MVP we store encrypted in IndexedDB with passphrase; later phase uses NIP-07 extension or NIP-46 bunker. OK?
+3. **Relay list ownership** — UI exposes relay selection per-message ("Delivery settings"). Confirm we want per-send relay override vs. always pool-default.
+4. **Markdown scope** — Confirm the formatting toolbar subset (bold, italic, underline, link, code, emoji, mention, attach). Code blocks / lists / quotes — yes/no?
+5. **App switcher routing** — Inactive dock tiles: route to "Coming soon" page or just open the switcher popover? Is the dock inter-app nav needed in v1 at all?
+6. **Drive integration depth (v1)** — Right now all "Stored in Drive" links are inert stubs. Confirm — no real Drive app needed in v1.
+7. **Snooze** — locally computed (no NIP kind for snooze) or rejected as out-of-MVP? Recommend local-only flag in Dexie.
+
+## 14. Definition of done (MVP)
+
+- User can generate/import an npub, configure relays, and see the network card reflect real status.
+- User can compose a real NIP-17/NIP-44 DM to an npub (autocomplete by profile), attach a file via Blossom, and the recipient reveals it.
+- Inbox lists real received DMs; clicking opens the reading pane; reply composer sends threaded replies.
+- All mailboxes and labels are wired and persistent across reloads.
+- Compose modal: draft autosave, recipient pills, Cc/Bcc, encryption + relay pills, markdown toolbar best effort, Send + Schedule send.
+- App builds as web (`pnpm build`) — desktop shell punted to P7.
+
+## 15. Interaction specification
+
+Every interactive component must implement the states below. Use Tailwind `group`/`peer` variants or CSS classes. Transition duration: `150ms ease-in-out` for micro-interactions, `200ms` for panel slides, `250ms` for modal open/close.
+
+### 15.1 Button / clickable base
+
+| State | Change | Tailwind equivalent |
+|-------|--------|---------------------|
+| Default | As spec'd in §5 | — |
+| Hover | Raise opacity 0.9 or lighten bg 5% | `hover:brightness-110` |
+| Active / Press | Scale 0.97, darken bg 10% | `active:scale-[0.97] active:brightness-90` |
+| Focus-visible | 2px `#8B5CF6` ring, offset 2px | `focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0D12]` |
+| Disabled | Opacity 0.4, cursor not-allowed | `disabled:opacity-40 disabled:cursor-not-allowed` |
+
+### 15.2 MailboxRow (sidebar nav)
+
+| State | Change |
+|-------|--------|
+| Default | Icon + label `#949BAA` (inactive) |
+| Hover (inactive) | Icon + label `#F3F5F7` at 60% |
+| Selected (active mailbox) | 216×38 pill `#2B2146` radius 10, icon `#A78BFA`, label white, count `#A78BFA` |
+
+### 15.3 MessageRow (message list)
+
+| State | Change |
+|-------|--------|
+| Default | As spec'd, 1px bottom divider (`#272D3A`), bg transparent |
+| Hover | bg `#151922` at 60% opacity overlay |
+| Selected (reading pane open) | bg `#151922`, left 3px `#8B5CF6` accent border |
+| Unread dot | 7×7 `#A78BFA` ellipse visible |
+| Read (after click) | Sender / subject switch from Semi Bold to Medium weight, unread dot hidden |
+
+### 15.4 FilterChip (message list header)
+
+| State | Change |
+|-------|--------|
+| Active | bg `#2B2146`, stroke `#8B5CF6`, text `#A78BFA` |
+| Hover (inactive) | stroke `#8B5CF6` at 50% opacity |
+| Inactive default | bg `#151922`, stroke `#272D3A`, text `#949BAA` |
+
+### 15.5 Reading pane pills (Work / Encrypted / 3 relays)
+
+| State | Change |
+|-------|--------|
+| Work (active label) | bg `#2B2146`, stroke `#8B5CF6`, text `#A78BFA` |
+| Encrypted | bg transparent, stroke `#272D3A`, text `#34D399` |
+| 3 relays (neutral) | bg transparent, stroke `#272D3A`, text `#949BAA` |
+| Hover (any pill) | `brightness-110` |
+
+### 15.6 IconDock tiles
+
+| State | Change |
+|-------|--------|
+| Selected (active app) | bg `#2B2146`, stroke `#8B5CF6`, letter `#A78BFA` |
+| Inactive default | bg transparent, stroke `#272D3A`, letter `#949BAA` |
+| Hover (inactive) | bg `#11141B` (same as dock bg, but let colour shine 50% brighter via `brightness-125`) |
+| Logo tile (always "N") | bg `#8B5CF6`, radius 13, white letter — no interactive states |
+
+### 15.7 Avatar (message row + reading pane)
+
+| State | Change |
+|-------|--------|
+| Default | Ellipse with deterministic fill, white initials |
+| Hover | `brightness-110`, cursor pointer (click opens npub profile sidebar in phase 2) |
+
+### 15.8 Compose modal transitions
+
+| Action | Animation |
+|--------|----------|
+| Open | Scale from 0.95 → 1, opacity 0 → 1 over 250ms ease-out |
+| Close | Scale 1 → 0.95, opacity 1 → 0 over 200ms ease-in |
+| Minimize | Translate to bottom-right (position fixed), scale to 0.8, 200ms ease-in-out |
+| Restore | Reverse of minimize, 200ms ease-in-out |
+| Scrim | Opacity 0 → `rgba(5,7,11,0.44)` over 200ms on open, reverse on close |
+
+### 15.9 AppSwitcher popover
+
+The popover is a 280×300 card (`#1B202B`, radius 18, stroke `#272D3A`, drop shadow) positioned at (1112,74) relative to the canvas, overlapping the reading pane's top-right corner. It is rendered within a z-index layer above all panels.
+
+| State / Action | Behavior |
+|----------------|----------|
+| Closed (default) | Not rendered in DOM. |
+| Open trigger | Click on any inactive dock tile (`D`, `C`, `N`, `P`, `⌕`, `?`) or the active app tile. Also toggled by an explicit trigger button. |
+| Open animation | Scale 0.95 → 1, opacity 0 → 1 over 200ms ease-out. |
+| Close trigger | Click outside the popover boundary, press `Escape`, or click/tap one of the 6 app tiles. |
+| Close animation | Scale 1 → 0.95, opacity 1 → 0 over 150ms ease-in. |
+| Tile click | Each 64×64 tile navigates to the corresponding app route. Post/Mail (`M`) navigates to `/mail/inbox`. Inactive tiles (`D`, `C`, `N`, `P`, `T`) navigate to placeholder `"/coming-soon?app=<letter>"`. |
+| Focus management | On open, first tile receives focus. Tab cycles through the 6 tiles. Escape closes and returns focus to the trigger element. |
+| Z-index | 50 (above reading pane, below compose modal scrim). |
+| Z-index (scrim overlap) | No scrim behind the popover — it floats over content with its own drop shadow. If compose modal is open, the popover renders below the compose scrim layer. |
+
+Keyboard: Arrow keys navigate tiles in grid order (left/right/up/down). Enter/Space selects.
+
+## 16. Responsive behavior
+
+The reference canvas is 1440×1024. Below are the breakpoints and what changes at each. Note: responsive desktop mail apps typically do not support mobile widths; the minimum supported width is **900px** for MVP. Mobile-first responsive is phase 2.
+
+| Breakpoint | Panel behavior |
+|------------|---------------|
+| ≥ 1440px | Four panels as specified in §2.3. Layout centered in the viewport with max-width 1440px, horizontally centered. |
+| 1100–1439px | Reading pane shrinks from 672px → `1fr` remainder. Message list maintains 400px min-width. Sidebar maintains 248px. Dock stays 72px. |
+| 900–1099px | Reading pane collapses to full-width overlay (slide from right) toggled by selecting a message. Message list + sidebar + dock remain visible. Reading pane has prominent `←` back button (already in spec). Sidebar folds to icons-only (width collapses to 72px, labels hidden, text labels visible as tooltips). Compose button shows only the `＋` icon. |
+| < 900px | Not supported in MVP. Show a "Open in browser" prompt. Covers mobile and very narrow desktop windows. Phase 2 adds a mobile layout. |
+
+Implementation approach: use CSS `@container` queries where possible so the reading pane self-manages its collapsed state independently of viewport width. The `MailLayout` component reads a `useWindowSize()` or CSS container query to toggle between `layout: 'three-pane'` and `layout: 'overlay-pane'`.
+
+## 17. Compose state machine
+
+The compose modal has a defined lifecycle. AI must implement exactly the transitions below; any other transition is a bug.
+
+```
+                    ┌──────────────────────────────────┐
+                    │           closed                  │
+                    └─────┬────────────────────────────┘
+                          │ open()
+                          ▼
+                    ┌──────────────────────────────────┐
+              ┌─────│         composing                │◄────┐
+              │     │  (draft exists, user editing)    │     │
+              │     └─────┬──────────────┬─────────────┘     │
+              │           │              │                   │
+              │     autosave()      minimize()               │
+              │           │              │                   │
+              │           ▼              ▼                   │
+              │    ┌──────────┐   ┌──────────┐               │
+              │    │draft_saved│   │ minimized│───────────────┘
+              │    │ (toast:   │   │ (draft   │ restore()
+              │    │ "Draft    │   │ persists)│
+              │    │ saved")   │   └──────────┘
+              │    └──────────┘
+              │           │
+              │      send() or scheduleSend()
+              │           │
+              │           ▼
+              │    ┌──────────────────────────────────┐
+              │    │          sending                  │
+              │    │  (Send button disabled, shows     │
+              │    │   spinner, "Sending..." label)    │
+              │    └─────┬──────────────┬─────────────┘
+              │          │              │
+              │     publish OK    publish fail
+              │          │              │
+              │          ▼              ▼
+              │    ┌──────────┐   ┌──────────┐
+              │    │  sent    │   │  failed  │
+              │    │ (toast:  │   │ (toast:  │
+              │    │ "Sent")  │   │ "Send    │
+              │    │  then    │   │  failed" │
+              │    │ close()  │   │ │ user   │
+              │    │  reset   │   │ │ retry  │
+              │    │  draft   │   │ │close() │
+              │    └──────────┘   └────┬─────┘
+              │                        │ discard()
+              │                        ▼
+              │                  ┌──────────┐
+              │                  │ discard  │
+              │                  │ (toast:  │
+              │                  │ "Draft   │
+              │                  │  deleted")│
+              │                  └──────────┘
+              │                        │
+              └────────────────────────┘
+                         │
+                         ▼
+                     ┌──────────┐
+                     │  closed  │
+                     └──────────┘
+```
+
+### Transition rules
+
+| From | To | Trigger | Side effects |
+|------|----|---------|-------------|
+| `closed` | `composing` | User clicks Compose CTA or Reply button | Draft initialized from blank or reply-to template; modal opens with animation |
+| `composing` | `closed` | User clicks `×` close button + no unsaved changes | Modal closes immediately |
+| `composing` | `closed` | User clicks `×` + unsaved changes | Show "Discard draft?" confirmation dialog; if confirmed, `discard()` then close; if cancelled, stay in `composing` |
+| `composing` | `minimized` | User clicks minimize `–` button | Modal slides to bottom-right corner, scrim removed; draft remains in zustand |
+| `minimized` | `composing` | User clicks minimized tab/bar | Modal restores to centered position, scrim reappears |
+| `composing` | `draft_saved` | `autosave()` fires (1s after last keystroke) | Writes to Dexie; shows green "Draft saved" indicator for 3s in compose header |
+| `composing` | `sending` | User clicks Send (or Schedule fires) | Send button disabled + spinner; `sendMessage()` called |
+| `sending` | `sent` | `sendMessage()` resolves successfully | Toast "Sent"; modal auto-closes after 1.5s; draft deleted from Dexie; message appears in Sent mailbox |
+| `sending` | `failed` | `sendMessage()` rejects | Toast "Send failed — tap to retry"; Send button re-enabled; draft preserved |
+| `failed` | `closed` | User clicks `×` or Discard | `discard()`; draft deleted from Dexie |
+| `failed` | `composing` | User edits draft content | Automatically returns to composing state |
+| `failed` | `sending` | User clicks Send again | Retry flow |
+| `composing` | `closed` (scheduled) | User clicks Schedule send | Draft saved with `scheduledFor` timestamp; modal closes; draft remains in Dexie for cron check |
+
+### Autosave behavior
+
+- Triggers 1 second after the user stops typing (debounce).
+- Writes to both Zustand (`compose.draft`) and Dexie (`db.drafts.put()`).
+- On page reload, checks Dexie for drafts with `savedAt !== null` and prompts "You have an unsaved draft. Restore?".
+- Scheduled drafts (`scheduledFor !== null`) are checked on app startup via `setInterval` every 60s (or via a `setTimeout` per draft) and automatically sent when the scheduled time arrives.
+
+### Guard conditions (must always hold)
+
+1. When `status === 'closed'`, `draft` must be the empty/initial state (all fields blank).
+2. When `status === 'sending'`, the Send button must be disabled and show a spinner.
+3. When `status === 'minimized'`, the draft must be persisted in Dexie (autosaved at least once).
+4. When `status === 'sent'`, the draft must be cleared from both Zustand and Dexie within 1.5s of success.
+5. Minimize is only available when at least one recipient is filled (prevents accidental minimization of empty drafts).
