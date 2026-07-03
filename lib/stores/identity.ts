@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createKeyStore, generateKey, importFromNsec } from "@post/nostr-core";
 import { getPublicKey } from "nostr-tools/pure";
 import type { Identity } from "@/lib/types";
+import { isTauri, createTauriKeyStore } from "@/lib/tauri";
 
 export interface Nip07 {
   getPublicKey(): Promise<string>;
@@ -27,6 +28,10 @@ interface IdentityState {
   getSigner: () => ((t: { kind: number; tags: string[][]; content: string; created_at: number }) => Promise<{ sig: string }>) | null;
 }
 
+function getKeyStore() {
+  return isTauri() ? createTauriKeyStore() : createKeyStore();
+}
+
 export const useIdentityStore = create<IdentityState>((set, get) => ({
   identity: null,
   keyStore: null,
@@ -34,7 +39,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   nip07Available: typeof window !== "undefined" && !!window.nostr,
 
   async createOrImport(nsec?: string): Promise<Identity> {
-    const keyStore = createKeyStore();
+    const keyStore = getKeyStore();
 
     let keys: { npub: string; pubkey: string; nsec?: string };
 

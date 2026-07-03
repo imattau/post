@@ -701,10 +701,204 @@ Optimistic UX: list renders from local cache; new events streamed in from relays
 
 ## 10. Tauri desktop (later phase)
 
-- `src-tauri/` → single Rust binary wrapping the Next.js static export.
-- Native window controls align with compose modal's minimize/close styling.
-- Secure nsec storage in OS keychain via Tauri plugin.
-- Offline-first: relays reconnect when network returns; drafts encrypted at rest.
+### 10.0 Prerequisites
+
+```bash
+# Install Rust via rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# Install Tauri CLI
+pnpm add -D @tauri-apps/cli
+# Verify
+cargo --version && rustc --version
+```
+
+Dev dependency: `@tauri-apps/cli`. Script entries: `"tauri": "tauri"`, `"tauri:dev": "tauri dev"`, `"tauri:build": "tauri build"`.
+
+### 10.1 Project scaffolding
+
+```
+post/
+├─ src-tauri/                        # NEW — Rust project root
+│  ├─ Cargo.toml                     # Rust dependencies
+│  ├─ tauri.conf.json                # Window/bundle/security config
+│  ├─ capabilities/
+│  │  └─ default.json                # Permissions (stronghold, updater, tray)
+│  ├─ icons/                         # App icons (generated via `pnpm tauri icon`)
+│  ├─ src/
+│  │  ├─ lib.rs                      # Plugin registration + commands + tray
+│  │  ├─ main.rs                     # Entry point
+│  │  └─ nsec_store.rs               # Stronghold-based nsec CRUD
+│  └─ binaries/
+```
+
+### 10.2 Rust dependencies (`src-tauri/Cargo.toml`)
+
+```toml
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-stronghold = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-store = "2"
+tauri-plugin-process = "2"
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+```
+
+### 10.3 Next.js static export config
+
+Update `next.config.ts` to enable static export for Tauri:
+
+```typescript
+const isProd = process.env.NODE_ENV === "production";
+const internalHost = process.env.TAURI_DEV_HOST || "localhost";
+
+const nextConfig: NextConfig = {
+  output: "export",
+  images: { unoptimized: true },
+  assetPrefix: isProd ? undefined : `http://${internalHost}:3000`,
+  outputFileTracingRoot: process.cwd(),
+};
+```
+
+### 10.4 Tauri config (`src-tauri/tauri.conf.json`)
+
+| Key | Value |
+|-----|-------|
+| `productName` | `"Post"` |
+| `version` | `"0.1.0"` |
+| `identifier` | `"app.nostr.post"` |
+| `build.beforeDevCommand` | `"pnpm dev"` |
+| `build.beforeBuildCommand` | `"pnpm build"` |
+| `build.devUrl` | `"http://localhost:3000"` |
+| `build.frontendDist` | `"../out"` |
+| `app.windows[0].title` | `"Post — Private messaging for Nostr"` |
+| `app.windows[0].width` | `1440` |
+| `app.windows[0].height` | `1024` |
+| `app.windows[0].minWidth` | `900` |
+| `app.windows[0].minHeight` | `600` |
+| `app.security.csp` | `"default-src 'self'; connect-src 'self' wss://*.nostr.*; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'"` |
+| `bundle.active` | `true` |
+| `bundle.createUpdaterArtifacts` | `true` |
+| `bundle.targets` | `["deb", "appimage", "msi", "nsis", "dmg"]` |
+| `plugins.stronghold` | `{}` |
+
+### 10.5 Capabilities (`src-tauri/capabilities/default.json`)
+
+```json
+{
+  "identifier": "default",
+  "description": "Default capabilities for Post",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "stronghold:default",
+    "updater:default",
+    "store:default",
+    "process:default",
+    "shell:allow-open"
+  ]
+}
+```
+
+### 10.6 Secure nsec storage (`src-tauri/src/nsec_store.rs`)
+
+Uses Tauri's Stronghold plugin (IOTA Stronghold encrypted vault). Four Rust commands exposed to the frontend:
+
+| Command | Signature | Behaviour |
+|---------|-----------|-----------|
+| `store_nsec` | `(nsec: String) -> Result<()>` | Encrypts nsec in Stronghold vault under key `"nostr-nsec"` |
+| `get_nsec` | `() -> Result<Option<String>>` | Decrypts and returns nsec from vault |
+| `delete_nsec` | `() -> Result<()>` | Removes nsec from vault |
+| `has_nsec` | `() -> Result<bool>` | Returns whether nsec exists in vault |
+
+Vault initialisation uses `tauri_plugin_stronghold::Builder::with_argon2(&salt_path)` with a salt file at `app_local_data_dir/salt.txt`.
+
+### 10.7 Frontend bridge (`lib/tauri.ts`)
+
+Bridges Tauri native APIs into the app's existing `KeyStore` interface:
+
+```typescript
+export function createTauriKeyStore(): KeyStore {
+  // Uses invoke("store_nsec"), invoke("get_nsec"), invoke("delete_nsec")
+  // Replaces the browser-localStorage KeyStore when running in Tauri
+}
+```
+
+The identity store (`lib/stores/identity.ts`) detects Tauri runtime via `window.__TAURI__` and uses `createTauriKeyStore` instead of the browser KeyStore.
+
+### 10.8 System tray
+
+| Aspect | Behaviour |
+|--------|-----------|
+| Tray icon | App icon (16×16/22×22 platform-dependent) |
+| Left click | Shows and focuses the main window |
+| Menu | "Show Post" (focus window), "Compose" (trigger compose), "Quit" (`app.exit(0)`) |
+| Close button | Hides to tray (configurable) |
+
+Implementation in `lib.rs` via `TrayIconBuilder::new()` with `features = ["tray-icon"]`.
+
+### 10.9 Auto-update
+
+| Step | Mechanism |
+|------|-----------|
+| Artifacts | Tauri CLI generates `.AppImage.tar.gz` / `.app.tar.gz` / `.msi.zip` + `.sig` |
+| Signing | `pnpm tauri signer generate -w ~/.tauri/post.key`; set `TAURI_SIGNING_PRIVATE_KEY` env |
+| Update source | Static JSON at `https://releases.nostr.app/latest.json` or self-hosted server |
+| Frontend check | `check()` from `@tauri-apps/plugin-updater` on startup + every 6h |
+| Install | `downloadAndInstall()` with progress events → UI progress bar |
+| Relaunch | `relaunch()` from `@tauri-apps/plugin-process` |
+
+Update JSON structure:
+```json
+{
+  "version": "0.2.0",
+  "notes": "Bug fixes and improvements",
+  "pub_date": "2025-07-04T12:00:00Z",
+  "platforms": {
+    "linux-x86_64": { "signature": "...", "url": "https://releases.nostr.app/0.2.0/post_0.2.0_amd64.AppImage.tar.gz" },
+    "windows-x86_64": { "signature": "...", "url": "https://releases.nostr.app/0.2.0/post_0.2.0_x64-setup.exe.zip" },
+    "darwin-x86_64": { "signature": "...", "url": "https://releases.nostr.app/0.2.0/post_0.2.0_x64.dmg.tar.gz" },
+    "darwin-aarch64": { "signature": "...", "url": "https://releases.nostr.app/0.2.0/post_0.2.0_aarch64.dmg.tar.gz" }
+  }
+}
+```
+
+### 10.10 Offline-first adjustments
+
+| Browser feature | Tauri replacement |
+|----------------|-------------------|
+| `localStorage` (KeyStore) | `invoke("store_nsec")` → Stronghold vault |
+| `localStorage` (settings/blossom URL) | `@tauri-apps/plugin-store` JSON file |
+| Dexie IndexedDB | Works natively in WebView — no change needed |
+| `window.nostr` (NIP-07) | `invoke("get_nsec")` → sign in Rust |
+| `XMLHttpRequest` (Blossom) | Standard fetch works in WebView |
+| `navigator.clipboard` | `@tauri-apps/plugin-clipboard` |
+
+### 10.11 Implementation order
+
+| Step | Task |
+|------|------|
+| 1 | Run `pnpm tauri init` to scaffold `src-tauri/` |
+| 2 | Configure `tauri.conf.json` (window, security, bundle targets) |
+| 3 | Add Rust deps to `Cargo.toml`: stronghold, updater, store, process, shell |
+| 4 | Implement `nsec_store.rs` with 4 commands |
+| 5 | Register plugins + commands + tray in `lib.rs` |
+| 6 | Create `capabilities/default.json` with permission set |
+| 7 | Create `lib/tauri.ts` bridge — Tauri-aware KeyStore factory |
+| 8 | Update `lib/stores/identity.ts` — detect Tauri runtime + use Tauri KeyStore |
+| 9 | Configure updater: generate keys, create JSON, wire frontend check |
+| 10 | Generate icons via `pnpm tauri icon` |
+| 11 | Test: `pnpm tauri:dev` → native window, identity, tray |
+| 12 | Build: `pnpm tauri:build` → installable `.deb`/`.AppImage`/`.dmg`/`.msi` |
+
+### 10.12 Key risks
+
+1. **nsec migration** — existing users with nsec in localStorage need a one-time import on first Tauri launch
+2. **CSP** — `connect-src` must permit `wss://` for relays; `img-src` must allow Blossom URLs
+3. **Linux AppImage** — requires FUSE; updater uses `.tar.gz` wrapper (not raw AppImage)
+4. **Windows installer** — NSIS default, MSI for system-wide install; both generated
+5. **Auto-update on Linux** — AppImage needs write access to its own path
 
 ## 11. Build phases & milestones
 
