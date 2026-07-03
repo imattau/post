@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Draft, RecipientEntry, AttachmentUpload, SendResult } from "@/lib/types";
 
-type ComposeStatus = "closed" | "composing" | "minimized" | "sending" | "scheduled";
+export type ComposeStatus = "closed" | "composing" | "minimized" | "sending" | "scheduled" | "sent" | "failed";
 
 interface ComposeState {
   status: ComposeStatus;
@@ -10,6 +10,7 @@ interface ComposeState {
   encrypted: boolean;
   giftWrap: boolean;
   relayOverrides: string[];
+  error: string | null;
   open: (replyTo?: Draft) => void;
   close: () => void;
   minimize: () => void;
@@ -23,10 +24,12 @@ interface ComposeState {
   toggleGiftWrap: () => void;
   setRelayOverrides: (relays: string[]) => void;
   send: () => Promise<SendResult>;
+  retry: () => Promise<SendResult>;
   scheduleSend: (at: number) => Promise<void>;
   autosave: () => Promise<void>;
   discard: () => void;
   resetDraft: () => void;
+  returnToComposing: () => void;
 }
 
 function emptyDraft(): Draft {
@@ -53,16 +56,27 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   encrypted: true,
   giftWrap: false,
   relayOverrides: [],
+  error: null,
 
   open: (replyTo?: Draft) => {
-    set({ status: "composing", draft: replyTo ?? emptyDraft() });
+    set({ status: "composing", draft: replyTo ?? emptyDraft(), error: null });
   },
 
   close: () => {
-    set({ status: "closed" });
+    const { draft } = get();
+    const hasContent = draft.to.length > 0 || draft.subject || draft.body;
+    if (hasContent) {
+      get().autosave();
+    }
+    set({ status: "closed", draft: emptyDraft(), uploads: [], error: null });
   },
 
   minimize: () => {
+    const { draft } = get();
+    if (draft.to.length === 0 && !draft.subject && !draft.body) {
+      return;
+    }
+    get().autosave();
     set({ status: "minimized" });
   },
 
@@ -73,15 +87,22 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   updateRecipients: (to, cc, bcc) => {
     set((state) => ({
       draft: { ...state.draft, to, cc, bcc, updatedAt: Date.now() },
+      status: state.status === "failed" ? "composing" : state.status,
     }));
   },
 
   updateSubject: (subject: string) => {
-    set((state) => ({ draft: { ...state.draft, subject, updatedAt: Date.now() } }));
+    set((state) => ({
+      draft: { ...state.draft, subject, updatedAt: Date.now() },
+      status: state.status === "failed" ? "composing" : state.status,
+    }));
   },
 
   updateBody: (body: string) => {
-    set((state) => ({ draft: { ...state.draft, body, updatedAt: Date.now() } }));
+    set((state) => ({
+      draft: { ...state.draft, body, updatedAt: Date.now() },
+      status: state.status === "failed" ? "composing" : state.status,
+    }));
   },
 
   addAttachment: (file: File) => {
@@ -112,9 +133,52 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   },
 
   async send() {
-    set({ status: "sending" });
-    // Will wire to real sendMessage in later phase
-    return { eventId: "", published: new Map(), delivered: 0 };
+    set({ status: "sending", error: null });
+    try {
+      const { sendMessage, createKeyStore } = await import("@post/nostr-core");
+      const { draft, encrypted, giftWrap, relayOverrides, uploads } = get();
+      const keyStore = createKeyStore();
+      const identity = keyStore.load();
+      if (!identity?.nsec) throw new Error("No private key");
+
+      if (draft.to.length === 0) throw new Error("No recipient");
+
+      const { decode } = await import("nostr-tools/nip19");
+      const nsecDecoded = decode(identity.nsec);
+      if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+
+      const { useRelaysStore } = await import("@/lib/stores/relays");
+      const pool = useRelaysStore.getState().pool;
+      if (!pool) throw new Error("Relay pool not connected");
+
+      const attachments = uploads
+        .filter((u): u is AttachmentUpload & { result: NonNullable<AttachmentUpload["result"]> } => u.status === "uploaded" && u.result !== null)
+        .map((u) => u.result);
+
+      const result = await sendMessage(pool, keyStore, {
+        to: draft.to[0].pubkey,
+        content: draft.body,
+        subject: draft.subject || undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
+        replyTo: undefined,
+        relayOverrides: relayOverrides.length > 0 ? relayOverrides : undefined,
+        giftWrap,
+      });
+
+      const { db } = await import("@/lib/db/schema");
+      await db.drafts.delete(draft.id);
+
+      set({ status: "sent", draft: emptyDraft(), uploads: [] });
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Send failed";
+      set({ status: "failed", error: message });
+      return { eventId: "", published: new Map(), delivered: 0 };
+    }
+  },
+
+  async retry() {
+    return get().send();
   },
 
   async scheduleSend(at: number) {
@@ -122,6 +186,8 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
       status: "scheduled",
       draft: { ...state.draft, scheduledFor: at },
     }));
+    const { db } = await import("@/lib/db/schema");
+    await db.drafts.put({ ...get().draft, scheduledFor: at, savedAt: Date.now() });
   },
 
   async autosave() {
@@ -134,10 +200,19 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   },
 
   discard: () => {
-    set({ status: "closed", draft: emptyDraft(), uploads: [] });
+    const { draft } = get();
+    (async () => {
+      const { db } = await import("@/lib/db/schema");
+      await db.drafts.delete(draft.id);
+    })();
+    set({ status: "closed", draft: emptyDraft(), uploads: [], error: null });
   },
 
   resetDraft: () => {
     set({ draft: emptyDraft(), uploads: [] });
+  },
+
+  returnToComposing: () => {
+    set({ status: "composing" });
   },
 }));
