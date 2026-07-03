@@ -2,8 +2,10 @@
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCallback, useState } from "react";
-import { MESSAGES } from "@/lib/mock/threads";
 import { useRelaysStore } from "@/lib/stores/relays";
+import { useLabelsStore } from "@/lib/stores/labels";
+import { useMessagesStore } from "@/lib/stores/messages";
+import { useMailboxMessages } from "../_components/useMailboxMessages";
 import ReadingPane from "@/components/ReadingPane";
 import ComposeModal from "@/components/ComposeModal";
 
@@ -11,25 +13,30 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const selectedId = searchParams.get("c") || "msg-1";
+  const selectedId = searchParams.get("c");
   const composeOpen = searchParams.get("compose") === "true";
 
-  const selectedMessage = MESSAGES.find((m) => m.id === selectedId) ?? MESSAGES[0];
+  const { messages } = useMailboxMessages("inbox");
+  const selectedMessage = selectedId ? messages.find((m) => m.id === selectedId) ?? null : messages[0] ?? null;
 
-  const [starredIds, setStarredIds] = useState<Set<string>>(new Set(["msg-1"]));
+  const labels = useLabelsStore((s) => s.byId);
+  const labelIds = useLabelsStore((s) => s.allIds);
+
+  const markRead = useMessagesStore((s) => s.markRead);
+  const toggleStar = useMessagesStore((s) => s.toggleStar);
+  const toggleArchive = useMessagesStore((s) => s.toggleArchive);
+  const toggleSpam = useMessagesStore((s) => s.toggleSpam);
 
   const clearSelection = useCallback(() => {
     router.replace(pathname, { scroll: false });
   }, [router, pathname]);
 
-  const toggleStar = useCallback((id: string) => {
-    setStarredIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const handleToggleStar = useCallback(
+    (id: string) => {
+      toggleStar(id);
+    },
+    [toggleStar]
+  );
 
   const closeCompose = useCallback(() => {
     router.replace(pathname, { scroll: false });
@@ -40,6 +47,18 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const syncedAgo = useRelaysStore((s) => s.syncedAgo);
   const connectedCount = Object.values(relayStatuses).filter((s) => s.connected).length;
   const totalCount = Object.keys(relayStatuses).length;
+
+  const [showLabelInput, setShowLabelInput] = useState(false);
+  const [newLabelName, setNewLabelName] = useState("");
+
+  const createLabel = useCallback(async () => {
+    if (!newLabelName.trim()) return;
+    const colors = ["#60A5FA", "#34D399", "#FBBF24", "#FB7185", "#A78BFA", "#14B8A6"];
+    const color = colors[labelIds.length % colors.length];
+    await useLabelsStore.getState().createLabel(newLabelName.trim(), color);
+    setNewLabelName("");
+    setShowLabelInput(false);
+  }, [newLabelName, labelIds.length]);
 
   return (
     <>
@@ -62,11 +81,11 @@ export default function MailContent({ children }: { children: React.ReactNode })
 
         <nav className="flex flex-col gap-0.5 mt-6">
           {[
-            { icon: "▣", label: "Inbox", count: 12, href: "/mail/inbox" },
+            { icon: "▣", label: "Inbox", count: null, href: "/mail/inbox" },
             { icon: "☆", label: "Starred", count: null, href: "/mail/starred" },
             { icon: "◷", label: "Snoozed", count: null, href: "/mail/snoozed" },
             { icon: "➤", label: "Sent", count: null, href: "/mail/sent" },
-            { icon: "▤", label: "Drafts", count: 2, href: "/mail/drafts" },
+            { icon: "▤", label: "Drafts", count: null, href: "/mail/drafts" },
             { icon: "⌁", label: "Archive", count: null, href: "/mail/archive" },
             { icon: "!", label: "Spam", count: null, href: "/mail/spam" },
           ].map((item) => {
@@ -85,33 +104,55 @@ export default function MailContent({ children }: { children: React.ReactNode })
                 <span className={`flex-1 text-[13px] ${isActive ? "font-semibold" : "font-medium"}`}>
                   {item.label}
                 </span>
-                {item.count !== null && (
-                  <span className={`text-[13px] ${isActive ? "text-brand-light" : "text-text-secondary"}`}>
-                    {item.count}
-                  </span>
-                )}
               </a>
             );
           })}
         </nav>
 
-        <p className="text-text-tertiary text-[10px] font-semibold tracking-wider mt-6 mb-2 px-3">LABELS</p>
+        <div className="flex items-center justify-between mt-6 mb-2 px-3">
+          <p className="text-text-tertiary text-[10px] font-semibold tracking-wider">LABELS</p>
+          <button
+            onClick={() => setShowLabelInput(true)}
+            className="text-text-tertiary text-[14px] cursor-pointer hover:text-text-secondary"
+          >
+            ＋
+          </button>
+        </div>
 
         <div className="flex flex-col gap-0.5">
-          {[
-            { name: "Work", color: "var(--color-info)" },
-            { name: "Friends", color: "var(--color-ok)" },
-            { name: "Projects", color: "var(--color-warn)" },
-            { name: "Receipts", color: "var(--color-danger)" },
-          ].map((label) => (
-            <div
-              key={label.name}
-              className="flex items-center gap-3 h-[30px] px-3 text-text-secondary hover:text-text-near-white cursor-pointer rounded-[10px] transition-all duration-150"
-            >
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: label.color }} />
-              <span className="text-[13px] font-medium">{label.name}</span>
+          {labelIds.map((id) => {
+            const label = labels[id];
+            if (!label) return null;
+            const isActive = pathname === `/mail/labels/${id}`;
+            return (
+              <a
+                key={id}
+                href={`/mail/labels/${id}`}
+                className={`flex items-center gap-3 h-[30px] px-3 rounded-[10px] no-underline transition-all duration-150 ${
+                  isActive
+                    ? "bg-surface-active text-white"
+                    : "text-text-secondary hover:text-text-near-white"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
+                <span className="text-[13px] font-medium">{label.name}</span>
+              </a>
+            );
+          })}
+          {showLabelInput && (
+            <div className="flex items-center gap-2 px-3 py-1">
+              <input
+                type="text"
+                value={newLabelName}
+                onChange={(e) => setNewLabelName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") createLabel(); if (e.key === "Escape") setShowLabelInput(false); }}
+                placeholder="Label name"
+                className="flex-1 h-7 px-2 text-[12px] bg-pill-subtle border border-border rounded text-text-primary placeholder-text-placeholder outline-none"
+                autoFocus
+              />
+              <button onClick={createLabel} className="text-ok text-[12px] font-medium cursor-pointer">Add</button>
             </div>
-          ))}
+          )}
         </div>
 
         <div className="flex-1" />
@@ -142,9 +183,9 @@ export default function MailContent({ children }: { children: React.ReactNode })
       {selectedMessage ? (
         <ReadingPane
           message={selectedMessage}
-          starred={starredIds.has(selectedMessage.id)}
+          starred={selectedMessage.starred}
           onBack={clearSelection}
-          onToggleStar={() => toggleStar(selectedMessage.id)}
+          onToggleStar={() => handleToggleStar(selectedMessage.id)}
         />
       ) : (
         <div className="bg-dock flex items-center justify-center">
