@@ -51,7 +51,7 @@ export default function UploadProgress({
       />
       <div
         className="fixed z-50 rounded-[18px] border border-border bg-dock shadow-lg"
-        style={{ width: 500, left: 886, top: 594 }}
+        style={{ width: 500, height: 340, left: 886, top: 594 }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-2">
@@ -74,7 +74,7 @@ export default function UploadProgress({
             return (
               <div
                 key={file.id}
-                className="flex items-center gap-3 h-15 px-3 border border-border rounded-pill bg-sidebar"
+                className="flex items-center gap-3 h-15 px-3 border border-border rounded-[12px] bg-sidebar"
               >
                 <div
                   className="w-9 h-9 rounded-[9px] bg-pill-subtle flex items-center justify-center flex-shrink-0"

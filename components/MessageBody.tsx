@@ -49,5 +49,5 @@ function renderLine(line: string, i: number) {
 
 export default function MessageBody({ body }: { body: string }) {
   const lines = body.split("\n");
-  return <div className="px-5 py-2">{lines.map(renderLine)}</div>;
+  return <div className="px-6 py-2">{lines.map(renderLine)}</div>;
 }

@@ -78,7 +78,7 @@ export default function ContactsPage() {
             <button
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setSelectedContact(null); }}
-              className={`flex items-center gap-3 h-[38px] px-3 rounded-[10px] transition-all duration-150 cursor-pointer ${
+              className={`flex items-center gap-3 h-10 px-3 rounded-[10px] transition-all duration-150 cursor-pointer ${
                 activeTab === tab.id
                   ? "bg-surface-active text-white"
                   : "text-text-secondary hover:text-text-near-white hover:brightness-110"
@@ -100,14 +100,11 @@ export default function ContactsPage() {
             <h2 className="text-[28px] font-semibold text-text-primary">Overview</h2>
             <p className="text-[11px] text-text-tertiary mt-1 mb-6">Summary stats and all contacts.</p>
 
-            {/* Stats cards */}
-            <div className="grid grid-cols-4 gap-4 mb-8">
+            {/* Stats cards — single card with 4 sections per Figma */}
+            <div className="border border-border rounded-pill bg-sidebar p-6 flex justify-around mb-8">
               {STATS.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="border border-border rounded-pill bg-sidebar p-5 text-center"
-                >
-                  <p className="text-[28px] font-bold text-text-primary">{stat.value}</p>
+                <div key={stat.label} className="text-center">
+                  <p className="text-[28px] font-semibold text-text-primary">{stat.value}</p>
                   <p className="text-[11px] text-text-tertiary mt-1">{stat.label}</p>
                 </div>
               ))}

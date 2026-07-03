@@ -90,7 +90,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
       )}
       <div className="flex-1 grid grid-cols-[248px_448px_1fr] divide-x divide-border">
       {/* Sidebar */}
-      <div className="bg-sidebar flex flex-col p-4 gap-1 overflow-y-auto">
+      <div className="bg-sidebar flex flex-col pl-6 pr-4 pt-[25px] pb-4 gap-1 overflow-y-auto">
         <div className="mb-5">
           <h1 className="text-text-near-white text-[21px] font-semibold">N Mail</h1>
           <p className="text-text-secondary text-[11px]">Private messaging for Nostr</p>
@@ -98,13 +98,13 @@ export default function MailContent({ children }: { children: React.ReactNode })
 
         <a
           href="/mail/inbox?compose=true"
-          className="w-[200px] h-12 bg-brand rounded-pill flex items-center gap-2 justify-center no-underline hover:brightness-110 active:scale-[0.97] transition-all duration-150"
+          className="w-[200px] h-12 bg-brand rounded-pill flex items-center gap-[15px] pl-4 no-underline hover:brightness-110 active:scale-[0.97] transition-all duration-150"
         >
-          <span className="text-white text-[15px]">＋</span>
+          <span className="text-white text-[21px] font-medium">＋</span>
           <span className="text-white text-[14px] font-semibold">Compose</span>
         </a>
 
-        <nav className="flex flex-col gap-0.5 mt-6">
+        <nav className="flex flex-col gap-[6px] mt-6">
           {[
             { icon: "▣", label: "Inbox", count: unreadCounts.inbox, href: "/mail/inbox" },
             { icon: "☆", label: "Starred", count: null, href: "/mail/starred" },
@@ -119,7 +119,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
               <a
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-3 h-[38px] px-3 rounded-[10px] no-underline transition-all duration-150 ${
+                className={`flex items-center gap-3 h-[38px] pl-5 pr-3 rounded-[10px] no-underline transition-all duration-150 ${
                   isActive
                     ? "bg-surface-active text-white"
                     : "text-text-secondary hover:text-text-near-white hover:brightness-110"
@@ -137,7 +137,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="flex items-center justify-between mt-6 mb-2 px-3">
+        <div className="flex items-center justify-between mt-[45px] mb-2 px-3">
           <p className="text-text-tertiary text-[10px] font-semibold tracking-wider">LABELS</p>
           <button
             onClick={() => setShowLabelInput(true)}
@@ -184,15 +184,15 @@ export default function MailContent({ children }: { children: React.ReactNode })
         </div>
 
         <div className="flex-1" />
-        <div className="border border-border rounded-pill bg-dock p-3">
+        <div className="border border-border rounded-pill bg-dock p-4">
           <p className="text-[12px] font-semibold text-white">Network</p>
           <div className="flex items-center gap-1.5 mt-1">
             <div className={`w-2 h-2 rounded-full ${connectedCount > 0 ? "bg-ok" : "bg-danger"}`} />
-            <span className="text-[11px] text-text-secondary">
+            <span className="text-[12px] text-text-secondary">
               {connectedCount}/{totalCount} relays connected
             </span>
           </div>
-          <p className="text-[10px] text-text-tertiary mt-1">Delivery health</p>
+          <p className="text-[11px] text-text-tertiary mt-1">Delivery health</p>
           <div className="w-[184px] h-[6px] bg-pill-subtle rounded-progress mt-1">
             <div className="h-full bg-ok rounded-progress" style={{ width: `${healthPercent}%` }} />
           </div>

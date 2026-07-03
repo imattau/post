@@ -1,6 +1,6 @@
 export default function ReplyComposer({ recipientName }: { recipientName: string }) {
   return (
-    <div className="mx-5 mb-5 mt-2 h-[130px] max-w-[560px] border border-border rounded-pill bg-sidebar flex flex-col">
+    <div className="mx-6 mb-5 mt-2 h-[130px] max-w-[560px] border border-border rounded-pill bg-sidebar flex flex-col">
       <div className="flex items-center gap-2 px-4 pt-3 pb-1">
         <span className="text-[12px] text-text-secondary font-medium">{recipientName}</span>
       </div>
@@ -17,7 +17,7 @@ export default function ReplyComposer({ recipientName }: { recipientName: string
           </button>
         ))}
         <div className="flex-1" />
-        <button className="h-8 px-4 rounded-[10px] bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150">
+        <button className="h-[34px] w-[90px] rounded-[10px] bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150">
           Send
         </button>
       </div>

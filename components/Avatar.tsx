@@ -26,7 +26,8 @@ export default function Avatar({
   className?: string;
 }) {
   const colorIndex = hashInitials(initials) % AVATAR_COLORS.length;
-  const fontSize = Math.round(size * 0.28);
+  const fontSizes: Record<number, number> = { 36: 10, 40: 11, 46: 14 };
+  const fontSize = fontSizes[size] ?? Math.round(size * 0.28);
 
   return (
     <div

@@ -114,7 +114,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
 
   const formatToolbar = (
     <div className="flex items-center gap-0.5 px-5 py-1.5 border-t border-modal-stroke">
-      <button onMouseDown={(e) => { e.preventDefault(); insertFormat("**", "**"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-bold rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">B</button>
+      <button onMouseDown={(e) => { e.preventDefault(); insertFormat("**", "**"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-semibold rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">B</button>
       <button onMouseDown={(e) => { e.preventDefault(); insertFormat("_", "_"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium italic rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">I</button>
       <button onMouseDown={(e) => { e.preventDefault(); insertFormat("__", "__"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium underline rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">U</button>
       <button onMouseDown={(e) => { e.preventDefault(); insertFormat("[", "](url)"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">⌁</button>
@@ -307,7 +307,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 <button
                   onClick={send}
                   disabled={isSending || draft.to.length === 0}
-                  className="h-10 px-5 rounded-l-pill bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="h-10 px-5 rounded-l-[12px] bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isSending ? (
                     <><span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending</>
@@ -318,7 +318,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 <button
                   onClick={() => setShowSendMenu(!showSendMenu)}
                   disabled={isSending}
-                  className="h-10 w-[34px] rounded-r-pill bg-brand text-white flex items-center justify-center cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 border-l border-white/20 disabled:opacity-40"
+                  className="h-10 w-[34px] rounded-r-[12px] bg-brand text-white flex items-center justify-center cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 border-l border-white/20 disabled:opacity-40"
                 >
                   <span className="text-[12px]">⌄</span>
                 </button>

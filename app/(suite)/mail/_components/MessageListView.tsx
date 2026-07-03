@@ -53,15 +53,15 @@ export default function MessageListView({
 
   return (
     <div className="flex flex-col h-full" role="region" aria-label={title}>
-      <div className="flex items-center justify-between px-5 pt-5 pb-2">
+      <div className="flex items-center justify-between px-6 pt-5 pb-2">
         <div>
           <h2 className="text-[22px] font-semibold text-white" tabIndex={-1}>{title}</h2>
           <p className="text-text-secondary text-[11px]">{subtitle}</p>
         </div>
       </div>
 
-      <div className="px-5 py-2">
-        <div className="flex items-center gap-2 h-[42px] px-3 bg-sidebar border border-border rounded-pill max-w-[400px]">
+      <div className="px-6 py-2">
+        <div className="flex items-center gap-2 h-[42px] px-3 bg-sidebar border border-border rounded-[12px] max-w-[400px]">
           <span className="text-text-tertiary text-[15px]" aria-hidden="true">⌕</span>
           <input
             type="text"
@@ -69,12 +69,12 @@ export default function MessageListView({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search messages, people or npubs"
             aria-label="Search messages"
-            className="flex-1 bg-transparent border-none outline-none text-[13px] text-text-primary placeholder-text-placeholder"
+            className="flex-1 bg-transparent border-none outline-none text-[12px] text-text-primary placeholder-text-placeholder"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-2 px-5 py-2 overflow-x-auto [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filter messages">
+      <div className="flex items-center gap-2 px-6 py-2 overflow-x-auto" role="tablist" aria-label="Filter messages">
         {["Primary", "Unread", "Starred", "Attachments"].map((chip) => (
           <button
             key={chip}
@@ -93,7 +93,7 @@ export default function MessageListView({
         <button className="text-text-secondary text-[18px] font-semibold ml-1 cursor-pointer" aria-label="More filters">⋮</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto" role="list" aria-label="Message list">
+      <div className="flex-1 overflow-y-auto pt-3" role="list" aria-label="Message list">
         {messages.length === 0 ? (
           <EmptyState icon="▣" title="No messages yet" description="Start by composing a new message." />
         ) : filtered.length === 0 && searchQuery ? (

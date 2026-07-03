@@ -26,7 +26,7 @@ export default function SenderBlock({
   createdAt: number;
 }) {
   return (
-    <div className="flex items-center gap-3 px-5 py-3">
+    <div className="flex items-center gap-3 px-6 py-3">
       <Avatar initials={avatarInitials} size={46} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

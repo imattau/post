@@ -23,7 +23,7 @@ export default function AttachmentCard({
   }
 
   return (
-    <div className="flex items-center gap-3 h-[88px] px-3 border border-border rounded-pill bg-sidebar w-[274px]">
+    <div className="flex items-center gap-3 h-[88px] px-3 border border-border rounded-[12px] bg-sidebar w-[274px]">
       <div className="w-12 h-14 rounded-[8px] bg-pill-subtle flex items-center justify-center flex-shrink-0">
         {isImage() ? (
           <span className="text-text-tertiary text-[11px] font-bold">▣</span>

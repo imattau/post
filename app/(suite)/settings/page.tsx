@@ -27,7 +27,7 @@ export default function SettingsPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 h-[38px] px-3 rounded-[10px] text-left transition-all duration-150 cursor-pointer ${
+              className={`flex items-center gap-3 h-10 px-3 rounded-[10px] text-left transition-all duration-150 cursor-pointer ${
                 activeTab === tab.id
                   ? "bg-surface-active text-white"
                   : "text-text-secondary hover:text-text-near-white hover:brightness-110"
@@ -105,7 +105,7 @@ function IdentityTab() {
       <SectionHeader title="Current Identity" />
       <div className="flex items-center gap-5 p-4 border border-border rounded-pill bg-sidebar max-w-lg">
         <div className="w-[88px] h-[88px] rounded-[18px] bg-pill-subtle flex items-center justify-center flex-shrink-0">
-          <span className="text-white text-[25px] font-bold">AL</span>
+          <span className="text-white text-[25px] font-semibold">AL</span>
         </div>
         <div>
           <p className="text-[18px] font-semibold text-text-primary">Alice Nguyen</p>

@@ -33,7 +33,7 @@ export default function IconDock() {
   const colorClass = AVATAR_COLORS[hashInitials(avatarInitial) % AVATAR_COLORS.length];
 
   return (
-    <div className="w-[72px] h-dvh flex-shrink-0 bg-dock flex flex-col items-center py-3 gap-2">
+    <div className="w-[72px] h-dvh flex-shrink-0 bg-dock flex flex-col items-center pt-[18px]">
       {/* Logo — always "N" */}
       <div className="w-10 h-10 rounded-tile bg-brand flex items-center justify-center flex-shrink-0">
         <span className="text-white text-[17px] font-bold">N</span>
@@ -42,9 +42,9 @@ export default function IconDock() {
       {/* Active app — Post (M) */}
       <button
         onClick={toggleSwitcher}
-        className="w-10 h-10 rounded-tile-2 bg-surface-active border border-brand flex items-center justify-center flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
+        className="mt-[24px] w-10 h-10 rounded-tile-2 bg-surface-active border border-brand flex items-center justify-center flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
       >
-        <span className="text-brand-light text-[17px] font-bold">M</span>
+        <span className="text-brand-light text-[14px] font-semibold">M</span>
       </button>
 
       {/* Inactive apps */}
@@ -52,23 +52,23 @@ export default function IconDock() {
         <button
           key={tile.letter}
           onClick={toggleSwitcher}
-          className="w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
+          className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
         >
-          <span className="text-text-secondary text-[17px] font-semibold">{tile.letter}</span>
+          <span className="text-text-secondary text-[14px] font-semibold">{tile.letter}</span>
         </button>
       ))}
 
       {/* Hairline divider */}
-      <div className="w-[28px] h-px bg-border my-1" />
+      <div className="mt-[18px] w-10 h-px bg-border" />
 
       {/* Search */}
-      <button className="w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
-        <span className="text-text-secondary text-[15px]">⌕</span>
+      <button className="mt-[19px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
+        <span className="text-text-secondary text-[14px] font-semibold">⌕</span>
       </button>
 
       {/* Help */}
-      <button className="w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
-        <span className="text-text-secondary text-[15px] font-semibold">?</span>
+      <button className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
+        <span className="text-text-secondary text-[14px] font-semibold">?</span>
       </button>
 
       {/* Spacer */}
@@ -79,7 +79,7 @@ export default function IconDock() {
         <div className={`w-9 h-9 rounded-full ${colorClass} flex items-center justify-center`}>
           <span className="text-white text-[11px] font-semibold">{avatarInitial}</span>
         </div>
-        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-ok border-[1.5px] border-dock" />
+        <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-ok border-[1.5px] border-dock" />
       </button>
 
       {/* App Switcher popover */}
