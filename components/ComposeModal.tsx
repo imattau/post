@@ -120,14 +120,32 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const parseRecipient = useCallback(async (value: string) => {
     let pubkey = value;
     let npub = value;
+
     if (value.startsWith("npub1")) {
       const { decode } = await import("nostr-tools/nip19");
       const decoded = decode(value);
       if (decoded.type !== "npub") throw new Error("Expected an npub");
       pubkey = decoded.data;
+      npub = value;
+    } else if (value.includes("@") && !value.startsWith("npub1")) {
+      const { resolveNip05 } = await import("@post/nostr-core");
+      const result = await resolveNip05(value);
+      if (!result) throw new Error("NIP-05 lookup failed for this address");
+      pubkey = result.pubkey;
+      npub = result.pubkey;
+      const { npubEncode } = await import("nostr-tools/nip19");
+      npub = npubEncode(result.pubkey);
+      return {
+        pubkey,
+        npub,
+        name: value,
+        avatarUrl: "",
+        isGroup: false,
+      };
     }
+
     if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
-      throw new Error("Enter a 64-character pubkey or npub");
+      throw new Error("Enter a 64-character pubkey, npub, or NIP-05 address");
     }
 
     return {
@@ -382,7 +400,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                     }
                     if (e.key === "Escape") setShowContactSuggestions(false);
                   }}
-                  placeholder={draft.to.length === 0 ? "Search contacts or add npub/pubkey" : "Add another"}
+                  placeholder={draft.to.length === 0 ? "Search contacts, NIP-05, or add npub/pubkey" : "Add another"}
                   className="min-w-[180px] flex-1 bg-transparent border-none outline-none text-[13px] text-text-modal placeholder-text-placeholder"
                   disabled={isSending}
                 />

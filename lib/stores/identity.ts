@@ -94,7 +94,17 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
     set({ identity: null, keyStore: null, usingNip07: false });
   },
 
-  async refreshProfile() {},
+  async refreshProfile() {
+    const { identity } = get();
+    if (!identity?.pubkey) return;
+    const { useProfilesStore } = await import("@/lib/stores/profiles");
+    const profile = await useProfilesStore.getState().fetchProfile(identity.pubkey);
+    if (profile) {
+      set((state) => ({
+        identity: state.identity ? { ...state.identity, profile, nip05: profile.nip05 ?? null } : null,
+      }));
+    }
+  },
 
   getSigner: () => {
     const { usingNip07, identity } = get();

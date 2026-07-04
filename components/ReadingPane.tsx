@@ -1,12 +1,14 @@
 "use client";
 
 import type { MockMessage } from "@/lib/mock/threads";
+import type { Message } from "@post/nostr-core";
 import ReadingTopBar from "./ReadingTopBar";
 import SubjectPills from "./SubjectPills";
 import SenderBlock from "./SenderBlock";
 import MessageBody from "./MessageBody";
 import AttachmentCard from "./AttachmentCard";
 import ReplyComposer from "./ReplyComposer";
+import ThreadView from "./ThreadView";
 
 export default function ReadingPane({
   message,
@@ -20,6 +22,8 @@ export default function ReadingPane({
   onToggleRead,
   onToggleSpam,
   onCopyEventId,
+  threadMessages,
+  onThreadSelect,
 }: {
   message: MockMessage;
   starred: boolean;
@@ -32,6 +36,8 @@ export default function ReadingPane({
   onToggleRead: () => void;
   onToggleSpam: () => void;
   onCopyEventId: () => void;
+  threadMessages?: Message[];
+  onThreadSelect?: (id: string) => void;
 }) {
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
@@ -51,6 +57,10 @@ export default function ReadingPane({
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-10 pt-[30px]">
+        <ThreadView
+          messages={threadMessages ?? []}
+          onSelect={onThreadSelect ?? (() => {})}
+        />
         <div>
           <h1 className="max-w-[560px] text-[26px] font-semibold leading-tight text-text-near-white">
             {message.subject}

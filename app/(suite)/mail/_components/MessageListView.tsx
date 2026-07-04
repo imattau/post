@@ -62,14 +62,11 @@ export default function MessageListView({
     });
   }, []);
 
-  const batchActions = useMessagesStore((s) => ({
-    toggleStar: s.toggleStar,
-    toggleArchive: s.toggleArchive,
-    deleteMessage: s.deleteMessage,
-    markRead: s.markRead,
-    markUnread: s.markUnread,
-    toggleSpam: s.toggleSpam,
-  }));
+  const batchToggleStar = useMessagesStore((s) => s.toggleStar);
+  const batchToggleArchive = useMessagesStore((s) => s.toggleArchive);
+  const batchDeleteMessage = useMessagesStore((s) => s.deleteMessage);
+  const batchMarkRead = useMessagesStore((s) => s.markRead);
+  const batchMarkUnread = useMessagesStore((s) => s.markUnread);
 
   const performBatchAction = useCallback(async (action: (id: string) => Promise<void>) => {
     for (const id of batchSelection) {
@@ -191,31 +188,31 @@ export default function MessageListView({
           <div className="sticky bottom-0 left-0 right-0 flex items-center gap-2 px-4 py-3 bg-dock border-t border-border">
             <span className="text-[12px] text-text-secondary mr-2">{batchSelection.size} selected</span>
             <button
-              onClick={() => performBatchAction(batchActions.toggleArchive)}
+              onClick={() => performBatchAction(batchToggleArchive)}
               className="h-8 px-3 rounded-[10px] border border-border bg-sidebar text-[11px] font-medium text-text-secondary hover:border-brand/50 cursor-pointer transition-all duration-150"
             >
               Archive
             </button>
             <button
-              onClick={() => performBatchAction(batchActions.toggleStar)}
+              onClick={() => performBatchAction(batchToggleStar)}
               className="h-8 px-3 rounded-[10px] border border-border bg-sidebar text-[11px] font-medium text-text-secondary hover:border-brand/50 cursor-pointer transition-all duration-150"
             >
               Star
             </button>
             <button
-              onClick={() => performBatchAction(batchActions.markRead)}
+              onClick={() => performBatchAction(batchMarkRead)}
               className="h-8 px-3 rounded-[10px] border border-border bg-sidebar text-[11px] font-medium text-text-secondary hover:border-brand/50 cursor-pointer transition-all duration-150"
             >
               Read
             </button>
             <button
-              onClick={() => performBatchAction(batchActions.markUnread)}
+              onClick={() => performBatchAction(batchMarkUnread)}
               className="h-8 px-3 rounded-[10px] border border-border bg-sidebar text-[11px] font-medium text-text-secondary hover:border-brand/50 cursor-pointer transition-all duration-150"
             >
               Unread
             </button>
             <button
-              onClick={() => performBatchAction(batchActions.deleteMessage)}
+              onClick={() => performBatchAction(batchDeleteMessage)}
               className="h-8 px-3 rounded-[10px] border border-border bg-sidebar text-[11px] font-medium text-danger hover:border-danger/50 cursor-pointer transition-all duration-150"
             >
               Delete

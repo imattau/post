@@ -1,12 +1,13 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useMemo } from "react";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { useMessagesStore } from "@/lib/stores/messages";
 import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { useMailboxMessages } from "../_components/useMailboxMessages";
+import { getThreadMessages } from "@/lib/thread";
 import ReadingPane from "@/components/ReadingPane";
 import ComposeModal from "@/components/ComposeModal";
 
@@ -31,6 +32,12 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const selectedMessage = selectedId
     ? currentMessages.find((m) => m.id === selectedId) ?? allMessages.find((m) => m.id === selectedId) ?? null
     : currentMessages[0] ?? null;
+
+  const messagesById = useMessagesStore((s) => s.byId);
+  const threadMessages = useMemo(
+    () => (selectedMessage ? getThreadMessages(selectedMessage.id, messagesById) : []),
+    [selectedMessage, messagesById]
+  );
 
   const labels = useLabelsStore((s) => s.byId);
   const labelIds = useLabelsStore((s) => s.allIds);
@@ -87,6 +94,13 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const handleCopyEventId = useCallback(async (id: string) => {
     await navigator.clipboard?.writeText(id);
   }, []);
+
+  const handleThreadSelect = useCallback(
+    (id: string) => {
+      router.push(`${pathname}?c=${id}`, { scroll: false });
+    },
+    [router, pathname]
+  );
 
   const closeCompose = useCallback(() => {
     router.replace(pathname, { scroll: false });
@@ -275,6 +289,8 @@ export default function MailContent({ children }: { children: React.ReactNode })
           onToggleRead={() => handleToggleRead(selectedMessage.id, selectedMessage.read)}
           onToggleSpam={() => handleToggleSpam(selectedMessage.id)}
           onCopyEventId={() => handleCopyEventId(selectedMessage.id)}
+          threadMessages={threadMessages}
+          onThreadSelect={handleThreadSelect}
         />
       ) : (
         <div className="bg-dock flex items-center justify-center">
