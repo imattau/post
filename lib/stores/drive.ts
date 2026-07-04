@@ -21,6 +21,7 @@ interface DriveState {
   files: DriveFile[];
   folders: DriveFolder[];
   selectedFileId: string | null;
+  selectedFolderId: string | null;
   query: string;
   filter: DriveFilter;
   sort: DriveSort;
@@ -31,6 +32,7 @@ interface DriveState {
   load: () => Promise<void>;
   refresh: () => Promise<void>;
   selectFile: (id: string | null) => void;
+  selectFolder: (id: string | null) => void;
   setQuery: (query: string) => void;
   setFilter: (filter: DriveFilter) => void;
   setSort: (sort: DriveSort) => void;
@@ -41,6 +43,7 @@ interface DriveState {
   createFolder: (name: string) => Promise<string>;
   enqueueUploads: (files: File[]) => Promise<void>;
   clearUploads: () => void;
+  updateSharedWith: (id: string, sharedWith: string[]) => Promise<void>;
 }
 
 function cloneFiles(files: DriveFile[]): DriveFile[] {
@@ -168,6 +171,8 @@ function matchesScreen(file: DriveFile, screen: DriveScreen): boolean {
       return !file.trashed;
     case "recent":
       return !file.trashed && file.updatedAt >= Date.now() - 1000 * 60 * 60 * 24 * 7;
+    case "starred":
+      return !file.trashed && file.starred;
     case "shared":
       return !file.trashed && file.sharedWith.length >= 3;
     case "offline":
@@ -183,6 +188,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   files: [],
   folders: [],
   selectedFileId: null,
+  selectedFolderId: null,
   query: "",
   filter: "all",
   sort: "recent",
@@ -227,6 +233,10 @@ export const useDriveStore = create<DriveState>((set, get) => ({
 
   selectFile(id) {
     set({ selectedFileId: id });
+  },
+
+  selectFolder(id) {
+    set({ selectedFolderId: id, selectedFileId: null });
   },
 
   setQuery(query) {
@@ -367,6 +377,15 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   clearUploads() {
     set({ uploadJobs: [] });
   },
+
+  async updateSharedWith(id, sharedWith) {
+    const { db } = await import("@/lib/db/schema");
+    const file = get().files.find((item) => item.id === id);
+    if (!file) return;
+    const updated = { ...file, sharedWith, updatedAt: Date.now() };
+    await db.driveFiles.put(updated);
+    set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
+  },
 }));
 
 export function getVisibleDriveFiles(state = useDriveStore.getState(), screen: DriveScreen = "my-files"): DriveFile[] {
@@ -375,6 +394,7 @@ export function getVisibleDriveFiles(state = useDriveStore.getState(), screen: D
     state.files.filter((file) => {
       if (!matchesScreen(file, screen)) return false;
       if (!matchesFilter(file, state.filter)) return false;
+      if (state.selectedFolderId && file.folderId !== state.selectedFolderId) return false;
       if (!query) return true;
       const haystack = [
         file.name,

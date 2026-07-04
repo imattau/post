@@ -1,4 +1,4 @@
-export type DriveScreen = "my-files" | "recent" | "shared" | "offline" | "from-post" | "trash";
+export type DriveScreen = "my-files" | "recent" | "starred" | "shared" | "offline" | "from-post" | "trash";
 
 export type CalendarViewMode = "month" | "week" | "agenda";
 export type CalendarAvailability = "free" | "busy" | "tentative" | "out";
