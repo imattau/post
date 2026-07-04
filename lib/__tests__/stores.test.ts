@@ -24,6 +24,10 @@ vi.mock("@/lib/db/schema", () => ({
         if (index >= 0) driveFileRows[index] = row;
         else driveFileRows.push(row);
       }),
+      delete: vi.fn(async (id: string) => {
+        const index = driveFileRows.findIndex((item) => item.id === id);
+        if (index >= 0) driveFileRows.splice(index, 1);
+      }),
     },
     driveFolders: {
       count: vi.fn(async () => driveFolderRows.length),
@@ -404,5 +408,89 @@ describe("drive store", () => {
     await useDriveStore.getState().enqueueUploads([new File(["drive"], "notes.md", { type: "text/markdown" })]);
     expect(useDriveStore.getState().files.some((file) => file.name === "notes.md")).toBe(true);
     expect(useDriveStore.getState().uploadJobs.at(0)?.status).toBe("complete");
+  });
+
+  it("sorts files by name", async () => {
+    const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    useDriveStore.getState().setSort("name");
+    const visible = getVisibleDriveFiles(useDriveStore.getState());
+    for (let i = 1; i < visible.length; i++) {
+      expect(visible[i - 1].name.localeCompare(visible[i].name)).toBeLessThanOrEqual(0);
+    }
+  });
+
+  it("sorts files by size (descending)", async () => {
+    const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    useDriveStore.getState().setSort("size");
+    const visible = getVisibleDriveFiles(useDriveStore.getState());
+    for (let i = 1; i < visible.length; i++) {
+      expect(visible[i - 1].sizeBytes).toBeGreaterThanOrEqual(visible[i].sizeBytes);
+    }
+  });
+
+  it("paginates files with loadMore", async () => {
+    const { useDriveStore, getPaginatedFiles } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    useDriveStore.setState({ pageSize: 2 });
+    useDriveStore.getState().resetPage();
+    const page1 = getPaginatedFiles(useDriveStore.getState());
+    expect(page1.length).toBeLessThanOrEqual(2);
+    useDriveStore.getState().loadMore();
+    const page2 = getPaginatedFiles(useDriveStore.getState());
+    expect(page2.length).toBeGreaterThan(page1.length);
+  });
+
+  it("creates and renames a folder", async () => {
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    const initialCount = useDriveStore.getState().folders.length;
+    const id = await useDriveStore.getState().createFolder("Test Folder");
+    expect(useDriveStore.getState().folders.length).toBe(initialCount + 1);
+    expect(useDriveStore.getState().folders.find((f) => f.id === id)?.name).toBe("Test Folder");
+    await useDriveStore.getState().renameFolder(id, "Renamed Folder");
+    expect(useDriveStore.getState().folders.find((f) => f.id === id)?.name).toBe("Renamed Folder");
+  });
+
+  it("stars, trashes, and deletes a file permanently", async () => {
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    const file = useDriveStore.getState().files[0];
+    expect(file).toBeDefined();
+
+    await useDriveStore.getState().toggleStar(file.id);
+    expect(useDriveStore.getState().files.find((f) => f.id === file.id)?.starred).toBe(!file.starred);
+
+    await useDriveStore.getState().toggleTrash(file.id);
+    expect(useDriveStore.getState().files.find((f) => f.id === file.id)?.trashed).toBe(!file.trashed);
+
+    await useDriveStore.getState().toggleTrash(file.id);
+    expect(useDriveStore.getState().files.find((f) => f.id === file.id)?.trashed).toBe(file.trashed);
+
+    await useDriveStore.getState().deletePermanently(file.id);
+    expect(useDriveStore.getState().files.find((f) => f.id === file.id)).toBeUndefined();
+  });
+
+  it("trashes and restores a folder", async () => {
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    const folder = useDriveStore.getState().folders[0];
+    expect(folder).toBeDefined();
+
+    await useDriveStore.getState().toggleFolderStar(folder.id);
+    expect(useDriveStore.getState().folders.find((f) => f.id === folder.id)?.starred).toBe(true);
+
+    await useDriveStore.getState().toggleFolderTrash(folder.id);
+    expect(useDriveStore.getState().folders.find((f) => f.id === folder.id)).toBeUndefined();
+  });
+
+  it("resets page on query change", async () => {
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    useDriveStore.getState().loadMore();
+    expect(useDriveStore.getState().page).toBe(2);
+    useDriveStore.getState().setQuery("test");
+    expect(useDriveStore.getState().page).toBe(1);
   });
 });

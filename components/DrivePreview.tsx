@@ -83,6 +83,7 @@ export default function DrivePreview({
           <MenuRoot open={openMenuFileId === file.id} onOpenChange={(open) => onToggleMenu(open ? file.id : null)}>
             <MenuTrigger className="inline-flex items-center justify-center text-[18px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
               render={<span />}
+              aria-label="More options"
               onClick={(e) => e.stopPropagation()}>
               ⋮
             </MenuTrigger>

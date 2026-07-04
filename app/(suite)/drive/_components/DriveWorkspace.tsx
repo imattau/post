@@ -452,6 +452,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                 <MenuRoot open={menuOpen} onOpenChange={(open) => setOpenMenuFileId(open ? file.id : null)}>
                   <MenuTrigger className="inline-flex items-center justify-center text-[15px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
                     render={<span />}
+                    aria-label="More options"
                     onClick={(e) => e.stopPropagation()}>
                     ⋮
                   </MenuTrigger>
@@ -493,9 +494,10 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
               </div>
               <div className="relative">
                 <MenuRoot open={menuOpen} onOpenChange={(open) => setOpenMenuFileId(open ? file.id : null)}>
-                  <MenuTrigger className="inline-flex items-center justify-center text-[16px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
-                    render={<span />}
-                    onClick={(e) => e.stopPropagation()}>
+                    <MenuTrigger className="inline-flex items-center justify-center text-[16px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
+                      render={<span />}
+                      aria-label="More options"
+                      onClick={(e) => e.stopPropagation()}>
                     ⋮
                   </MenuTrigger>
                   <MenuPopup>

@@ -93,6 +93,7 @@ export default function DriveFolderGrid({
                     <MenuRoot open={openMenuFolderId === folder.id} onOpenChange={(open) => setOpenMenuFolderId(open ? folder.id : null)}>
                       <MenuTrigger className="inline-flex items-center justify-center text-[16px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
                         render={<span />}
+                        aria-label="More options"
                         onClick={(e) => { e.stopPropagation(); }}>
                         ⋮
                       </MenuTrigger>

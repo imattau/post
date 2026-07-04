@@ -492,12 +492,15 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     const file = uploadOriginalFiles.get(id);
     if (!file) {
       set((state) => ({
-        uploadJobs: state.uploadJobs.map((job) =>
-          job.id === id ? { ...job, status: "failed" as const, error: "Original file not available for retry" } : job
-        ),
+        uploadJobs: state.uploadJobs.filter((job) => job.id !== id),
       }));
       return;
     }
+    set((state) => ({
+      uploadJobs: state.uploadJobs.filter((job) => job.id !== id),
+    }));
+    uploadOriginalFiles.delete(id);
+    uploadAbortControllers.delete(id);
     await get().enqueueUploads([file]);
   },
 
