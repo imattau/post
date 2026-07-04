@@ -55,15 +55,82 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="mt-[52px]">
-          <p className="text-[12px] font-semibold text-text-primary">
-            Email-styled inbox
-          </p>
-          <p className="text-[11px] text-text-secondary mt-2 max-w-[600px]">
-            Post brings the familiar email experience to Nostr. End-to-end
-            encrypted direct messages organized in an intuitive inbox with
-            labels, threading, and search.
-          </p>
+        <div className="mt-[52px] flex flex-col gap-5 max-w-[600px]">
+          <div className="flex items-start gap-3">
+            <div className="flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-pill-subtle shrink-0 mt-0.5">
+              <span className="font-bold text-[11px] text-brand">I</span>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-text-primary">
+                Email-styled inbox
+              </p>
+              <p className="text-[11px] text-text-secondary mt-1">
+                Post brings the familiar email experience to Nostr. End-to-end
+                encrypted direct messages organized in an intuitive inbox with
+                labels, threading, and search.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-pill-subtle shrink-0 mt-0.5">
+              <span className="font-bold text-[11px] text-ok">E</span>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-text-primary">
+                End-to-end encrypted
+              </p>
+              <p className="text-[11px] text-text-secondary mt-1">
+                Messages are encrypted using NIP-17 and NIP-44, ensuring only
+                you and your recipient can read them.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-pill-subtle shrink-0 mt-0.5">
+              <span className="font-bold text-[11px] text-info">L</span>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-text-primary">
+                Labels &amp; filters
+              </p>
+              <p className="text-[11px] text-text-secondary mt-1">
+                Organize conversations with custom labels, star important
+                messages, and filter by category.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-pill-subtle shrink-0 mt-0.5">
+              <span className="font-bold text-[11px] text-teal">F</span>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-text-primary">
+                Attachments &amp; files
+              </p>
+              <p className="text-[11px] text-text-secondary mt-1">
+                Share images and files directly in messages with Blossom server
+                support and inline previews.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-pill-subtle shrink-0 mt-0.5">
+              <span className="font-bold text-[11px] text-warn">K</span>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-text-primary">
+                Multiple identities
+              </p>
+              <p className="text-[11px] text-text-secondary mt-1">
+                Sign in with passkeys, browser extensions (NIP-07), remote
+                signers (NIP-46), or import an existing nsec key.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </LoginLayout>
