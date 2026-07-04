@@ -13,6 +13,14 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1_000_000).toFixed(bytes >= 10_000_000 ? 0 : 1)} MB`;
 }
 
+function isHexPubkey(value: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(value);
+}
+
+function displayInitials(value: string): string {
+  return isHexPubkey(value) ? value.slice(0, 2).toUpperCase() : value;
+}
+
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
@@ -132,19 +140,23 @@ export default function DrivePreview({
         </div>
       </div>
 
-      <div className="mt-6 border-t border-border pt-5">
-        <p className="text-[12px] font-semibold text-text-near-white">Shared with</p>
-        <div className="mt-4 flex items-center">
-          {file.sharedWith.slice(0, 3).map((initials, index) => (
-            <div key={`${file.id}-${initials}-${index}`} className={`relative ${index > 0 ? "-ml-[10px]" : ""}`}>
-              <Avatar initials={initials} size={34} />
-            </div>
-          ))}
-          <div className="-ml-[10px] flex h-[34px] w-[34px] items-center justify-center rounded-full bg-pill-subtle text-[10px] font-semibold text-text-secondary">
-            +2
+      {file.sharedWith.length > 0 && (
+        <div className="mt-6 border-t border-border pt-5">
+          <p className="text-[12px] font-semibold text-text-near-white">Shared with</p>
+          <div className="mt-4 flex items-center">
+            {file.sharedWith.slice(0, 3).map((entry, index) => (
+              <div key={`${file.id}-${entry}-${index}`} className={`relative ${index > 0 ? "-ml-[10px]" : ""}`}>
+                <Avatar initials={displayInitials(entry)} size={34} />
+              </div>
+            ))}
+            {file.sharedWith.length > 3 && (
+              <div className="-ml-[10px] flex h-[34px] w-[34px] items-center justify-center rounded-full bg-pill-subtle text-[10px] font-semibold text-text-secondary">
+                +{file.sharedWith.length - 3}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       <Button
         onClick={onOpenFile}

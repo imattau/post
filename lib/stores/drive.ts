@@ -54,6 +54,9 @@ interface DriveState {
   toggleTrash: (id: string) => Promise<void>;
   toggleOffline: (id: string) => Promise<void>;
   createFolder: (name: string) => Promise<string>;
+  renameFolder: (id: string, name: string) => Promise<void>;
+  toggleFolderStar: (id: string) => Promise<void>;
+  toggleFolderTrash: (id: string) => Promise<void>;
   enqueueUploads: (files: File[]) => Promise<void>;
   clearUploads: () => void;
   cancelUpload: (id: string) => void;
@@ -538,6 +541,34 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     });
   },
 
+  async renameFolder(id, name) {
+    const { db } = await import("@/lib/db/schema");
+    const folder = get().folders.find((item) => item.id === id);
+    if (!folder) return;
+    const updated = { ...folder, name, updatedAt: Date.now() };
+    await db.driveFolders.put(updated);
+    set({ folders: get().folders.map((item) => (item.id === id ? updated : item)) });
+  },
+
+  async toggleFolderStar(id) {
+    const { db } = await import("@/lib/db/schema");
+    const folder = get().folders.find((item) => item.id === id);
+    if (!folder) return;
+    const updated = { ...folder, starred: !folder.starred, updatedAt: Date.now() };
+    await db.driveFolders.put(updated);
+    set({ folders: get().folders.map((item) => (item.id === id ? updated : item)) });
+  },
+
+  async toggleFolderTrash(id) {
+    const { db } = await import("@/lib/db/schema");
+    const folder = get().folders.find((item) => item.id === id);
+    if (!folder) return;
+    const updated = { ...folder, trashed: !folder.trashed, updatedAt: Date.now() };
+    await db.driveFolders.put(updated);
+    set({ folders: get().folders.filter((item) => (item.id === id ? false : true)) });
+    if (get().selectedFolderId === id) get().selectFolder(null);
+  },
+
   async importAttachment(attachment, sourceMessageId) {
     const identity = useIdentityStore.getState().identity;
     const now = Date.now();
@@ -638,10 +669,6 @@ export function getVisibleDriveFiles(state = useDriveStore.getState(), screen: D
     }),
     state.sort
   );
-}
-
-export function getDriveSelection(state = useDriveStore.getState()): DriveFile | null {
-  return state.files.find((file) => file.id === state.selectedFileId) ?? state.files[0] ?? null;
 }
 
 export function getPaginatedFiles(state = useDriveStore.getState(), screen: DriveScreen = "my-files"): DriveFile[] {

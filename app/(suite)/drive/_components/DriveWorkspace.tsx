@@ -6,6 +6,8 @@ import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";
 import ShareDialog from "@/components/ShareDialog";
+import DriveToolbar from "./DriveToolbar";
+import DriveFolderGrid from "./DriveFolderGrid";
 import { useDriveStore, getVisibleDriveFiles, getPaginatedFiles } from "@/lib/stores/drive";
 import { decryptDriveBlob } from "@post/nostr-core";
 import { useIdentityStore } from "@/lib/stores/identity";
@@ -153,6 +155,9 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     toggleOffline,
     deletePermanently,
     createFolder,
+    renameFolder,
+    toggleFolderStar,
+    toggleFolderTrash,
     enqueueUploads,
     clearUploads,
     cancelUpload,
@@ -171,6 +176,8 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const [dragActive, setDragActive] = useState(false);
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
+  const [renameFolderValue, setRenameFolderValue] = useState("");
   const [openMenuFileId, setOpenMenuFileId] = useState<string | null>(null);
   const [renameFileId, setRenameFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -243,6 +250,28 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     setNewFolderName("");
     setShowNewFolderInput(false);
   }, [newFolderName, createFolder, selectFolder]);
+
+  const handleRenameFolder = useCallback((folderId: string) => {
+    const folder = folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    setRenameFolderId(folderId);
+    setRenameFolderValue(folder.name);
+  }, [folders]);
+
+  const handleRenameFolderSubmit = useCallback(async () => {
+    if (!renameFolderId || !renameFolderValue.trim()) return;
+    await renameFolder(renameFolderId, renameFolderValue.trim());
+    setRenameFolderId(null);
+    setRenameFolderValue("");
+  }, [renameFolderId, renameFolderValue, renameFolder]);
+
+  const handleFolderStar = useCallback(async (folderId: string) => {
+    await toggleFolderStar(folderId);
+  }, [toggleFolderStar]);
+
+  const handleFolderTrash = useCallback(async (folderId: string) => {
+    await toggleFolderTrash(folderId);
+  }, [toggleFolderTrash]);
 
   const handleDownload = useCallback(async (file: DriveFile) => {
     if (!file.encryptedBlob || !file.encryption || !identity?.nsec) {
@@ -533,64 +562,42 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             </div>
           </div>
 
-          <div className="mt-5 flex items-center gap-3" suppressHydrationWarning>
-            <div className="flex h-[42px] flex-1 items-center gap-3 rounded-pill border border-border bg-sidebar px-3">
-              <span className="text-[15px] text-text-secondary">⌕</span>
-              <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search files, folders or people"
-                className="h-full flex-1 bg-transparent text-[12px] text-text-primary outline-none placeholder:text-text-placeholder" />
-            </div>
-            <Button variant="outline" onClick={() => setSort(sort === "recent" ? "name" : sort === "name" ? "size" : "recent")}
-              className="h-[42px] w-[112px] text-[11px] font-medium">
-              Sort: {sort === "recent" ? "Recent" : sort === "name" ? "Name" : "Size"}
-            </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "outline"} size="icon"
-              onClick={() => setViewMode("grid")}
-              className="h-[42px] w-[42px] rounded-pill text-[15px] font-semibold">
-              ▦
-            </Button>
-            <Button variant={viewMode === "list" ? "secondary" : "outline"} size="icon"
-              onClick={() => setViewMode("list")}
-              className="h-[42px] w-[42px] rounded-pill text-[15px] font-semibold">
-              ☷
-            </Button>
-          </div>
+          <DriveToolbar
+            searchInput={searchInput}
+            sort={sort}
+            viewMode={viewMode}
+            onSearchInputChange={setSearchInput}
+            onSortChange={() => setSort(sort === "recent" ? "name" : sort === "name" ? "size" : "recent")}
+            onViewModeChange={setViewMode}
+          />
 
           {meta.showFolders && (
-            <>
-              <div className="mt-8 flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-text-near-white">Folders</h3>
-                <Button variant="ghost" onClick={() => setShowNewFolderInput(true)} className="text-brand-light">
-                  + New Folder
-                </Button>
-              </div>
-              {showNewFolderInput && (
-                <div className="mt-3 flex items-center gap-2">
-                  <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") void handleCreateFolder(); if (e.key === "Escape") { setShowNewFolderInput(false); setNewFolderName(""); } }}
-                    placeholder="Folder name" autoFocus
-                    className="h-9 flex-1 rounded-pill border border-border bg-sidebar px-3 text-[12px] text-text-primary outline-none placeholder:text-text-placeholder" />
-                  <Button variant="default" onClick={() => void handleCreateFolder()}>Create</Button>
-                  <Button variant="outline" onClick={() => { setShowNewFolderInput(false); setNewFolderName(""); }}>Cancel</Button>
-                </div>
-              )}
-              <div className="mt-4 grid grid-cols-3 gap-4">
-                {folders.map((folder) => (
-                  <button key={folder.id} onClick={() => selectFolder(folder.id)}
-                    className="group flex h-[108px] flex-col justify-between rounded-pill border border-border bg-sidebar p-4 text-left hover:border-brand/50 transition-colors">
-                    <div className="flex items-start justify-between">
-                      <span className="flex h-[32px] w-[42px] items-center justify-center rounded-[9px] text-[14px] font-semibold text-white"
-                        style={{ backgroundColor: folder.color }}>▰</span>
-                      <span className="text-[16px] text-text-secondary">⋮</span>
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-semibold text-text-near-white">{folder.name}</p>
-                      <p className="mt-[4px] text-[10px] text-text-tertiary">{folder.fileCount} files</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
+            <DriveFolderGrid
+              folders={folders}
+              showNewFolderInput={showNewFolderInput}
+              newFolderName={newFolderName}
+              renameFolderId={renameFolderId}
+              renameFolderValue={renameFolderValue}
+              onSelectFolder={selectFolder}
+              onNewFolderNameChange={setNewFolderName}
+              onNewFolderKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreateFolder();
+                if (e.key === "Escape") { setShowNewFolderInput(false); setNewFolderName(""); }
+              }}
+              onNewFolderCreate={() => void handleCreateFolder()}
+              onNewFolderCancel={() => { setShowNewFolderInput(false); setNewFolderName(""); }}
+              onShowNewFolder={() => setShowNewFolderInput(true)}
+              onRenameFolder={handleRenameFolder}
+              onRenameValueChange={setRenameFolderValue}
+              onRenameKeyDown={(e) => {
+                if (e.key === "Enter") void handleRenameFolderSubmit();
+                if (e.key === "Escape") setRenameFolderId(null);
+              }}
+              onRenameSubmit={() => void handleRenameFolderSubmit()}
+              onRenameCancel={() => setRenameFolderId(null)}
+              onFolderStar={(id) => void handleFolderStar(id)}
+              onFolderTrash={(id) => void handleFolderTrash(id)}
+            />
           )}
 
           <div className="mt-8 flex items-center gap-2">

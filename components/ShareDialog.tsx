@@ -5,6 +5,29 @@ import Avatar from "./Avatar";
 import { Button } from "@/components/ui/button";
 import type { DriveFile } from "@/lib/types";
 
+function isHexPubkey(value: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(value);
+}
+
+function pubkeyInitials(pubkey: string): string {
+  return pubkey.slice(0, 2).toUpperCase();
+}
+
+async function resolveNpubOrPubkey(input: string): Promise<string | null> {
+  const trimmed = input.trim();
+  if (isHexPubkey(trimmed)) return trimmed;
+  if (trimmed.startsWith("npub1")) {
+    try {
+      const { decode } = await import("nostr-tools/nip19");
+      const decoded = decode(trimmed);
+      if (decoded.type === "npub") return decoded.data;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 interface ShareDialogProps {
   file: DriveFile;
   onClose: () => void;
@@ -26,10 +49,22 @@ export default function ShareDialog({ file, onClose, onUpdate }: ShareDialogProp
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  const addRecipient = useCallback(() => {
-    const val = input.trim().toUpperCase();
-    if (!val || sharedWith.includes(val)) return;
-    setSharedWith((prev) => [...prev, val]);
+  const [error, setError] = useState<string | null>(null);
+
+  const addRecipient = useCallback(async () => {
+    const val = input.trim();
+    if (!val) return;
+    const pubkey = await resolveNpubOrPubkey(val);
+    if (!pubkey) {
+      setError("Invalid npub or pubkey");
+      return;
+    }
+    if (sharedWith.includes(pubkey)) {
+      setError("Already added");
+      return;
+    }
+    setError(null);
+    setSharedWith((prev) => [...prev, pubkey]);
     setInput("");
   }, [input, sharedWith]);
 
@@ -55,35 +90,40 @@ export default function ShareDialog({ file, onClose, onUpdate }: ShareDialogProp
         <div className="mt-5 flex items-center gap-2">
           <input
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); setError(null); }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") addRecipient();
+              if (e.key === "Enter") void addRecipient();
               if (e.key === "Escape") onClose();
             }}
-            placeholder="Enter initials or npub..."
+            placeholder="Enter npub or hex pubkey..."
             className="h-9 flex-1 rounded-pill border border-border bg-sidebar px-3 text-[12px] text-text-primary outline-none placeholder:text-text-placeholder"
           />
-          <Button onClick={addRecipient}>
+          <Button onClick={() => void addRecipient()}>
             Add
           </Button>
         </div>
+        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
 
         <div className="mt-5 space-y-2">
           {sharedWith.length === 0 ? (
             <p className="text-[11px] text-text-tertiary">Not shared with anyone yet.</p>
           ) : (
-            sharedWith.map((initials) => (
-              <div key={initials} className="flex items-center justify-between rounded-[10px] border border-border bg-sidebar px-3 py-2">
-                <div className="flex items-center gap-3">
-                  <Avatar initials={initials} size={28} />
-                  <span className="text-[12px] font-medium text-text-near-white">{initials}</span>
+            sharedWith.map((entry) => {
+              const displayInitials = isHexPubkey(entry) ? pubkeyInitials(entry) : entry;
+              const displayName = isHexPubkey(entry) ? `${entry.slice(0, 8)}...` : entry;
+              return (
+                <div key={entry} className="flex items-center justify-between rounded-[10px] border border-border bg-sidebar px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <Avatar initials={displayInitials} size={28} />
+                    <span className="text-[12px] font-medium text-text-near-white">{displayName}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => removeRecipient(entry)}
+                    className="text-danger hover:text-danger">
+                    Remove
+                  </Button>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => removeRecipient(initials)}
-                  className="text-danger hover:text-danger">
-                  Remove
-                </Button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
