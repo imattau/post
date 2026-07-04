@@ -1,7 +1,9 @@
 "use client";
 
+import { useCallback } from "react";
 import type { MockMessage } from "@/lib/mock/threads";
 import type { Message } from "@post/nostr-core";
+import { useDriveStore } from "@/lib/stores/drive";
 import ReadingTopBar from "./ReadingTopBar";
 import SubjectPills from "./SubjectPills";
 import SenderBlock from "./SenderBlock";
@@ -39,6 +41,8 @@ export default function ReadingPane({
   threadMessages?: Message[];
   onThreadSelect?: (id: string) => void;
 }) {
+  const driveFiles = useDriveStore((s) => s.files);
+  const importAttachment = useDriveStore((s) => s.importAttachment);
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
       <ReadingTopBar
@@ -92,17 +96,22 @@ export default function ReadingPane({
 
         {message.attachments.length > 0 && (
           <div className="flex flex-wrap gap-3 pt-8 pb-3">
-            {message.attachments.map((att) => (
-              <AttachmentCard
-                key={att.id}
-                fileName={att.fileName}
-                sizeBytes={att.sizeBytes}
-                encrypted={att.encrypted}
-                sha256={att.sha256}
-                mimeType={att.mimeType}
-                url={att.url}
-              />
-            ))}
+            {message.attachments.map((att) => {
+              const inDrive = driveFiles.some((f) => f.sha256 === att.sha256);
+              return (
+                <AttachmentCard
+                  key={att.id}
+                  fileName={att.fileName}
+                  sizeBytes={att.sizeBytes}
+                  encrypted={att.encrypted}
+                  sha256={att.sha256}
+                  mimeType={att.mimeType}
+                  url={att.url}
+                  storedInDrive={inDrive}
+                  onSaveToDrive={inDrive ? undefined : () => importAttachment({ fileName: att.fileName, mimeType: att.mimeType, sizeBytes: att.sizeBytes, sha256: att.sha256, url: att.url, encrypted: att.encrypted }, message.id)}
+                />
+              );
+            })}
           </div>
         )}
       </div>

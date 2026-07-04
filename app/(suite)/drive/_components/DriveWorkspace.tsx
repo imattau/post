@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";
@@ -126,6 +127,10 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     load,
     selectFile,
     selectFolder,
+    selectedFileIds,
+    toggleFileSelection,
+    selectAllFiles,
+    clearFileSelection,
     setQuery,
     setFilter,
     setSort,
@@ -151,13 +156,23 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const [renameFileId, setRenameFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [shareFile, setShareFile] = useState<DriveFile | null>(null);
+  const searchParams = useSearchParams();
+  const blobParam = searchParams.get("blob");
   const meta = SCREEN_META[screen];
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     if (screen !== "my-files" && selectedFolderId) selectFolder(null);
-  }, [screen, selectedFolderId, selectFolder]);
+    clearFileSelection();
+  }, [screen, selectedFolderId, selectFolder, clearFileSelection]);
+
+  useEffect(() => {
+    if (blobParam && files.length > 0) {
+      const match = files.find((f) => f.sha256 === blobParam);
+      if (match) selectFile(match.id);
+    }
+  }, [blobParam, files, selectFile]);
 
   const selectedFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
   const totalBytes = files.reduce((sum, f) => sum + f.sizeBytes, 0);
@@ -224,6 +239,24 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     setRenameValue("");
   }, [renameFileId, renameValue]);
 
+  const handleBatchTrash = useCallback(async () => {
+    for (const id of selectedFileIds) await toggleTrash(id);
+    clearFileSelection();
+  }, [selectedFileIds, toggleTrash, clearFileSelection]);
+
+  const handleBatchStar = useCallback(async () => {
+    for (const id of selectedFileIds) await toggleStar(id);
+    clearFileSelection();
+  }, [selectedFileIds, toggleStar, clearFileSelection]);
+
+  const handleBatchDownload = useCallback(async () => {
+    for (const id of selectedFileIds) {
+      const file = files.find((f) => f.id === id);
+      if (file) await handleDownload(file);
+    }
+    clearFileSelection();
+  }, [selectedFileIds, files, handleDownload, clearFileSelection]);
+
   const handleOpenFile = useCallback(async () => {
     if (!selectedFile) return;
     if (screen === "trash") {
@@ -271,8 +304,20 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
 
   const renderFile = (file: DriveFile, view: "list" | "grid") => {
     const selected = selectedFile?.id === file.id;
+    const checked = selectedFileIds.includes(file.id);
     const menuOpen = openMenuFileId === file.id;
     const renaming = renameFileId === file.id;
+
+    const checkbox = (
+      <span
+        onClick={(e) => { e.stopPropagation(); toggleFileSelection(file.id); }}
+        className={`flex h-4 w-4 cursor-pointer items-center justify-center rounded-[3px] border text-[9px] font-bold ${
+          checked ? "border-brand bg-brand text-white" : "border-border bg-sidebar text-transparent"
+        }`}
+      >
+        {checked ? "✓" : ""}
+      </span>
+    );
 
     const renameInput = (
       <div className={`flex items-center gap-2 ${view === "list" ? "rounded-[10px]" : "rounded-pill"} border border-brand bg-surface-active ${view === "list" ? "px-4 py-3" : "p-4"}`}>
@@ -309,10 +354,11 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
           {renaming ? renameInput : (
             <button
               onClick={() => selectFile(file.id)}
-              className={`grid w-full grid-cols-[1fr_78px_110px_20px] items-center rounded-[10px] border px-4 py-3 text-left ${
+              className={`grid w-full grid-cols-[24px_1fr_78px_110px_20px] items-center rounded-[10px] border px-3 py-3 text-left ${
                 selected ? "border-brand bg-surface-active" : "border-border bg-sidebar"
               }`}
             >
+              {checkbox}
               <div className="flex min-w-0 items-center gap-4">
                 <FileThumb file={file} />
                 <div className="min-w-0">
@@ -341,7 +387,10 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             className={`w-full rounded-pill border p-4 text-left ${selected ? "border-brand bg-surface-active" : "border-border bg-sidebar"}`}
           >
             <div className="flex items-start justify-between">
-              <FileThumb file={file} />
+              <div className="relative">
+                <FileThumb file={file} />
+                <div className="absolute -left-1 -top-1">{checkbox}</div>
+              </div>
               <div className="relative">
                 <span onClick={(e) => { e.stopPropagation(); setOpenMenuFileId(menuOpen ? null : file.id); }}
                   className="cursor-pointer text-[16px] text-text-secondary">⋮</span>
@@ -409,8 +458,8 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             </div>
           </div>
 
-          <div className="mt-5 flex items-center gap-3">
-            <div className="flex h-[42px] flex-1 items-center gap-3 rounded-pill border border-border bg-sidebar px-3" suppressHydrationWarning>
+          <div className="mt-5 flex items-center gap-3" suppressHydrationWarning>
+            <div className="flex h-[42px] flex-1 items-center gap-3 rounded-pill border border-border bg-sidebar px-3">
               <span className="text-[15px] text-text-secondary">⌕</span>
               <input value={query} onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search files, folders or people"
@@ -497,9 +546,42 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                   <p className="mt-2 text-[11px] text-text-secondary">{meta.emptyDescription}</p>
                 </div>
               </div>
-            ) : viewMode === "list" ? (
+            ) : (
+              <>
+                {selectedFileIds.length > 0 && (
+                  <div className="mb-3 flex items-center gap-3 rounded-pill border border-brand bg-surface-active px-4 py-2.5">
+                    <span className="text-[12px] font-medium text-text-near-white">
+                      {selectedFileIds.length} selected
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <button onClick={() => void handleBatchTrash()}
+                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-danger">
+                        {screen === "trash" ? "Delete permanently" : "Trash"}
+                      </button>
+                      <button onClick={() => void handleBatchStar()}
+                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-text-secondary">
+                        Star
+                      </button>
+                      <button onClick={() => void handleBatchDownload()}
+                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-text-secondary">
+                        Download
+                      </button>
+                      <button onClick={clearFileSelection}
+                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-text-secondary">
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {viewMode === "list" ? (
               <div>
-                <div className="grid grid-cols-[1fr_78px_110px] px-[16px] pb-2 text-[10px] font-semibold text-text-tertiary">
+                <div className="grid grid-cols-[24px_1fr_78px_110px] px-[16px] pb-2 text-[10px] font-semibold text-text-tertiary">
+                  <span
+                    onClick={() => selectAllFiles()}
+                    className="cursor-pointer"
+                  >
+                    {selectedFileIds.length === visibleFiles.length ? "☑" : "☐"}
+                  </span>
                   <span>Name</span>
                   <span className="text-right">Size</span>
                   <span className="text-right">Modified</span>
@@ -509,6 +591,8 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             ) : (
               <div className="grid grid-cols-2 gap-4">{visibleFiles.map((file) => renderFile(file, "grid"))}</div>
             )}
+            </>
+          )}
           </div>
 
           {meta.showUploadDropzone && (

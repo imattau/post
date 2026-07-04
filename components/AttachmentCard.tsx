@@ -14,6 +14,8 @@ export default function AttachmentCard({
   sha256,
   mimeType,
   url,
+  storedInDrive,
+  onSaveToDrive,
 }: {
   fileName: string;
   sizeBytes: number;
@@ -21,11 +23,24 @@ export default function AttachmentCard({
   sha256: string;
   mimeType: string;
   url?: string;
+  storedInDrive?: boolean;
+  onSaveToDrive?: () => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   function isImage() {
     return mimeType.startsWith("image/");
+  }
+
+  async function handleSave() {
+    if (!onSaveToDrive) return;
+    setSaving(true);
+    try {
+      await onSaveToDrive();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -51,12 +66,22 @@ export default function AttachmentCard({
               Preview
             </button>
           )}
-          <a
-            href={`/drive?blob=${sha256}`}
-            className="text-[10px] font-medium text-brand-light hover:brightness-110 no-underline"
-          >
-            Open in Drive
-          </a>
+          {storedInDrive ? (
+            <a
+              href={`/drive?blob=${sha256}`}
+              className="text-[10px] font-medium text-brand-light hover:brightness-110 no-underline"
+            >
+              Open in Drive
+            </a>
+          ) : (
+            <button
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="text-[10px] font-medium text-brand-light cursor-pointer hover:brightness-110 disabled:opacity-40"
+            >
+              {saving ? "Saving..." : "Save to Drive"}
+            </button>
+          )}
         </div>
       </div>
       {previewOpen && (

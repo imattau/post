@@ -22,6 +22,7 @@ interface DriveState {
   folders: DriveFolder[];
   selectedFileId: string | null;
   selectedFolderId: string | null;
+  selectedFileIds: string[];
   query: string;
   filter: DriveFilter;
   sort: DriveSort;
@@ -33,6 +34,9 @@ interface DriveState {
   refresh: () => Promise<void>;
   selectFile: (id: string | null) => void;
   selectFolder: (id: string | null) => void;
+  toggleFileSelection: (id: string) => void;
+  selectAllFiles: () => void;
+  clearFileSelection: () => void;
   setQuery: (query: string) => void;
   setFilter: (filter: DriveFilter) => void;
   setSort: (sort: DriveSort) => void;
@@ -44,6 +48,7 @@ interface DriveState {
   enqueueUploads: (files: File[]) => Promise<void>;
   clearUploads: () => void;
   updateSharedWith: (id: string, sharedWith: string[]) => Promise<void>;
+  importAttachment: (attachment: { fileName: string; mimeType: string; sizeBytes: number; sha256: string; url: string; encrypted: boolean }, sourceMessageId?: string) => Promise<string>;
 }
 
 function cloneFiles(files: DriveFile[]): DriveFile[] {
@@ -57,6 +62,12 @@ function cloneFolders(folders: DriveFolder[]): DriveFolder[] {
 function guessFileKind(file: File): DriveFileKind {
   const name = file.name.toLowerCase();
   const mime = file.type.toLowerCase();
+  return guessFileKindFromMime(mime, name);
+}
+
+function guessFileKindFromMime(mimeType: string, fileName: string): DriveFileKind {
+  const name = fileName.toLowerCase();
+  const mime = mimeType.toLowerCase();
   if (name.endsWith(".fig")) return "figma";
   if (mime.includes("pdf") || name.endsWith(".pdf")) return "pdf";
   if (mime.startsWith("image/")) return "image";
@@ -189,6 +200,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   folders: [],
   selectedFileId: null,
   selectedFolderId: null,
+  selectedFileIds: [],
   query: "",
   filter: "all",
   sort: "recent",
@@ -217,6 +229,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
       folders: countedFolders,
       files,
       selectedFileId,
+      selectedFileIds: [],
       loading: false,
     });
   },
@@ -237,6 +250,26 @@ export const useDriveStore = create<DriveState>((set, get) => ({
 
   selectFolder(id) {
     set({ selectedFolderId: id, selectedFileId: null });
+  },
+
+  toggleFileSelection(id) {
+    set((state) => ({
+      selectedFileIds: state.selectedFileIds.includes(id)
+        ? state.selectedFileIds.filter((fid) => fid !== id)
+        : [...state.selectedFileIds, id],
+    }));
+  },
+
+  selectAllFiles() {
+    const screen = "my-files";
+    const allIds = getVisibleDriveFiles(get(), screen).map((f) => f.id);
+    set((state) => ({
+      selectedFileIds: state.selectedFileIds.length === allIds.length ? [] : allIds,
+    }));
+  },
+
+  clearFileSelection() {
+    set({ selectedFileIds: [] });
   },
 
   setQuery(query) {
@@ -385,6 +418,44 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     const updated = { ...file, sharedWith, updatedAt: Date.now() };
     await db.driveFiles.put(updated);
     set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
+  },
+
+  async importAttachment(attachment, sourceMessageId) {
+    const identity = useIdentityStore.getState().identity;
+    const now = Date.now();
+    const kind = guessFileKindFromMime(attachment.mimeType || "", attachment.fileName);
+    const file: DriveFile = {
+      id: crypto.randomUUID(),
+      name: attachment.fileName,
+      folderId: null,
+      fileKind: kind,
+      mimeType: attachment.mimeType || "application/octet-stream",
+      sizeBytes: attachment.sizeBytes,
+      createdAt: now,
+      updatedAt: now,
+      modifiedLabel: modifiedLabel(new Date(now)),
+      ownerName: identity?.profile?.displayName ?? identity?.profile?.name ?? "Unknown",
+      ownerInitials: (identity?.profile?.displayName ?? identity?.profile?.name ?? "U").slice(0, 2).toUpperCase() || "U",
+      source: sourceMessageId ? "post" : "attachment",
+      starred: false,
+      trashed: false,
+      offlineAvailable: false,
+      encrypted: attachment.encrypted,
+      storedInDrive: true,
+      sha256: attachment.sha256,
+      blobUrl: attachment.url,
+      preview: `Imported from message${sourceMessageId ? ` ${sourceMessageId.slice(0, 8)}` : ""}`,
+      sharedWith: [],
+      tags: attachment.encrypted ? ["Encrypted", "Blossom"] : ["Blossom"],
+      color: colorForKind(kind),
+      letter: fileLetter(kind, attachment.fileName),
+      encryption: null,
+      encryptedBlob: null,
+    };
+    const { db } = await import("@/lib/db/schema");
+    await db.driveFiles.put(file);
+    set((state) => ({ files: [file, ...state.files] }));
+    return file.id;
   },
 }));
 

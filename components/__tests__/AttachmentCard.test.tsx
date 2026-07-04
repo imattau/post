@@ -31,8 +31,13 @@ describe("AttachmentCard", () => {
     expect(screen.queryByText(/encrypted/)).not.toBeInTheDocument();
   });
 
-  it("renders Drive link with sha256", () => {
-    render(<AttachmentCard {...baseProps} sha256="sha-test" />);
+  it("renders Save to Drive button when not stored", () => {
+    render(<AttachmentCard {...baseProps} storedInDrive={false} />);
+    expect(screen.getByText("Save to Drive")).toBeInTheDocument();
+  });
+
+  it("renders Drive link with sha256 when stored", () => {
+    render(<AttachmentCard {...baseProps} sha256="sha-test" storedInDrive={true} />);
     const link = screen.getByText("Open in Drive");
     expect(link.closest("a")).toHaveAttribute("href", expect.stringContaining("/drive?blob=sha-test"));
   });
