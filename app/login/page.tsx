@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { isTauri, createTauriKeyStore } from "@/lib/tauri";
 import OptionCard from "@/components/login/OptionCard";
+import type { Identity } from "@/lib/types";
 import { createKeyStore } from "@post/nostr-core";
 
 export default function WelcomePage() {
   const router = useRouter();
-  const identity = useIdentityStore((s) => s.identity);
+  const setIdentity = useIdentityStore((s) => s.setIdentity);
   const createOrImport = useIdentityStore((s) => s.createOrImport);
-  const [checked, setChecked] = useState(false);
+  const [existingIdentity, setExistingIdentity] = useState<Identity | null>(null);
   const [creating, setCreating] = useState(false);
   const [nip07Available, setNip07Available] = useState(false);
   const [inTauri, setInTauri] = useState(false);
@@ -19,24 +20,9 @@ export default function WelcomePage() {
   useEffect(() => {
     setNip07Available(typeof window !== "undefined" && !!window.nostr);
     setInTauri(isTauri());
-  }, []);
-
-  useEffect(() => {
-    if (checked) return;
     const keyStore = isTauri() ? createTauriKeyStore() : createKeyStore();
-    const existing = keyStore.load();
-    if (existing) {
-      useIdentityStore.getState().setIdentity(existing);
-    }
-    setChecked(true);
-  }, [checked]);
-
-  useEffect(() => {
-    if (!checked) return;
-    if (identity) {
-      router.replace("/mail/inbox");
-    }
-  }, [identity, checked, router]);
+    setExistingIdentity(keyStore.load());
+  }, []);
 
   const handleTauriCreate = async () => {
     setCreating(true);
@@ -70,6 +56,26 @@ export default function WelcomePage() {
             description="Create or unlock a protected local identity."
             highlighted
             onClick={() => router.push("/login/passkey")}
+            rightElement={<span className="text-[20px] font-medium text-brand-light ml-2 shrink-0">›</span>}
+          />
+        )}
+
+        {existingIdentity && (
+          <OptionCard
+            icon={
+              <div className="w-[48px] h-[48px] rounded-[12px] bg-brand flex items-center justify-center">
+                <span className="font-bold text-[14px] text-white">
+                  {existingIdentity.npub.slice(5, 7).toUpperCase()}
+                </span>
+              </div>
+            }
+            title="Continue with saved identity"
+            description={`${existingIdentity.npub.slice(0, 12)}…`}
+            highlighted
+            onClick={() => {
+              setIdentity(existingIdentity);
+              router.push("/mail/inbox");
+            }}
             rightElement={<span className="text-[20px] font-medium text-brand-light ml-2 shrink-0">›</span>}
           />
         )}
