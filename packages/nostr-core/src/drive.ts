@@ -138,3 +138,79 @@ export function createFolderEvent(folder: DriveFolder): {
     created_at: Math.floor(folder.updatedAt / 1000),
   };
 }
+
+function tagValue(tags: string[][], name: string): string | undefined {
+  const tag = tags.find(([key]) => key === name);
+  return tag?.[1];
+}
+
+export function parseFileMetadataEvent(event: {
+  id: string;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+}): DriveFile {
+  const url = tagValue(event.tags, "url") ?? "";
+  const mime = tagValue(event.tags, "m") ?? "application/octet-stream";
+  const sha256 = tagValue(event.tags, "x") ?? null;
+  const sizeStr = tagValue(event.tags, "size") ?? "0";
+  const folderId = tagValue(event.tags, "folder") ?? null;
+  const encrypted = tagValue(event.tags, "encrypted") === "true";
+  const createdAt = event.created_at * 1000;
+
+  const name = event.content || sha256 || "Untitled";
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+
+  return {
+    id: sha256 ?? event.id,
+    name,
+    folderId,
+    fileKind: "other",
+    mimeType: mime,
+    sizeBytes: parseInt(sizeStr, 10) || 0,
+    createdAt,
+    updatedAt: createdAt,
+    modifiedLabel: new Date(createdAt).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }),
+    ownerName: event.pubkey.slice(0, 8),
+    ownerInitials: event.pubkey.slice(0, 2).toUpperCase(),
+    source: "blossom",
+    starred: false,
+    trashed: false,
+    offlineAvailable: false,
+    encrypted,
+    storedInDrive: true,
+    sha256,
+    blobUrl: url || null,
+    preview: name,
+    sharedWith: [],
+    tags: encrypted ? ["Encrypted"] : [],
+    color: "var(--color-text-secondary)",
+    letter: name.slice(0, 1).toUpperCase() || "?",
+    encryption: null,
+    encryptedBlob: null,
+  };
+}
+
+export function parseFolderEvent(event: {
+  id: string;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+}): DriveFolder {
+  const d = tagValue(event.tags, "d") ?? event.id;
+  const title = tagValue(event.tags, "title") ?? event.content;
+  const parentId = tagValue(event.tags, "parent") ?? null;
+
+  return {
+    id: d,
+    name: title,
+    parentId,
+    fileCount: 0,
+    color: "var(--color-brand)",
+    updatedAt: event.created_at * 1000,
+    starred: false,
+    trashed: false,
+  };
+}

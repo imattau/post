@@ -254,6 +254,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
       page: 1,
       hasMore: true,
     });
+    void syncFromRelays();
   },
 
   async refresh() {
@@ -650,6 +651,27 @@ async function publishFolderEvent(folder: DriveFolder): Promise<void> {
     await pool.publish(signedEvent);
   } catch {
     // Publishing folder event to relays is best-effort
+  }
+}
+
+async function syncFromRelays(): Promise<void> {
+  try {
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    const { syncDriveFromRelays } = await import("@/lib/drive-sync");
+
+    const pool = useRelaysStore.getState().pool;
+    const identity = useIdentityStore.getState().identity;
+    if (!pool || !identity?.pubkey) return;
+
+    const { files, folders } = await syncDriveFromRelays(pool, identity.pubkey);
+    const countedFolders = folders.map((folder) => ({
+      ...folder,
+      fileCount: files.filter((file) => file.folderId === folder.id && !file.trashed).length,
+    }));
+    useDriveStore.setState({ files, folders: countedFolders });
+  } catch {
+    // Relay sync is best-effort
   }
 }
 
