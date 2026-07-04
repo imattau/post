@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileImage, File, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { formatSize } from "@/lib/utils";
@@ -13,6 +13,8 @@ export default function AttachmentCard({
   mimeType,
   url,
   storedInDrive,
+  fileKey,
+  fileIv,
   onSaveToDrive,
 }: {
   fileName: string;
@@ -22,10 +24,20 @@ export default function AttachmentCard({
   mimeType: string;
   url?: string;
   storedInDrive?: boolean;
+  fileKey?: string;
+  fileIv?: string;
   onSaveToDrive?: () => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
+  const [decrypting, setDecrypting] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (decryptedUrl?.startsWith("blob:")) URL.revokeObjectURL(decryptedUrl);
+    };
+  }, [decryptedUrl]);
 
   function isImage() {
     return mimeType.startsWith("image/");
@@ -38,6 +50,41 @@ export default function AttachmentCard({
       await onSaveToDrive();
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePreview() {
+    setPreviewOpen(true);
+    if (!encrypted || !fileKey || !fileIv || !sha256 || decryptedUrl) return;
+    setDecrypting(true);
+    try {
+      const { decryptAttachment, downloadBlob } = await import("@post/nostr-core");
+      const { createKeyStore } = await import("@post/nostr-core");
+      const keyStore = createKeyStore();
+      const identity = keyStore.load();
+      if (!identity?.nsec) return;
+      const { decode } = await import("nostr-tools/nip19");
+      const decoded = decode(identity.nsec);
+      if (decoded.type !== "nsec") return;
+      const sk = decoded.data as Uint8Array;
+
+      const serverUrl = (await import("@/lib/stores/blossom")).useBlossomStore.getState().serverUrl;
+      const ciphertext = await downloadBlob({ id: sha256, fileName, mimeType, sizeBytes, sha256, url: "", storedInDrive: false, encrypted: true }, sk, serverUrl);
+
+      const b64ToBytes = (b64: string) => {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+      };
+
+      const plaintext = await decryptAttachment(ciphertext, b64ToBytes(fileKey), b64ToBytes(fileIv));
+      const blobUrl = URL.createObjectURL(plaintext);
+      setDecryptedUrl(blobUrl);
+    } catch {
+      // Decryption failed
+    } finally {
+      setDecrypting(false);
     }
   }
 
@@ -58,10 +105,10 @@ export default function AttachmentCard({
         <div className="flex gap-3 mt-1">
           {isImage() && (
             <button
-              onClick={() => setPreviewOpen(true)}
+              onClick={() => void handlePreview()}
               className="text-[10px] font-medium text-brand-light cursor-pointer hover:brightness-110"
             >
-              Preview
+              {decrypting ? "Decrypting..." : "Preview"}
             </button>
           )}
           {storedInDrive ? (
@@ -90,11 +137,15 @@ export default function AttachmentCard({
             <p className="truncate text-[13px] font-semibold text-text-modal">{fileName}</p>
             <Dialog.Close className="text-text-modal-2 hover:text-text-modal cursor-pointer"><X size={18} /></Dialog.Close>
           </div>
-          {url ? (
+          {decryptedUrl ? (
+            <img src={decryptedUrl} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
+          ) : url && !encrypted ? (
             <img src={url} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
           ) : (
             <div className="flex h-48 w-80 items-center justify-center rounded-[8px] bg-pill-subtle">
-              <p className="text-[12px] text-text-tertiary">Preview unavailable for this attachment.</p>
+              <p className="text-[12px] text-text-tertiary">
+                {encrypted ? "Encrypted — requires decryption key." : "Preview unavailable for this attachment."}
+              </p>
             </div>
           )}
         </Dialog.Popup>

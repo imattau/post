@@ -20,7 +20,7 @@ const NAV_ITEMS: Array<{
   { id: "settings", icon: "⚙", label: "Settings", href: "/calendar/settings" },
 ];
 
-export default function CalendarSidebar({ activeNav }: { activeNav: ActiveNav }) {
+export default function CalendarSidebar({ activeNav }: { activeNav: ActiveNav | undefined }) {
   const calendars = useCalendarStore((s) => s.calendars);
   const visibleCalendars = calendars.filter((calendar) => calendar.id !== "public");
 

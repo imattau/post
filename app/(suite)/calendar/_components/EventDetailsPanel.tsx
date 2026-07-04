@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -121,10 +122,12 @@ export default function EventDetailsPanel({
       </section>
 
       <div className="grid grid-cols-2 gap-3">
-        <Button variant="outline" size="lg">
-          Edit event
-        </Button>
-        <Button variant="outline" size="lg">
+        <Link href={`/calendar/new?edit=${event.id}`} className="no-underline">
+          <Button variant="outline" size="lg" className="w-full">
+            Edit event
+          </Button>
+        </Link>
+        <Button variant="outline" size="lg" onClick={() => {}}>
           Message guests
         </Button>
       </div>

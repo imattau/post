@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import CalendarSidebar from "./CalendarSidebar";
 
-type ActiveNav = "month" | "week" | "agenda" | "invitations" | "shared" | "settings";
+export type ActiveNav = "month" | "week" | "agenda" | "invitations" | "shared" | "settings";
 
 export default function CalendarPageFrame({
   activeNav,
@@ -13,7 +13,7 @@ export default function CalendarPageFrame({
   children,
   rightRail,
 }: {
-  activeNav: ActiveNav;
+  activeNav: ActiveNav | undefined;
   title: string;
   subtitle?: string;
   headerActions?: ReactNode;

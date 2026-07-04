@@ -44,6 +44,8 @@ export interface AttachmentRef {
   url: string;
   storedInDrive: boolean;
   encrypted: boolean;
+  fileKey?: string;
+  fileIv?: string;
 }
 
 export type DriveViewMode = "list" | "grid";

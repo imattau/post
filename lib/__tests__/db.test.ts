@@ -32,8 +32,8 @@ describe("PostDB schema", () => {
     expect(db.relayConfigs).toBeDefined();
   });
 
-  it("version 2 has correct schema", () => {
+  it("version 3 has correct schema", () => {
     const db = new PostDB();
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(3);
   });
 });

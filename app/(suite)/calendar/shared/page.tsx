@@ -8,13 +8,23 @@ import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarSharedPage() {
-  const { calendars, activeMonth, load } = useCalendarStore();
+  const { calendars, activeMonth, loading, error, load } = useCalendarStore();
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const sharedCalendars = useMemo(() => calendars.filter((calendar) => calendar.id !== "public"), [calendars]);
+
+  if (loading && calendars.length === 0) {
+    return (
+      <CalendarPageFrame activeNav="shared" title="Loading..." subtitle="">
+        <div className="flex h-full items-center justify-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+        </div>
+      </CalendarPageFrame>
+    );
+  }
 
   return (
     <CalendarPageFrame
@@ -40,6 +50,11 @@ export default function CalendarSharedPage() {
         </div>
       }
     >
+      {error && (
+        <div className="mb-4 rounded-[12px] border border-danger/30 bg-danger/10 px-4 py-3 text-[12px] text-danger">
+          {error}
+        </div>
+      )}
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         {sharedCalendars.map((calendar) => (
           <div key={calendar.id} className="rounded-[14px] border border-border bg-[#10151D] p-5">
@@ -53,10 +68,18 @@ export default function CalendarSharedPage() {
               </div>
             </div>
             <div className="mt-4 flex gap-2">
-              <button className="h-8 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-text-secondary">
+              <button
+                type="button"
+                className="h-8 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-text-secondary"
+                onClick={() => {}}
+              >
                 Manage sharing
               </button>
-              <button className="h-8 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-text-secondary">
+              <button
+                type="button"
+                className="h-8 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-text-secondary"
+                onClick={() => navigator.clipboard.writeText(`${window.location.origin}/calendar?calendar=${calendar.id}`)}
+              >
                 Copy link
               </button>
             </div>

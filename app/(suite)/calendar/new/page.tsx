@@ -28,14 +28,19 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function CalendarNewEventPage() {
   const router = useRouter();
-  const { calendars, createEvent, activeMonth, load } = useCalendarStore();
+  const { calendars, createEvent, activeMonth, selectedDate, load } = useCalendarStore();
   const [guest, _setGuest] = useState("Alice Nguyen");
+
+  const defaultDate = useMemo(() => {
+    const d = selectedDate ?? new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, [selectedDate]);
 
   const { register, handleSubmit, watch, setValue } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: "Suite planning workshop",
-      date: "2026-07-10",
+      date: defaultDate,
       startTime: "10:00",
       endTime: "11:30",
       calendarId: "work",

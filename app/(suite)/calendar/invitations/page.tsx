@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatLongDate, formatTimeRange, monthLabel } from "@/lib/calendar";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
@@ -9,7 +9,8 @@ import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarInvitationsPage() {
-  const { events, calendars, activeMonth, load, updateEvent } = useCalendarStore();
+  const { events, calendars, activeMonth, loading, error, load, updateEvent } = useCalendarStore();
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -20,6 +21,16 @@ export default function CalendarInvitationsPage() {
     () => events.filter((event) => event.invitation === "pending" || event.invitation === "maybe").sort((a, b) => a.startAt - b.startAt),
     [events]
   );
+
+  if (loading && events.length === 0) {
+    return (
+      <CalendarPageFrame activeNav="invitations" title="Loading..." subtitle="">
+        <div className="flex h-full items-center justify-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+        </div>
+      </CalendarPageFrame>
+    );
+  }
 
   return (
     <CalendarPageFrame
@@ -46,6 +57,16 @@ export default function CalendarInvitationsPage() {
       }
     >
       <div className="mt-5 space-y-3">
+        {error && (
+          <div className="rounded-[12px] border border-danger/30 bg-danger/10 px-4 py-3 text-[12px] text-danger">
+            {error}
+          </div>
+        )}
+        {feedback && (
+          <div className="rounded-[14px] border border-ok/30 bg-ok/10 p-3 text-[12px] text-ok">
+            {feedback}
+          </div>
+        )}
         {invitations.length === 0 && (
           <div className="rounded-[14px] border border-border bg-pill-subtle p-6 text-[12px] text-text-secondary">
             No pending invitations.
@@ -67,7 +88,10 @@ export default function CalendarInvitationsPage() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={async () => updateEvent(event.id, { invitation: "accepted" })}
+                    onClick={async () => {
+                      await updateEvent(event.id, { invitation: "accepted" });
+                      setFeedback("Accepted");
+                    }}
                   >
                     Accept
                   </Button>
@@ -75,14 +99,20 @@ export default function CalendarInvitationsPage() {
                     size="sm"
                     variant="outline"
                     className="text-warn"
-                    onClick={async () => updateEvent(event.id, { invitation: "maybe" })}
+                    onClick={async () => {
+                      await updateEvent(event.id, { invitation: "maybe" });
+                      setFeedback("Marked as maybe");
+                    }}
                   >
                     Maybe
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={async () => updateEvent(event.id, { invitation: "declined" })}
+                    onClick={async () => {
+                      await updateEvent(event.id, { invitation: "declined" });
+                      setFeedback("Declined");
+                    }}
                   >
                     Decline
                   </Button>

@@ -244,10 +244,22 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       updateAttachment(file.name, { status: "uploading" });
 
       try {
-        const result = await uploadFile(file, sk, (pct) => {
+        const { encryptAttachment } = await import("@post/nostr-core");
+        const { ciphertext, fileKey, fileIv } = await encryptAttachment(file);
+        const ciphertextBytes = await ciphertext.arrayBuffer();
+        const wrappedFile = new (window as any).File([ciphertextBytes], file.name, { type: "application/octet-stream" }) as File;
+        const result = await uploadFile(wrappedFile, sk, (pct) => {
           setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, progress: pct } : u)));
           updateAttachment(file.name, { progress: pct });
         });
+        const bytesToBase64 = (bytes: Uint8Array) => {
+          let binary = "";
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          return btoa(binary);
+        };
+        result.fileKey = bytesToBase64(fileKey);
+        result.fileIv = bytesToBase64(fileIv);
+        result.encrypted = true;
         setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, status: "uploaded", progress: 100 } : u)));
         updateAttachment(file.name, { status: "uploaded", progress: 100, result });
       } catch (err) {

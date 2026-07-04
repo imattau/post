@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { formatLongDate, formatTimeRange } from "@/lib/calendar";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
 import { useCalendarStore } from "@/lib/stores/calendar";
@@ -11,21 +12,24 @@ function groupKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+const PAGE_SIZE = 12;
+
 export default function CalendarAgendaPage() {
-  const { activeMonth, events, calendars, load, previousMonth, nextMonth, goToToday } = useCalendarStore();
+  const { activeMonth, events, calendars, loading, error, load, previousMonth, nextMonth, goToToday } = useCalendarStore();
+  const [showCount, setShowCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const calendarById = useMemo(() => new Map(calendars.map((calendar) => [calendar.id, calendar])), [calendars]);
-  const upcomingEvents = useMemo(() => {
+  const allUpcoming = useMemo(() => {
     const today = new Date();
     return events
       .filter((event) => new Date(event.endAt) >= today)
-      .sort((a, b) => a.startAt - b.startAt)
-      .slice(0, 12);
+      .sort((a, b) => a.startAt - b.startAt);
   }, [events]);
+  const upcomingEvents = useMemo(() => allUpcoming.slice(0, showCount), [allUpcoming, showCount]);
   const groups = useMemo(() => {
     const map = new Map<string, typeof upcomingEvents>();
     for (const event of upcomingEvents) {
@@ -37,6 +41,16 @@ export default function CalendarAgendaPage() {
     return [...map.entries()].map(([key, value]) => ({ date: new Date(`${key}T00:00:00`), events: value }));
   }, [upcomingEvents]);
 
+  if (loading && events.length === 0) {
+    return (
+      <CalendarPageFrame activeNav="agenda" title="Loading..." subtitle="">
+        <div className="flex h-full items-center justify-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+        </div>
+      </CalendarPageFrame>
+    );
+  }
+
   return (
     <CalendarPageFrame
       activeNav="agenda"
@@ -44,6 +58,11 @@ export default function CalendarAgendaPage() {
       subtitle="Chronological view of events and invitations."
       headerActions={<CalendarViewControls activeView="agenda" onToday={goToToday} onPrevious={previousMonth} onNext={nextMonth} />}
     >
+      {error && (
+        <div className="mb-4 rounded-[12px] border border-danger/30 bg-danger/10 px-4 py-3 text-[12px] text-danger">
+          {error}
+        </div>
+      )}
       <div className="mt-5 space-y-6">
         {groups.map((group) => (
           <section key={groupKey(group.date)}>
@@ -86,6 +105,13 @@ export default function CalendarAgendaPage() {
         {groups.length === 0 && (
           <div className="rounded-[14px] border border-border bg-pill-subtle p-6 text-[12px] text-text-secondary">
             No upcoming events.
+          </div>
+        )}
+        {showCount < allUpcoming.length && (
+          <div className="pt-2 text-center">
+            <Button variant="outline" size="sm" onClick={() => setShowCount((c) => c + PAGE_SIZE)}>
+              Show more
+            </Button>
           </div>
         )}
       </div>

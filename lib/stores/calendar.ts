@@ -33,10 +33,18 @@ function firstOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+function recomputeSync(calendars: CalendarCalendar[], events: CalendarEvent[]): CalendarSyncState {
+  const syncedCalendars = calendars.filter((c) => c.enabled).length;
+  const pendingInvitations = events.filter(
+    (e) => e.invitation === "pending" || e.invitation === "maybe"
+  ).length;
+  return { syncedCalendars, pendingInvitations, healthyRelays: 5, updatedAt: Date.now() };
+}
+
 export const useCalendarStore = create<CalendarState>((set, get) => ({
   calendars: CALENDARS,
   events: CALENDAR_EVENTS,
-  sync: CALENDAR_SYNC,
+  sync: recomputeSync(CALENDARS, CALENDAR_EVENTS),
   activeMonth: CALENDAR_MONTH,
   selectedDate: CALENDAR_SELECTED_DAY,
   selectedEventId: "suite-planning",
@@ -67,6 +75,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       set({
         calendars,
         events,
+        sync: recomputeSync(calendars, events),
         loading: false,
         selectedEventId: get().selectedEventId ?? events[0]?.id ?? null,
       });
@@ -107,13 +116,13 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   previousWeek() {
-    const current = get().activeMonth;
-    set({ activeMonth: new Date(current.getFullYear(), current.getMonth(), current.getDate() - 7) });
+    const current = get().selectedDate;
+    set({ selectedDate: new Date(current.getFullYear(), current.getMonth(), current.getDate() - 7) });
   },
 
   nextWeek() {
-    const current = get().activeMonth;
-    set({ activeMonth: new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7) });
+    const current = get().selectedDate;
+    set({ selectedDate: new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7) });
   },
 
   async toggleCalendar(calendarId) {
@@ -122,7 +131,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const calendars = get().calendars.map((calendar) =>
         calendar.id === calendarId ? { ...calendar, enabled: !calendar.enabled } : calendar
       );
-      set({ calendars });
+      const sync = recomputeSync(calendars, get().events);
+      set({ calendars, sync });
       const { db } = await import("@/lib/db/schema");
       const updated = calendars.find((calendar) => calendar.id === calendarId);
       if (updated) {
@@ -141,7 +151,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         id: event.id ?? crypto.randomUUID(),
       };
       const events = [...get().events, created].sort((a, b) => a.startAt - b.startAt);
-      set({ events, selectedEventId: created.id });
+      set({ events, sync: recomputeSync(get().calendars, events), selectedEventId: created.id });
       const { db } = await import("@/lib/db/schema");
       await db.calendarEvents.put(created);
       return created;
@@ -155,7 +165,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     set({ error: null });
     try {
       const events = get().events.map((event) => (event.id === eventId ? { ...event, ...patch } : event));
-      set({ events });
+      set({ events, sync: recomputeSync(get().calendars, events) });
       const updated = events.find((event) => event.id === eventId);
       if (!updated) return;
       const { db } = await import("@/lib/db/schema");
@@ -169,7 +179,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     set({ error: null });
     try {
       const events = get().events.filter((event) => event.id !== eventId);
-      set({ events, selectedEventId: get().selectedEventId === eventId ? null : get().selectedEventId });
+      set({ events, sync: recomputeSync(get().calendars, events), selectedEventId: get().selectedEventId === eventId ? null : get().selectedEventId });
       const { db } = await import("@/lib/db/schema");
       await db.calendarEvents.delete(eventId);
     } catch (err) {

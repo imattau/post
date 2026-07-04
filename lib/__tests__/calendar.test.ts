@@ -136,16 +136,20 @@ describe("calendar store", () => {
     expect(useCalendarStore.getState().activeMonth).toEqual(new Date(2026, 7, 1));
   });
 
-  it("previousWeek subtracts 7 days", async () => {
+  it("previousWeek subtracts 7 days from selectedDate", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
+    useCalendarStore.setState({ selectedDate: new Date(2026, 6, 4) });
     useCalendarStore.getState().previousWeek();
-    expect(useCalendarStore.getState().activeMonth).toEqual(new Date(2026, 5, 24));
+    expect(useCalendarStore.getState().selectedDate).toEqual(new Date(2026, 6, 4 - 7));
+    expect(useCalendarStore.getState().activeMonth).toEqual(new Date(2026, 6, 1));
   });
 
-  it("nextWeek adds 7 days", async () => {
+  it("nextWeek adds 7 days to selectedDate", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
+    useCalendarStore.setState({ selectedDate: new Date(2026, 6, 4) });
     useCalendarStore.getState().nextWeek();
-    expect(useCalendarStore.getState().activeMonth).toEqual(new Date(2026, 6, 8));
+    expect(useCalendarStore.getState().selectedDate).toEqual(new Date(2026, 6, 4 + 7));
+    expect(useCalendarStore.getState().activeMonth).toEqual(new Date(2026, 6, 1));
   });
 
   it("load seeds from DB and populates state", async () => {

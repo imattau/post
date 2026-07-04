@@ -15,6 +15,8 @@ export interface MockAttachment {
   url: string;
   encrypted: boolean;
   storedInDrive?: boolean;
+  fileKey?: string;
+  fileIv?: string;
 }
 
 export interface MockMessage {

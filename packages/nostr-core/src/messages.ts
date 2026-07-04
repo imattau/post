@@ -3,6 +3,7 @@ import type { NostrEvent } from "nostr-tools";
 import type { RelayPool } from "./relays";
 import type { KeyStore } from "./keys";
 import type { Message, AttachmentRef } from "./types";
+import { wrapFileKey, unwrapFileKey, fromBase64Key, toBase64Key } from "./attachments";
 
 type Event = NostrEvent;
 
@@ -20,6 +21,71 @@ export interface SendResult {
   eventId: string;
   published: Map<string, boolean>;
   delivered: number;
+}
+
+function buildMessagePayload(content: string, subject: string | undefined, attachments: AttachmentRef[] | undefined, sk: Uint8Array, to: string): string {
+  if (!attachments?.length) return content;
+
+  const attachmentPayloads = attachments.map((att) => {
+    const encryptedKey = att.encrypted && att.fileKey
+      ? wrapFileKey(fromBase64Key(att.fileKey), sk, to)
+      : undefined;
+    return {
+      fileName: att.fileName,
+      mimeType: att.mimeType,
+      sizeBytes: att.sizeBytes,
+      sha256: att.sha256,
+      url: att.url,
+      encryptedKey,
+      fileIv: att.fileIv,
+    };
+  });
+
+  return JSON.stringify({
+    body: content,
+    subject,
+    attachments: attachmentPayloads,
+    v: 1,
+  });
+}
+
+export function parseMessagePayloadAndUnwrap(plaintext: string, sk: Uint8Array, senderPubkey: string): {
+  body: string;
+  subject: string | undefined;
+  attachments: AttachmentRef[];
+} {
+  try {
+    const parsed = JSON.parse(plaintext);
+    if (parsed && typeof parsed === "object" && parsed.v === 1) {
+      const attachments: AttachmentRef[] = (parsed.attachments || []).map((att: any) => {
+        const ref: AttachmentRef = {
+          id: att.sha256 ?? att.url,
+          fileName: att.fileName || "Untitled",
+          mimeType: att.mimeType || "application/octet-stream",
+          sizeBytes: att.sizeBytes || 0,
+          sha256: att.sha256,
+          url: att.url,
+          storedInDrive: false,
+          encrypted: false,
+        };
+        if (att.encryptedKey && att.fileIv) {
+          try {
+            const fileKey = unwrapFileKey(att.encryptedKey, sk, senderPubkey);
+            ref.encrypted = true;
+            ref.fileIv = att.fileIv;
+            ref.fileKey = toBase64Key(fileKey);
+          } catch {
+            // Key doesn't apply to this recipient — skip
+          }
+        }
+        return ref;
+      });
+      return { body: parsed.body || "", subject: parsed.subject, attachments };
+    }
+  } catch {
+    // Not JSON format — treat as plain text
+  }
+  return { body: plaintext, subject: undefined, attachments: [] };
 }
 
 export async function sendMessage(
@@ -41,13 +107,14 @@ export async function sendMessage(
     event = nip17.wrapEvent(
       sk,
       { publicKey: opts.to },
-      opts.content,
+      buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.to),
       opts.subject,
       opts.replyTo ? { eventId: opts.replyTo } : undefined
     );
   } else {
     const conversationKey = nip44.v2.utils.getConversationKey(sk, opts.to);
-    const encrypted = nip44.v2.encrypt(opts.content, conversationKey);
+    const payload = buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.to);
+    const encrypted = nip44.v2.encrypt(payload, conversationKey);
     const tags: string[][] = [["p", opts.to]];
     if (opts.subject) tags.push(["subject", opts.subject]);
     if (opts.replyTo) tags.push(["e", opts.replyTo]);
@@ -128,17 +195,18 @@ class IncomingStream implements AsyncGenerator<Message> {
         try {
           const conversationKey = nip44.v2.utils.getConversationKey(sk, event.pubkey);
           const plaintext = nip44.v2.decrypt(event.content, conversationKey);
+          const { body, subject, attachments } = parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey);
           const msg: Message = {
             id: event.id,
             kind: event.kind,
             pubkey: event.pubkey,
             recipientPubkey: pubkey,
-            content: plaintext,
+            content: body,
             raw: event.content,
             createdAt: event.created_at,
             tags: event.tags,
-            subject: extractSubject(event),
-            preview: extractPreview(plaintext),
+            subject: subject ?? extractSubject(event),
+            preview: extractPreview(body),
             read: false,
             starred: false,
             archived: false,
@@ -148,7 +216,7 @@ class IncomingStream implements AsyncGenerator<Message> {
             labelIds: [],
             replyTo: event.tags.find((t) => t[0] === "e")?.[1] ?? null,
             relayUrls: [],
-            attachments: [],
+            attachments,
             isEncrypted: true,
             isGiftWrapped: false,
             deliveryStatus: "delivered" as const,

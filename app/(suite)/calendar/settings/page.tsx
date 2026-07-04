@@ -8,11 +8,21 @@ import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarSettingsPage() {
-  const { calendars, sync, activeMonth, load, toggleCalendar } = useCalendarStore();
+  const { calendars, sync, activeMonth, loading, error, load, toggleCalendar } = useCalendarStore();
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  if (loading && calendars.length === 0) {
+    return (
+      <CalendarPageFrame activeNav="settings" title="Loading..." subtitle="">
+        <div className="flex h-full items-center justify-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+        </div>
+      </CalendarPageFrame>
+    );
+  }
 
   return (
     <CalendarPageFrame
@@ -38,6 +48,11 @@ export default function CalendarSettingsPage() {
         </div>
       }
     >
+      {error && (
+        <div className="mb-4 rounded-[12px] border border-danger/30 bg-danger/10 px-4 py-3 text-[12px] text-danger">
+          {error}
+        </div>
+      )}
       <div className="mt-5 space-y-3">
         <section className="rounded-[14px] border border-border bg-[#10151D] p-5">
           <p className="text-[12px] font-semibold text-text-near-white">Sync status</p>
@@ -54,6 +69,22 @@ export default function CalendarSettingsPage() {
               <p className="text-[11px] text-text-tertiary">Pending invites</p>
               <p className="mt-1 text-[20px] font-semibold text-text-near-white">{sync.pendingInvitations}</p>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-[14px] border border-border bg-[#10151D] p-5">
+          <p className="text-[12px] font-semibold text-text-near-white">Relay configuration</p>
+          <p className="mt-1 text-[11px] text-text-tertiary">Calendar events are published to your configured relays.</p>
+          <div className="mt-3 rounded-[12px] border border-border bg-pill-subtle px-4 py-3 text-[12px] text-text-secondary">
+            {sync.healthyRelays} healthy relay{sync.healthyRelays !== 1 ? "s" : ""} connected
+          </div>
+        </section>
+
+        <section className="rounded-[14px] border border-border bg-[#10151D] p-5">
+          <p className="text-[12px] font-semibold text-text-near-white">Reminders</p>
+          <p className="mt-1 text-[11px] text-text-tertiary">Default reminder for new events.</p>
+          <div className="mt-3 rounded-[12px] border border-border bg-pill-subtle px-4 py-3 text-[12px] text-text-secondary">
+            15 minutes before
           </div>
         </section>
 

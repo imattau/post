@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
-import Avatar from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { buildMonthGrid, formatTimeRange, getEventSpanDays, isSameDay, isSameMonth, monthLabel } from "@/lib/calendar";
@@ -36,6 +35,7 @@ export default function CalendarWorkspace() {
     nextMonth,
     toggleCalendar,
     updateEvent,
+    deleteEvent,
   } = useCalendarStore();
 
   useEffect(() => {
@@ -115,21 +115,6 @@ export default function CalendarWorkspace() {
             </div>
           </section>
 
-          <section className="mt-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">Shared</p>
-            <div className="mt-3 space-y-2">
-              {[
-                { initials: "AL", name: "Alice Nguyen" },
-                { initials: "JB", name: "Jonas Berg" },
-              ].map((person) => (
-                <div key={person.name} className="flex items-center gap-3">
-                  <Avatar initials={person.initials} size={28} />
-                  <span className="text-[12px] font-medium text-text-secondary">{person.name}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
           <section className="mt-auto pt-6">
             <Card className="shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
               <CardContent className="space-y-3">
@@ -177,13 +162,40 @@ export default function CalendarWorkspace() {
             <div className="divide-y divide-border">
               {weeks.map((week) => {
                 const weekStart = week[0];
+                const multiDayThisWeek = visibleEvents
+                  .filter((event) => event.allDay && getEventSpanDays(event) > 1)
+                  .filter((event) => {
+                    const start = new Date(event.startAt);
+                    const end = new Date(event.endAt);
+                    return start <= week[6] && end >= weekStart;
+                  });
                 return (
-                  <div key={weekStart.toISOString()} className="grid grid-cols-7 overflow-visible">
+                  <div key={weekStart.toISOString()} className="grid grid-cols-7">
                     {week.map((day) => {
-                      const dayEvents = visibleEvents.filter((event) => isSameDay(new Date(event.startAt), day));
                       const selected = isSameDay(day, selectedDate);
                       const dayInMonth = isSameMonth(day, activeMonth);
                       const hasToday = isSameDay(day, today);
+                      const startOfDay = new Date(day);
+                      startOfDay.setHours(0, 0, 0, 0);
+                      const endOfDay = new Date(day);
+                      endOfDay.setHours(23, 59, 59, 999);
+
+                      const dayMultiDay = multiDayThisWeek.filter((event) => {
+                        const eventStart = new Date(event.startAt);
+                        return eventStart <= endOfDay && new Date(event.endAt) >= startOfDay;
+                      });
+                      const dayRegular = visibleEvents
+                        .filter((event) => {
+                          if (event.allDay && getEventSpanDays(event) > 1) return false;
+                          return isSameDay(new Date(event.startAt), day);
+                        })
+                        .slice(0, 3);
+
+                      const overflow = visibleEvents.filter((event) => {
+                        if (event.allDay && getEventSpanDays(event) > 1) return false;
+                        return isSameDay(new Date(event.startAt), day);
+                      }).length - 3;
+
                       return (
                         <div
                           key={day.toISOString()}
@@ -214,49 +226,66 @@ export default function CalendarWorkspace() {
                             >
                               {day.getDate()}
                             </span>
-                            {dayEvents.length > 0 && (
-                              <span className="mt-1 text-[9px] uppercase tracking-[0.08em] text-text-tertiary">
-                                {dayEvents.length}
-                              </span>
-                            )}
                           </div>
 
-                          <div className="mt-2 space-y-1.5 overflow-visible">
-                            {visibleEvents
-                              .filter((event) => isSameDay(new Date(event.startAt), day))
-                              .map((event) => {
-                                const calendar = calendarById.get(event.calendarId);
-                                const spanDays = event.allDay ? getEventSpanDays(event) : 1;
-                                const isMultiDay = spanDays > 1;
-                                const subtitle = event.allDay
-                                  ? "All day"
-                                  : formatTimeRange(event.startAt, event.endAt).replace(" to ", " - ");
-                                return (
-                                  <button
-                                    key={event.id}
-                                    type="button"
-                                    className={`block text-left ${isMultiDay ? "absolute left-2 right-auto top-[32px] z-20" : "relative"}`}
-                                    style={
-                                      isMultiDay
-                                        ? {
-                                            width: `calc(${spanDays} * 100% + ${(spanDays - 1) * 1}px)`,
-                                          }
-                                        : undefined
-                                    }
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      selectEvent(event.id);
+                          <div className="mt-1 space-y-0.5">
+                            {dayMultiDay.map((event) => {
+                              const calendar = calendarById.get(event.calendarId);
+                              const eventStart = new Date(event.startAt);
+                              const isStart = isSameDay(eventStart, day);
+                              return (
+                                <button
+                                  key={event.id}
+                                  type="button"
+                                  className="block w-full text-left"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    selectEvent(event.id);
+                                  }}
+                                >
+                                  <div
+                                    className="flex h-5 items-center rounded-[4px] px-1.5 text-[10px] font-medium leading-tight text-white"
+                                    style={{
+                                      backgroundColor: calendar?.color ? `color-mix(in srgb, ${calendar.color}, transparent 70%)` : "rgba(74,47,130,0.3)",
+                                      borderLeft: `2px solid ${calendar?.color ?? "var(--color-brand)"}`,
                                     }}
                                   >
-                                    <CalendarEventPill
-                                      title={event.title}
-                                      subtitle={subtitle}
-                                      color={calendar?.color ?? "var(--color-brand)"}
-                                      compact={isMultiDay}
-                                    />
-                                  </button>
-                                );
-                              })}
+                                    {isStart ? event.title : ""}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-1 space-y-1">
+                            {dayRegular.map((event) => {
+                              const calendar = calendarById.get(event.calendarId);
+                              const subtitle = event.allDay
+                                ? "All day"
+                                : formatTimeRange(event.startAt, event.endAt).replace(" to ", " - ");
+                              return (
+                                <button
+                                  key={event.id}
+                                  type="button"
+                                  className="block w-full text-left"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    selectEvent(event.id);
+                                  }}
+                                >
+                                  <CalendarEventPill
+                                    title={event.title}
+                                    subtitle={subtitle}
+                                    color={calendar?.color ?? "var(--color-brand)"}
+                                  />
+                                </button>
+                              );
+                            })}
+                            {overflow > 0 && (
+                              <span className="block text-[10px] font-medium text-text-tertiary">
+                                +{overflow} more
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
@@ -290,6 +319,7 @@ export default function CalendarWorkspace() {
                 onAccept={() => updateEvent(selectedEvent.id, { invitation: "accepted" })}
                 onMaybe={() => updateEvent(selectedEvent.id, { invitation: "maybe" })}
                 onDecline={() => updateEvent(selectedEvent.id, { invitation: "declined" })}
+                onDelete={() => deleteEvent(selectedEvent.id)}
               />
             </div>
           ) : (

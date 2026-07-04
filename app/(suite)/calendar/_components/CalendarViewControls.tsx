@@ -22,7 +22,7 @@ export default function CalendarViewControls({
   onToday,
   onPrevious,
   onNext,
-  showMore = true,
+  showMore = false,
 }: {
   activeView: CalendarView;
   onToday?: () => void;

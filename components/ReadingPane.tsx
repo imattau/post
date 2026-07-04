@@ -110,6 +110,8 @@ export default function ReadingPane({
                   sha256={att.sha256}
                   mimeType={att.mimeType}
                   url={att.url}
+                  fileKey={att.fileKey}
+                  fileIv={att.fileIv}
                   storedInDrive={inDrive}
                   onSaveToDrive={inDrive ? undefined : () => importAttachment({ fileName: att.fileName, mimeType: att.mimeType, sizeBytes: att.sizeBytes, sha256: att.sha256, url: att.url, encrypted: att.encrypted }, message.id)}
                 />
