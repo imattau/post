@@ -28,31 +28,43 @@ async function getStrongholdStore() {
   return { stronghold, store: client.getStore() };
 }
 
+const SESSION_KEY = "nostr-identity";
+
 export function createTauriKeyStore(): KeyStore {
   let cached: Identity | null = null;
 
   return {
     load(): Identity | null {
-      return cached;
+      if (cached) return cached;
+      try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        cached = JSON.parse(raw) as Identity;
+        return cached;
+      } catch {
+        return null;
+      }
     },
     save(identity: Identity): void {
       cached = identity;
+      try {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(identity));
+      } catch {}
       if (identity.nsec) {
         getStrongholdStore().then(({ stronghold, store }) => {
           const data = Array.from(new TextEncoder().encode(identity.nsec!));
           store.insert("nostr-nsec", data).then(() => stronghold.save());
-        }).catch(() => {
-          try { localStorage.setItem("nostr-identity", JSON.stringify(identity)); } catch {}
-        });
+        }).catch(() => {});
       }
     },
     clear(): void {
       cached = null;
+      try {
+        localStorage.removeItem(SESSION_KEY);
+      } catch {}
       getStrongholdStore().then(({ store }) => {
         store.remove("nostr-nsec");
-      }).catch(() => {
-        try { localStorage.removeItem("nostr-identity"); } catch {}
-      });
+      }).catch(() => {});
     },
   };
 }

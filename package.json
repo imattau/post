@@ -27,6 +27,7 @@
     "dexie": "^4.4.4",
     "lucide-react": "^1.23.0",
     "next": "^15.3.1",
+    "nostr-passkey": "^0.3.0",
     "react": "^19.1.0",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.1.0",

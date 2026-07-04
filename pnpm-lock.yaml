@@ -41,6 +41,9 @@ importers:
       next:
         specifier: ^15.3.1
         version: 15.5.20(@babel/core@7.29.7)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      nostr-passkey:
+        specifier: ^0.3.0
+        version: 0.3.0(nostr-tools@2.23.9(typescript@5.9.3))
       react:
         specifier: ^19.1.0
         version: 19.2.7
@@ -2318,6 +2321,18 @@ packages:
   node-releases@2.0.50:
     resolution: {integrity: sha512-J6l92tKHX6w8Jy5nO1Vuc01NoIiRGi/d6qBKVxh+IQ8Cr3b6HbVNfKiF8ZpFKufTwpwxMmce2W3iQZ861ZRyTg==}
     engines: {node: '>=18'}
+
+  nostr-passkey@0.3.0:
+    resolution: {integrity: sha512-2JF8JnkH/VmD4QX34/gfms5zFm/eCvPsPlkCMaGtqNnivkbChsZVOwQlcK4qzKmk1kswYqQdsCOWj7kh+r26Zw==}
+    peerDependencies:
+      applesauce-accounts: ^6.2.0
+      applesauce-signers: ^6.2.0
+      nostr-tools: ^2.23.8
+    peerDependenciesMeta:
+      applesauce-accounts:
+        optional: true
+      applesauce-signers:
+        optional: true
 
   nostr-tools@2.23.9:
     resolution: {integrity: sha512-PBN3TpGh+EszlTZWpQdvcqEMqhcKcY1vTw0Xkkccg+TyP7y/icu9/iXJw72aFZ/ETm35ehU0hneGTXLaTSkImw==}
@@ -5336,6 +5351,10 @@ snapshots:
       - babel-plugin-macros
 
   node-releases@2.0.50: {}
+
+  nostr-passkey@0.3.0(nostr-tools@2.23.9(typescript@5.9.3)):
+    dependencies:
+      nostr-tools: 2.23.9(typescript@5.9.3)
 
   nostr-tools@2.23.9(typescript@5.9.3):
     dependencies:
