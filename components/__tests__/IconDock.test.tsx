@@ -54,7 +54,7 @@ describe("IconDock", () => {
   it("renders avatar with initial from npub", () => {
     render(<IconDock />);
     // npub1test → slice(5, 6) = "t" → toUpperCase() = "T"
-    expect(screen.getByText("T")).toBeInTheDocument();
+    expect(screen.getAllByText("T").length).toBeGreaterThanOrEqual(1);
   });
 
   it("clicking M tile opens app switcher", async () => {

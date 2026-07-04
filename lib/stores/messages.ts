@@ -11,12 +11,14 @@ interface MessagesState {
   loadFromCache: () => Promise<void>;
   selectMessage: (id: string | null) => void;
   markRead: (id: string) => Promise<void>;
+  markUnread: (id: string) => Promise<void>;
   toggleStar: (id: string) => Promise<void>;
   toggleArchive: (id: string) => Promise<void>;
   toggleSpam: (id: string) => Promise<void>;
   snooze: (id: string, until: number) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   ingestFromRelay: (message: Message) => void;
+  upsertMessage: (message: Message) => Promise<void>;
 }
 
 export const useMessagesStore = create<MessagesState>((set, get) => ({
@@ -47,6 +49,16 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const msg = byId[id];
     if (!msg || msg.read) return;
     const updated = { ...msg, read: true };
+    const { db } = await import("@/lib/db/schema");
+    await db.messages.put(updated);
+    set({ byId: { ...byId, [id]: updated } });
+  },
+
+  async markUnread(id: string) {
+    const { byId } = get();
+    const msg = byId[id];
+    if (!msg || !msg.read) return;
+    const updated = { ...msg, read: false };
     const { db } = await import("@/lib/db/schema");
     await db.messages.put(updated);
     set({ byId: { ...byId, [id]: updated } });
@@ -106,6 +118,16 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     set({
       byId: { ...byId, [message.id]: message },
       ids: [message.id, ...ids],
+    });
+  },
+
+  async upsertMessage(message: Message) {
+    const { byId, ids } = get();
+    const { db } = await import("@/lib/db/schema");
+    await db.messages.put(message);
+    set({
+      byId: { ...byId, [message.id]: message },
+      ids: ids.includes(message.id) ? ids : [message.id, ...ids],
     });
   },
 }));

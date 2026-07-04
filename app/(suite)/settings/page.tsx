@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { resolveNip05 } from "@post/nostr-core";
+import { useIdentityStore } from "@/lib/stores/identity";
+import { useRelaysStore } from "@/lib/stores/relays";
+import { useSettingsStore } from "@/lib/stores/settings";
 
 type SettingsTab = "General" | "Identity" | "Relays" | "Privacy" | "Notifications";
 
@@ -57,8 +61,10 @@ export default function SettingsPage() {
   );
 }
 
-function ToggleRow({ label, description, defaultOn }: { label: string; description: string; defaultOn?: boolean }) {
-  const [on, setOn] = useState(defaultOn ?? false);
+function ToggleRow({ settingKey, label, description, defaultOn }: { settingKey: string; label: string; description: string; defaultOn?: boolean }) {
+  const value = useSettingsStore((s) => s.values[settingKey]);
+  const setValue = useSettingsStore((s) => s.setValue);
+  const on = typeof value === "boolean" ? value : defaultOn ?? false;
   return (
     <div className="flex items-center justify-between py-3 border-b border-border/50">
       <div className="flex-1 pr-4">
@@ -66,7 +72,7 @@ function ToggleRow({ label, description, defaultOn }: { label: string; descripti
         <p className="text-[11px] text-text-tertiary mt-0.5">{description}</p>
       </div>
       <button
-        onClick={() => setOn(!on)}
+        onClick={() => setValue(settingKey, !on)}
         className={`relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0 cursor-pointer ${
           on ? "bg-brand" : "bg-pill-subtle"
         }`}
@@ -90,13 +96,38 @@ function GeneralTab() {
     <div>
       <h2 className="text-[28px] font-semibold text-text-primary">General</h2>
       <p className="text-[11px] text-text-tertiary mt-1 mb-6">Core behaviour for Post and shared suite features.</p>
-      <ToggleRow label="Default post privacy" description="Choose whether new posts begin as private, public or remember your last choice." />
-      <ToggleRow label="Use built-in reader" description="Use the built-in reader where possible." defaultOn />
+      <ToggleRow settingKey="default-post-privacy" label="Default post privacy" description="Choose whether new posts begin as private, public or remember your last choice." />
+      <ToggleRow settingKey="built-in-reader" label="Use built-in reader" description="Use the built-in reader where possible." defaultOn />
     </div>
   );
 }
 
 function IdentityTab() {
+  const identity = useIdentityStore((s) => s.identity);
+  const usingNip07 = useIdentityStore((s) => s.usingNip07);
+  const connectNip07 = useIdentityStore((s) => s.connectNip07);
+  const createOrImport = useIdentityStore((s) => s.createOrImport);
+  const [nip05, setNip05] = useState(identity?.nip05 ?? "");
+  const [verifyStatus, setVerifyStatus] = useState("");
+  const initials = identity?.profile?.displayName?.slice(0, 2).toUpperCase() ?? identity?.npub?.slice(5, 7).toUpperCase() ?? "?";
+
+  const verifyNip05 = async () => {
+    if (!nip05.trim()) return;
+    const result = await resolveNip05(nip05.trim());
+    setVerifyStatus(result?.pubkey === identity?.pubkey ? "Verified" : "No match");
+  };
+
+  const exportIdentity = () => {
+    if (!identity?.nsec) return;
+    const blob = new Blob([identity.nsec], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "nostr-nsec-backup.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <h2 className="text-[28px] font-semibold text-text-primary">Identity</h2>
@@ -105,12 +136,12 @@ function IdentityTab() {
       <SectionHeader title="Current Identity" />
       <div className="flex items-center gap-5 p-4 border border-border rounded-pill bg-sidebar max-w-lg">
         <div className="w-[88px] h-[88px] rounded-[18px] bg-pill-subtle flex items-center justify-center flex-shrink-0">
-          <span className="text-white text-[25px] font-semibold">AL</span>
+          <span className="text-white text-[25px] font-semibold">{initials}</span>
         </div>
         <div>
-          <p className="text-[18px] font-semibold text-text-primary">Alice Nguyen</p>
-          <p className="text-[11px] text-brand-light">@alice</p>
-          <p className="text-[10px] text-text-tertiary">npub1alice…x9k2</p>
+          <p className="text-[18px] font-semibold text-text-primary">{identity?.profile?.displayName || identity?.profile?.name || "Local identity"}</p>
+          <p className="text-[11px] text-brand-light">{identity?.nip05 ?? "No NIP-05"}</p>
+          <p className="text-[10px] text-text-tertiary">{identity?.npub ?? "No identity loaded"}</p>
         </div>
       </div>
 
@@ -118,21 +149,31 @@ function IdentityTab() {
       <div className="flex items-center gap-2 max-w-lg">
         <input
           type="text"
+          value={nip05}
+          onChange={(e) => { setNip05(e.target.value); setVerifyStatus(""); }}
           placeholder="alice@example.com"
           className="flex-1 h-9 px-3 text-[13px] bg-sidebar border border-border rounded-pill text-text-primary placeholder-text-placeholder outline-none"
         />
-        <button className="h-9 px-4 rounded-pill bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110">Verify</button>
+        <button onClick={verifyNip05} className="h-9 px-4 rounded-pill bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110">Verify</button>
       </div>
+      {verifyStatus && <p className="mt-2 text-[11px] text-text-tertiary">{verifyStatus}</p>}
 
       <SectionHeader title="Signing Method" />
       <div className="flex gap-2 max-w-lg">
         {["NIP-07 Extension", "Local Key Store", "NIP-46 Bunker"].map((method) => (
           <button
             key={method}
+            onClick={() => {
+              if (method === "NIP-07 Extension") void connectNip07();
+              if (method === "Local Key Store") void createOrImport();
+            }}
+            disabled={method === "NIP-46 Bunker"}
             className={`h-9 px-4 rounded-pill text-[12px] font-medium border cursor-pointer transition-all ${
-              method === "NIP-07 Extension"
+              (method === "NIP-07 Extension" && usingNip07) || (method === "Local Key Store" && !usingNip07)
                 ? "bg-surface-active border-brand text-brand-light"
-                : "bg-sidebar border-border text-text-secondary hover:border-brand/50"
+                : method === "NIP-46 Bunker"
+                  ? "bg-sidebar border-border text-text-tertiary opacity-50 cursor-not-allowed"
+                  : "bg-sidebar border-border text-text-secondary hover:border-brand/50"
             }`}
           >
             {method}
@@ -141,7 +182,7 @@ function IdentityTab() {
       </div>
 
       <SectionHeader title="Export Identity" />
-      <button className="h-9 px-4 rounded-pill bg-modal-2 border border-border text-text-modal-2 text-[12px] font-medium cursor-pointer hover:brightness-110 transition-all">
+      <button onClick={exportIdentity} disabled={!identity?.nsec} className="h-9 px-4 rounded-pill bg-modal-2 border border-border text-text-modal-2 text-[12px] font-medium cursor-pointer hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
         Identity backup.json
       </button>
     </div>
@@ -149,12 +190,26 @@ function IdentityTab() {
 }
 
 function RelaysTab() {
+  const relays = useRelaysStore((s) => s.relays);
+  const statuses = useRelaysStore((s) => s.statuses);
+  const addRelay = useRelaysStore((s) => s.addRelay);
+  const removeRelay = useRelaysStore((s) => s.removeRelay);
+  const connect = useRelaysStore((s) => s.connect);
+  const [relayUrl, setRelayUrl] = useState("");
+
+  const addRelayUrl = async () => {
+    if (!relayUrl.trim()) return;
+    addRelay({ url: relayUrl.trim(), read: true, write: true });
+    setRelayUrl("");
+    await connect();
+  };
+
   return (
     <div>
       <h2 className="text-[28px] font-semibold text-text-primary">Relays</h2>
       <p className="text-[11px] text-text-tertiary mt-1 mb-6">Control how Post discovers, publishes and retrieves events.</p>
 
-      <ToggleRow label="Automatic relay selection" description="Use contact lists and event hints to select relays." defaultOn />
+      <ToggleRow settingKey="automatic-relay-selection" label="Automatic relay selection" description="Use contact lists and event hints to select relays." defaultOn />
 
       <div className="flex items-center justify-between py-3 border-b border-border/50">
         <div className="flex-1 pr-4">
@@ -166,16 +221,16 @@ function RelaysTab() {
 
       <SectionHeader title="Connected Relays" />
       <div className="space-y-1 max-w-lg">
-        {["relay.damus.io", "relay.nostr.band", "nos.lol", "relay.snort.social", "purplepag.es"].map(
-          (relay, i) => (
+        {relays.map(
+          (relay) => (
             <div
-              key={relay}
-              className="flex items-center gap-3 h-10 px-3 rounded-[8px] hover:bg-sidebar/60 transition-colors"
+              key={relay.url}
+              className="group flex items-center gap-3 h-10 px-3 rounded-[8px] hover:bg-sidebar/60 transition-colors"
             >
-              <div className={`w-2 h-2 rounded-full ${i < 3 ? "bg-ok" : "bg-text-tertiary"}`} />
-              <span className="flex-1 text-[13px] text-text-primary">{relay}</span>
-              <span className="text-[10px] text-text-tertiary">{i < 3 ? `${12 + i * 3}ms` : "—"}</span>
-              <button className="text-[10px] text-danger hover:brightness-110 cursor-pointer hidden group-hover:block">Remove</button>
+              <div className={`w-2 h-2 rounded-full ${statuses[relay.url]?.connected ? "bg-ok" : "bg-text-tertiary"}`} />
+              <span className="flex-1 text-[13px] text-text-primary">{relay.url}</span>
+              <span className="text-[10px] text-text-tertiary">{statuses[relay.url]?.latency ? `${statuses[relay.url].latency}ms` : "—"}</span>
+              <button onClick={async () => { removeRelay(relay.url); await connect(); }} className="text-[10px] text-danger hover:brightness-110 cursor-pointer hidden group-hover:block">Remove</button>
             </div>
           )
         )}
@@ -183,16 +238,18 @@ function RelaysTab() {
       <div className="flex items-center gap-2 mt-3 max-w-lg">
         <input
           type="text"
+          value={relayUrl}
+          onChange={(e) => setRelayUrl(e.target.value)}
           placeholder="wss://relay.example.com"
           className="flex-1 h-9 px-3 text-[13px] bg-sidebar border border-border rounded-pill text-text-primary placeholder-text-placeholder outline-none"
         />
-        <button className="h-9 px-4 rounded-pill bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110">Add</button>
+        <button onClick={addRelayUrl} className="h-9 px-4 rounded-pill bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110">Add</button>
       </div>
 
       <SectionHeader title="Delivery" />
-      <ToggleRow label="Show relay delivery preview" description="Display the relay set before sending." defaultOn />
-      <ToggleRow label="Download profile metadata" description="Download profile metadata, relay list and contact graph." defaultOn />
-      <ToggleRow label="Prefer recipient relay lists" description="Prefer recipient relay lists when delivering private posts." defaultOn />
+      <ToggleRow settingKey="relay-delivery-preview" label="Show relay delivery preview" description="Display the relay set before sending." defaultOn />
+      <ToggleRow settingKey="download-profile-metadata" label="Download profile metadata" description="Download profile metadata, relay list and contact graph." defaultOn />
+      <ToggleRow settingKey="prefer-recipient-relays" label="Prefer recipient relay lists" description="Prefer recipient relay lists when delivering private posts." defaultOn />
     </div>
   );
 }
@@ -203,9 +260,9 @@ function PrivacyTab() {
       <h2 className="text-[28px] font-semibold text-text-primary">Privacy</h2>
       <p className="text-[11px] text-text-tertiary mt-1 mb-6">Encryption, metadata exposure and local data controls.</p>
 
-      <ToggleRow label="Encrypt direct posts" description="Use supported Nostr encryption for private communication." defaultOn />
-      <ToggleRow label="Encrypt attachments" description="Encrypt files before uploading to Drive or Blossom." defaultOn />
-      <ToggleRow label="Hide notification content" description="Do not show content in desktop notifications." />
+      <ToggleRow settingKey="encrypt-direct-posts" label="Encrypt direct posts" description="Use supported Nostr encryption for private communication." defaultOn />
+      <ToggleRow settingKey="encrypt-attachments" label="Encrypt attachments" description="Encrypt files before uploading to Drive or Blossom." defaultOn />
+      <ToggleRow settingKey="hide-notification-content" label="Hide notification content" description="Do not show content in desktop notifications." />
     </div>
   );
 }
@@ -216,10 +273,10 @@ function NotificationsTab() {
       <h2 className="text-[28px] font-semibold text-text-primary">Notifications</h2>
       <p className="text-[11px] text-text-tertiary mt-1 mb-6">Choose what appears in the suite notification centre.</p>
 
-      <ToggleRow label="New private posts" description="Notify for new private posts." defaultOn />
-      <ToggleRow label="Mentions and replies" description="Notify when someone mentions or replies to you." defaultOn />
-      <ToggleRow label="Digest summaries" description="Bundle low-priority activity into summaries." />
-      <ToggleRow label="Delivery failure alerts" description="Alert when a post cannot reach its target relays." defaultOn />
+      <ToggleRow settingKey="notify-private-posts" label="New private posts" description="Notify for new private posts." defaultOn />
+      <ToggleRow settingKey="notify-mentions" label="Mentions and replies" description="Notify when someone mentions or replies to you." defaultOn />
+      <ToggleRow settingKey="notify-digests" label="Digest summaries" description="Bundle low-priority activity into summaries." />
+      <ToggleRow settingKey="notify-delivery-failures" label="Delivery failure alerts" description="Alert when a post cannot reach its target relays." defaultOn />
     </div>
   );
 }

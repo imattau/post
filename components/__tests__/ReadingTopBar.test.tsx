@@ -8,10 +8,16 @@ function renderTopBar(overrides: Partial<ComponentProps<typeof ReadingTopBar>> =
   const props = {
     onBack: vi.fn(),
     starred: false,
+    read: true,
+    spam: false,
     onToggleStar: vi.fn(),
     onArchive: vi.fn(),
     onSnooze: vi.fn(),
     onDelete: vi.fn(),
+    onToggleRead: vi.fn(),
+    onToggleSpam: vi.fn(),
+    onCopyEventId: vi.fn(),
+    messageId: "test-msg-1",
     ...overrides,
   };
   render(<ReadingTopBar {...props} />);
@@ -63,5 +69,26 @@ describe("ReadingTopBar", () => {
   it("renders more button", () => {
     renderTopBar();
     expect(screen.getByText("⋮")).toBeInTheDocument();
+  });
+
+  it("dedicated read/unread button calls onToggleRead", async () => {
+    const onToggleRead = vi.fn();
+    renderTopBar({ onToggleRead, read: true });
+    await userEvent.click(screen.getByText("Mark unread"));
+    expect(onToggleRead).toHaveBeenCalledOnce();
+  });
+
+  it("more menu calls spam and copy handlers", async () => {
+    const onToggleSpam = vi.fn();
+    const onCopyEventId = vi.fn();
+    renderTopBar({ onToggleSpam, onCopyEventId });
+
+    await userEvent.click(screen.getByText("⋮"));
+    await userEvent.click(screen.getByText("Mark spam"));
+    await userEvent.click(screen.getByText("⋮"));
+    await userEvent.click(screen.getByText("Copy event id"));
+
+    expect(onToggleSpam).toHaveBeenCalledOnce();
+    expect(onCopyEventId).toHaveBeenCalledOnce();
   });
 });

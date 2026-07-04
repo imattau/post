@@ -11,19 +11,27 @@ import ReplyComposer from "./ReplyComposer";
 export default function ReadingPane({
   message,
   starred,
+  spam,
   onBack,
   onToggleStar,
   onArchive,
   onSnooze,
   onDelete,
+  onToggleRead,
+  onToggleSpam,
+  onCopyEventId,
 }: {
   message: MockMessage;
   starred: boolean;
+  spam: boolean;
   onBack: () => void;
   onToggleStar: () => void;
   onArchive: () => void;
   onSnooze: () => void;
   onDelete: () => void;
+  onToggleRead: () => void;
+  onToggleSpam: () => void;
+  onCopyEventId: () => void;
 }) {
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
@@ -34,11 +42,17 @@ export default function ReadingPane({
         onArchive={onArchive}
         onSnooze={onSnooze}
         onDelete={onDelete}
+        onToggleRead={onToggleRead}
+        onToggleSpam={onToggleSpam}
+        onCopyEventId={onCopyEventId}
+        read={message.read}
+        spam={spam}
+        messageId={message.id}
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-10 pt-[30px]">
         <div>
-          <h1 className="max-w-[560px] text-[25px] font-semibold leading-tight text-text-near-white">
+          <h1 className="max-w-[560px] text-[26px] font-semibold leading-tight text-text-near-white">
             {message.subject}
           </h1>
         </div>
@@ -76,6 +90,7 @@ export default function ReadingPane({
                 encrypted={att.encrypted}
                 sha256={att.sha256}
                 mimeType={att.mimeType}
+                url={att.url}
               />
             ))}
           </div>

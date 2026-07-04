@@ -12,6 +12,7 @@ interface RelaysState {
   connected: boolean;
   addRelay: (config: RelayConfig) => void;
   removeRelay: (url: string) => void;
+  loadRelayConfigs: () => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => void;
   updateStatuses: () => Promise<void>;
@@ -27,10 +28,18 @@ export const useRelaysStore = create<RelaysState>((set, get) => ({
 
   addRelay: (config: RelayConfig) => {
     set((state) => ({ relays: [...state.relays, config] }));
+    void import("@/lib/db/schema").then(({ db }) => db.relayConfigs.put(config));
   },
 
   removeRelay: (url: string) => {
     set((state) => ({ relays: state.relays.filter((r) => r.url !== url) }));
+    void import("@/lib/db/schema").then(({ db }) => db.relayConfigs.delete(url));
+  },
+
+  loadRelayConfigs: async () => {
+    const { db } = await import("@/lib/db/schema");
+    const saved = await db.relayConfigs.toArray();
+    if (saved.length > 0) set({ relays: saved });
   },
 
   connect: async () => {

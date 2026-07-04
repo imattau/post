@@ -6,6 +6,8 @@ import { useRelaysStore } from "@/lib/stores/relays";
 import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { startSync, loadCachedMessages } from "@/lib/sync";
 import { loadBlossomConfig } from "@/lib/stores/blossom";
+import { useContactsStore } from "@/lib/stores/contacts";
+import { useSettingsStore } from "@/lib/stores/settings";
 import { isTauri, createTauriKeyStore } from "@/lib/tauri";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -32,6 +34,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       }
 
       loadBlossomConfig();
+      useSettingsStore.getState().load();
+      await useContactsStore.getState().loadContacts();
+      await useRelaysStore.getState().loadRelayConfigs();
       await loadCachedMessages();
       await useMailboxStore.getState().refreshUnreadCounts();
       await connect();

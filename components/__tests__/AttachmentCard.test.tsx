@@ -34,7 +34,7 @@ describe("AttachmentCard", () => {
   it("renders Drive link with sha256", () => {
     render(<AttachmentCard {...baseProps} sha256="sha-test" />);
     const link = screen.getByText("Open in Drive");
-    expect(link.closest("a")).toHaveAttribute("href", expect.stringContaining("sha-test"));
+    expect(link.closest("a")).toHaveAttribute("href", expect.stringContaining("/drive?blob=sha-test"));
   });
 
   it("shows Preview button for images", () => {

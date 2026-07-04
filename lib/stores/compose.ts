@@ -12,6 +12,7 @@ interface ComposeState {
   relayOverrides: string[];
   error: string | null;
   open: (draft?: Partial<Draft>) => void;
+  openSavedDraft: (id: string) => Promise<void>;
   close: () => void;
   minimize: () => void;
   restore: () => void;
@@ -28,6 +29,7 @@ interface ComposeState {
   retry: () => Promise<SendResult>;
   scheduleSend: (at: number) => Promise<void>;
   autosave: () => Promise<void>;
+  listDrafts: () => Promise<Draft[]>;
   discard: () => void;
   resetDraft: () => void;
   returnToComposing: () => void;
@@ -61,7 +63,15 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   error: null,
 
   open: (draft?: Partial<Draft>) => {
-    set({ status: "composing", draft: { ...emptyDraft(), ...draft, updatedAt: Date.now() }, error: null });
+    const next = { ...emptyDraft(), ...draft, updatedAt: Date.now() };
+    set({ status: "composing", draft: next, relayOverrides: next.relayOverrides, error: null });
+  },
+
+  async openSavedDraft(id: string) {
+    const { db } = await import("@/lib/db/schema");
+    const draft = await db.drafts.get(id);
+    if (!draft) return;
+    set({ status: "composing", draft, uploads: draft.attachments, relayOverrides: draft.relayOverrides, error: null });
   },
 
   close: () => {
@@ -139,7 +149,7 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   },
 
   setRelayOverrides: (relays: string[]) => {
-    set({ relayOverrides: relays });
+    set((state) => ({ relayOverrides: relays, draft: { ...state.draft, relayOverrides: relays } }));
   },
 
   async send() {
@@ -176,7 +186,36 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
       });
 
       const { db } = await import("@/lib/db/schema");
+      const now = Date.now();
+      const sentMessage = {
+        id: result.eventId || draft.id,
+        kind: giftWrap ? 1059 : 14,
+        pubkey: identity.pubkey,
+        recipientPubkey: draft.to[0].pubkey,
+        content: draft.body,
+        raw: "",
+        createdAt: now,
+        tags: draft.replyTo ? [["e", draft.replyTo]] : [],
+        subject: draft.subject || "(no subject)",
+        preview: draft.body.replace(/\n/g, " ").slice(0, 120),
+        read: true,
+        starred: false,
+        archived: false,
+        snoozedUntil: null,
+        spam: false,
+        mailbox: "sent" as const,
+        labelIds: [],
+        replyTo: draft.replyTo,
+        relayUrls: relayOverrides,
+        attachments,
+        isEncrypted: encrypted,
+        isGiftWrapped: giftWrap,
+        deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
+      };
+      await db.messages.put(sentMessage);
       await db.drafts.delete(draft.id);
+      const { useMessagesStore } = await import("@/lib/stores/messages");
+      await useMessagesStore.getState().upsertMessage(sentMessage);
 
       set({ status: "sent", draft: emptyDraft(), uploads: [] });
       return result;
@@ -197,16 +236,21 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
       draft: { ...state.draft, scheduledFor: at },
     }));
     const { db } = await import("@/lib/db/schema");
-    await db.drafts.put({ ...get().draft, scheduledFor: at, savedAt: Date.now() });
+    await db.drafts.put({ ...get().draft, attachments: get().uploads, scheduledFor: at, savedAt: Date.now() });
   },
 
   async autosave() {
-    const { draft } = get();
+    const { draft, uploads } = get();
     const { db } = await import("@/lib/db/schema");
-    await db.drafts.put({ ...draft, savedAt: Date.now(), updatedAt: Date.now() });
+    await db.drafts.put({ ...draft, attachments: uploads, savedAt: Date.now(), updatedAt: Date.now() });
     set((state) => ({
       draft: { ...state.draft, savedAt: Date.now() },
     }));
+  },
+
+  async listDrafts() {
+    const { db } = await import("@/lib/db/schema");
+    return db.drafts.orderBy("updatedAt").reverse().toArray();
   },
 
   discard: () => {

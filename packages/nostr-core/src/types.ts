@@ -46,6 +46,71 @@ export interface AttachmentRef {
   encrypted: boolean;
 }
 
+export type DriveViewMode = "list" | "grid";
+export type DriveFilter = "all" | "documents" | "images" | "media";
+export type DriveSort = "recent" | "name" | "size";
+export type DriveSource = "seed" | "blossom" | "attachment" | "post";
+export type DriveFileKind = "figma" | "pdf" | "album" | "spreadsheet" | "video" | "markdown" | "json" | "document" | "image" | "other";
+
+export interface EncryptedBlobMetadata {
+  version: 1;
+  algorithm: "AES-GCM";
+  salt: string;
+  wrapIv: string;
+  fileIv: string;
+  wrappedKey: string;
+}
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  fileCount: number;
+  color: string;
+  updatedAt: number;
+  starred: boolean;
+  trashed: boolean;
+}
+
+export interface DriveFile {
+  id: string;
+  name: string;
+  folderId: string | null;
+  fileKind: DriveFileKind;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: number;
+  updatedAt: number;
+  modifiedLabel: string;
+  ownerName: string;
+  ownerInitials: string;
+  source: DriveSource;
+  starred: boolean;
+  trashed: boolean;
+  offlineAvailable: boolean;
+  encrypted: boolean;
+  storedInDrive: boolean;
+  sha256: string | null;
+  blobUrl: string | null;
+  preview: string;
+  sharedWith: string[];
+  tags: string[];
+  color: string;
+  letter: string;
+  encryption: EncryptedBlobMetadata | null;
+  encryptedBlob: Blob | null;
+}
+
+export interface DriveUploadJob {
+  id: string;
+  fileName: string;
+  sizeBytes: number;
+  progress: number;
+  status: "pending" | "uploading" | "complete" | "failed";
+  error: string | null;
+  fileId: string | null;
+}
+
 export interface AttachmentUpload {
   file: File;
   progress: number;

@@ -44,6 +44,13 @@ test.describe("Navigation", () => {
     await expect(page.locator("text=Following")).toBeVisible();
   });
 
+  test("drive page loads", async ({ page }) => {
+    await page.goto("/drive");
+    await expect(page.locator("text=Drive")).toBeVisible();
+    await expect(page.locator("text=My files")).toBeVisible();
+    await expect(page.locator("text=Preview")).toBeVisible();
+  });
+
   test("settings page loads", async ({ page }) => {
     await page.goto("/settings");
     await expect(page.locator("text=Settings")).toBeVisible();

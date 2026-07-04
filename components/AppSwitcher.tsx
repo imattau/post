@@ -11,8 +11,8 @@ interface AppTile {
 
 const APPS: AppTile[] = [
   { letter: "M", name: "Post", color: "var(--color-brand)", route: "/mail/inbox" },
-  { letter: "D", name: "Drive", color: "var(--color-info)", route: "/coming-soon?app=D" },
-  { letter: "C", name: "Calendar", color: "var(--color-teal)", route: "/coming-soon?app=C" },
+  { letter: "D", name: "Drive", color: "var(--color-info)", route: "/drive" },
+  { letter: "C", name: "Calendar", color: "var(--color-teal)", route: "/calendar" },
   { letter: "N", name: "Notes", color: "var(--color-warn)", route: "/coming-soon?app=N" },
   { letter: "P", name: "Contacts", color: "var(--color-danger)", route: "/contacts" },
   { letter: "T", name: "Tasks", color: "var(--color-teal)", route: "/coming-soon?app=T" },
@@ -45,7 +45,7 @@ export default function AppSwitcher({ onClose }: { onClose: () => void }) {
     >
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <span className="text-text-primary text-[13px] font-semibold">Nostr Suite</span>
-        <button className="text-brand-light text-[11px] font-medium hover:brightness-110">All apps</button>
+        <a href="/coming-soon?app=all" className="text-brand-light text-[11px] font-medium hover:brightness-110 no-underline">All apps</a>
       </div>
       <div className="grid grid-cols-3 gap-3 px-5 py-2">
         {APPS.map((app) => (

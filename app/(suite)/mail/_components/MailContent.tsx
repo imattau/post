@@ -37,8 +37,11 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const draftCount = useMailboxStore((s) => s.unreadCounts.drafts);
 
   const markRead = useMessagesStore((s) => s.markRead);
+  const markUnread = useMessagesStore((s) => s.markUnread);
+  const messageById = useMessagesStore((s) => s.byId);
   const toggleStar = useMessagesStore((s) => s.toggleStar);
   const toggleArchive = useMessagesStore((s) => s.toggleArchive);
+  const toggleSpam = useMessagesStore((s) => s.toggleSpam);
   const snooze = useMessagesStore((s) => s.snooze);
   const deleteMessage = useMessagesStore((s) => s.deleteMessage);
 
@@ -70,6 +73,20 @@ export default function MailContent({ children }: { children: React.ReactNode })
     await deleteMessage(id);
     clearSelection();
   }, [deleteMessage, clearSelection]);
+
+  const handleToggleRead = useCallback(async (id: string, read: boolean) => {
+    if (read) await markUnread(id);
+    else await markRead(id);
+  }, [markRead, markUnread]);
+
+  const handleToggleSpam = useCallback(async (id: string) => {
+    await toggleSpam(id);
+    clearSelection();
+  }, [toggleSpam, clearSelection]);
+
+  const handleCopyEventId = useCallback(async (id: string) => {
+    await navigator.clipboard?.writeText(id);
+  }, []);
 
   const closeCompose = useCallback(() => {
     router.replace(pathname, { scroll: false });
@@ -249,11 +266,15 @@ export default function MailContent({ children }: { children: React.ReactNode })
         <ReadingPane
           message={selectedMessage}
           starred={selectedMessage.starred}
+          spam={messageById[selectedMessage.id]?.spam ?? currentMailbox === "spam"}
           onBack={clearSelection}
           onToggleStar={() => handleToggleStar(selectedMessage.id)}
           onArchive={() => handleArchive(selectedMessage.id)}
           onSnooze={() => handleSnooze(selectedMessage.id)}
           onDelete={() => handleDelete(selectedMessage.id)}
+          onToggleRead={() => handleToggleRead(selectedMessage.id, selectedMessage.read)}
+          onToggleSpam={() => handleToggleSpam(selectedMessage.id)}
+          onCopyEventId={() => handleCopyEventId(selectedMessage.id)}
         />
       ) : (
         <div className="bg-dock flex items-center justify-center">

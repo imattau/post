@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useBlossomStore } from "@/lib/stores/blossom";
+import { useRelaysStore } from "@/lib/stores/relays";
+import { useContactsStore } from "@/lib/stores/contacts";
+import MessageBody from "./MessageBody";
 import UploadProgress from "./UploadProgress";
 
 interface UploadItem {
@@ -19,10 +22,18 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [showSendMenu, setShowSendMenu] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [showUploadOverlay, setShowUploadOverlay] = useState(false);
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [ccText, setCcText] = useState("");
+  const [bccText, setBccText] = useState("");
+  const [showDeliverySettings, setShowDeliverySettings] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showContactSuggestions, setShowContactSuggestions] = useState(false);
 
   const status = useComposeStore((s) => s.status);
   const draft = useComposeStore((s) => s.draft);
@@ -36,6 +47,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const addAttachment = useComposeStore((s) => s.addAttachment);
   const updateAttachment = useComposeStore((s) => s.updateAttachment);
   const removeAttachment = useComposeStore((s) => s.removeAttachment);
+  const toggleEncrypted = useComposeStore((s) => s.toggleEncrypted);
   const toggleGiftWrap = useComposeStore((s) => s.toggleGiftWrap);
   const close = useComposeStore((s) => s.close);
   const open = useComposeStore((s) => s.open);
@@ -46,14 +58,34 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const retry = useComposeStore((s) => s.retry);
 
   const uploadFile = useBlossomStore((s) => s.uploadFile);
+  const relays = useRelaysStore((s) => s.relays);
   const [recipientText, setRecipientText] = useState("");
   const [recipientError, setRecipientError] = useState<string | null>(null);
+
+  const contacts = useContactsStore((s) => s.contacts);
+  const contactSuggestions = useMemo(() => {
+    if (!recipientText.trim()) return [];
+    const q = recipientText.toLowerCase();
+    return contacts.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.handle.toLowerCase().includes(q) ||
+        c.npub.toLowerCase().includes(q) ||
+        c.pubkey.toLowerCase().includes(q)
+    ).slice(0, 6);
+  }, [contacts, recipientText]);
 
   const handleAttach = useCallback(() => fileInputRef.current?.click(), []);
 
   useEffect(() => {
     if (status === "closed") open();
   }, [status, open]);
+
+  useEffect(() => {
+    if (bodyRef.current && bodyRef.current.innerText !== draft.body) {
+      bodyRef.current.innerText = draft.body;
+    }
+  }, [draft.id, draft.body]);
 
   useEffect(() => {
     if (status === "sent") {
@@ -63,47 +95,108 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   }, [status, onClose]);
 
   const handleClose = useCallback(() => {
-    close();
-    onClose();
-  }, [close, onClose]);
+    if (draft.subject || draft.body || draft.to.length > 0) {
+      setShowDiscardConfirm(true);
+    } else {
+      close();
+      onClose();
+    }
+  }, [close, onClose, draft]);
 
   const handleDiscard = useCallback(() => {
     discard();
     onClose();
+    setShowDiscardConfirm(false);
   }, [discard, onClose]);
+
+  const requestDiscard = useCallback(() => {
+    if (draft.subject || draft.body || draft.to.length > 0) {
+      setShowDiscardConfirm(true);
+    } else {
+      handleDiscard();
+    }
+  }, [draft, handleDiscard]);
+
+  const parseRecipient = useCallback(async (value: string) => {
+    let pubkey = value;
+    let npub = value;
+    if (value.startsWith("npub1")) {
+      const { decode } = await import("nostr-tools/nip19");
+      const decoded = decode(value);
+      if (decoded.type !== "npub") throw new Error("Expected an npub");
+      pubkey = decoded.data;
+    }
+    if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
+      throw new Error("Enter a 64-character pubkey or npub");
+    }
+
+    return {
+      pubkey,
+      npub,
+      name: value.startsWith("npub1") ? `${value.slice(0, 12)}…` : `${pubkey.slice(0, 8)}…`,
+      avatarUrl: "",
+      isGroup: false,
+    };
+  }, []);
 
   const addRecipientFromText = useCallback(async () => {
     const value = recipientText.trim();
     if (!value) return;
 
     try {
-      let pubkey = value;
-      let npub = value;
-      if (value.startsWith("npub1")) {
-        const { decode } = await import("nostr-tools/nip19");
-        const decoded = decode(value);
-        if (decoded.type !== "npub") throw new Error("Expected an npub");
-        pubkey = decoded.data;
-      }
-      if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
-        throw new Error("Enter a 64-character pubkey or npub");
-      }
-
-      const recipient = {
-        pubkey,
-        npub,
-        name: value.startsWith("npub1") ? `${value.slice(0, 12)}…` : `${pubkey.slice(0, 8)}…`,
-        avatarUrl: "",
-        isGroup: false,
-      };
-
+      const recipient = await parseRecipient(value);
       updateRecipients([...draft.to, recipient], draft.cc, draft.bcc);
       setRecipientText("");
       setRecipientError(null);
+      setShowContactSuggestions(false);
     } catch (err) {
       setRecipientError(err instanceof Error ? err.message : "Invalid recipient");
     }
-  }, [draft.bcc, draft.cc, draft.to, recipientText, updateRecipients]);
+  }, [draft.bcc, draft.cc, draft.to, parseRecipient, recipientText, updateRecipients]);
+
+  const selectContact = useCallback((contact: typeof contacts[number]) => {
+    updateRecipients(
+      [...draft.to, { pubkey: contact.pubkey, npub: contact.npub, name: contact.name, avatarUrl: contact.picture || "", isGroup: false }],
+      draft.cc,
+      draft.bcc
+    );
+    setRecipientText("");
+    setRecipientError(null);
+    setShowContactSuggestions(false);
+  }, [draft.bcc, draft.cc, draft.to, updateRecipients]);
+
+  const addCcFromText = useCallback(async () => {
+    const value = ccText.trim();
+    if (!value) return;
+    try {
+      const recipient = await parseRecipient(value);
+      updateRecipients(draft.to, [...draft.cc, recipient], draft.bcc);
+      setCcText("");
+      setRecipientError(null);
+    } catch (err) {
+      setRecipientError(err instanceof Error ? err.message : "Invalid Cc recipient");
+    }
+  }, [ccText, draft.bcc, draft.cc, draft.to, parseRecipient, updateRecipients]);
+
+  const addBccFromText = useCallback(async () => {
+    const value = bccText.trim();
+    if (!value) return;
+    try {
+      const recipient = await parseRecipient(value);
+      updateRecipients(draft.to, draft.cc, [...draft.bcc, recipient]);
+      setBccText("");
+      setRecipientError(null);
+    } catch (err) {
+      setRecipientError(err instanceof Error ? err.message : "Invalid Bcc recipient");
+    }
+  }, [bccText, draft.bcc, draft.cc, draft.to, parseRecipient, updateRecipients]);
+
+  const toggleRelayOverride = useCallback((url: string) => {
+    const next = draft.relayOverrides.includes(url)
+      ? draft.relayOverrides.filter((relay) => relay !== url)
+      : [...draft.relayOverrides, url];
+    useComposeStore.getState().setRelayOverrides(next);
+  }, [draft.relayOverrides]);
 
   const handleFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -252,7 +345,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                   <span className="text-text-modal-2 text-[15px]">–</span>
                 </button>
                 <button
-                  onClick={handleDiscard}
+                  onClick={requestDiscard}
                   disabled={isSending}
                   className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
                 >
@@ -264,7 +357,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
             {/* To field */}
             <div className="flex items-start gap-3 px-5 py-3 border-b border-modal-stroke">
               <span className="text-[12px] font-medium text-text-modal-2 pt-1">To</span>
-              <div className="flex-1 flex flex-wrap items-center gap-1.5">
+              <div className="flex-1 flex flex-wrap items-center gap-1.5 relative">
                 {draft.to.map((recipient) => (
                   <span
                     key={recipient.pubkey}
@@ -276,24 +369,102 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 <input
                   type="text"
                   value={recipientText}
-                  onChange={(e) => { setRecipientText(e.target.value); setRecipientError(null); }}
-                  onBlur={() => { void addRecipientFromText(); }}
+                  onChange={(e) => { setRecipientText(e.target.value); setRecipientError(null); setShowContactSuggestions(true); }}
+                  onFocus={() => setShowContactSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowContactSuggestions(false), 200)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === ",") {
                       e.preventDefault();
                       void addRecipientFromText();
                     }
+                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                      e.preventDefault();
+                    }
+                    if (e.key === "Escape") setShowContactSuggestions(false);
                   }}
-                  placeholder={draft.to.length === 0 ? "Add npub or pubkey" : "Add another"}
+                  placeholder={draft.to.length === 0 ? "Search contacts or add npub/pubkey" : "Add another"}
                   className="min-w-[180px] flex-1 bg-transparent border-none outline-none text-[13px] text-text-modal placeholder-text-placeholder"
                   disabled={isSending}
                 />
+                {showContactSuggestions && contactSuggestions.length > 0 && (
+                  <div className="absolute left-0 top-full mt-1 w-full z-20 rounded-[10px] border border-border bg-modal-card shadow-lg overflow-hidden">
+                    {contactSuggestions.map((contact) => (
+                      <button
+                        key={contact.id}
+                        onMouseDown={(e) => { e.preventDefault(); selectContact(contact); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer"
+                      >
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0`} style={{ backgroundColor: contact.color }}>
+                          <span className="text-white text-[10px] font-semibold">{contact.initials}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[12px] font-medium text-text-modal truncate block">{contact.name}</span>
+                          <span className="text-[10px] text-text-tertiary truncate block">{contact.handle}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex gap-1">
-                <button disabled className="text-[11px] font-medium text-text-tertiary cursor-not-allowed opacity-50">Cc</button>
-                <button disabled className="text-[11px] font-medium text-text-tertiary cursor-not-allowed opacity-50">Bcc</button>
+                <button onClick={() => setShowCc((show) => !show)} className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Cc</button>
+                <button onClick={() => setShowBcc((show) => !show)} className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Bcc</button>
               </div>
             </div>
+            {showCc && (
+              <div className="flex items-start gap-3 px-5 py-2 border-b border-modal-stroke">
+                <span className="text-[12px] font-medium text-text-modal-2 pt-1">Cc</span>
+                <div className="flex-1 flex flex-wrap items-center gap-1.5">
+                  {draft.cc.map((recipient) => (
+                    <span key={recipient.pubkey} className="h-7 px-2.5 rounded-pill bg-pill-subtle border border-modal-stroke text-text-modal-2 text-[12px] font-medium leading-[26px]">
+                      {recipient.name}
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={ccText}
+                    onChange={(e) => { setCcText(e.target.value); setRecipientError(null); }}
+                    onBlur={() => { void addCcFromText(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        void addCcFromText();
+                      }
+                    }}
+                    placeholder="Add Cc npub or pubkey"
+                    className="min-w-[180px] flex-1 bg-transparent border-none outline-none text-[13px] text-text-modal placeholder-text-placeholder"
+                    disabled={isSending}
+                  />
+                </div>
+              </div>
+            )}
+            {showBcc && (
+              <div className="flex items-start gap-3 px-5 py-2 border-b border-modal-stroke">
+                <span className="text-[12px] font-medium text-text-modal-2 pt-1">Bcc</span>
+                <div className="flex-1 flex flex-wrap items-center gap-1.5">
+                  {draft.bcc.map((recipient) => (
+                    <span key={recipient.pubkey} className="h-7 px-2.5 rounded-pill bg-pill-subtle border border-modal-stroke text-text-modal-2 text-[12px] font-medium leading-[26px]">
+                      {recipient.name}
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={bccText}
+                    onChange={(e) => { setBccText(e.target.value); setRecipientError(null); }}
+                    onBlur={() => { void addBccFromText(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        void addBccFromText();
+                      }
+                    }}
+                    placeholder="Add Bcc npub or pubkey"
+                    className="min-w-[180px] flex-1 bg-transparent border-none outline-none text-[13px] text-text-modal placeholder-text-placeholder"
+                    disabled={isSending}
+                  />
+                </div>
+              </div>
+            )}
             {recipientError && <p className="px-5 pt-1 text-[11px] text-danger">{recipientError}</p>}
 
             {/* Subject field */}
@@ -309,15 +480,20 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
               />
             </div>
 
-            {/* Body */}
-            <div
-              ref={bodyRef}
-              contentEditable={!isSending}
-              onInput={handleBodyInput}
-              className="flex-1 p-5 text-[14px] text-text-modal outline-none overflow-y-auto whitespace-pre-wrap empty:before:content-[attr(data-placeholder)]"
-              data-placeholder="Write your message…"
-              suppressContentEditableWarning
-            />
+            {showPreview ? (
+              <div className="flex-1 p-5 overflow-y-auto">
+                <MessageBody body={draft.body || "Nothing to preview yet."} />
+              </div>
+            ) : (
+              <div
+                ref={bodyRef}
+                contentEditable={!isSending}
+                onInput={handleBodyInput}
+                className="flex-1 p-5 text-[14px] text-text-modal outline-none overflow-y-auto whitespace-pre-wrap empty:before:content-[attr(data-placeholder)]"
+                data-placeholder="Write your message…"
+                suppressContentEditableWarning
+              />
+            )}
 
             {/* Attachment cards */}
             {uploads.length > 0 && (
@@ -355,8 +531,19 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
 
             {/* Status pills */}
             <div className="flex items-center gap-2 px-5 py-2">
-              <span className="h-[26px] px-3 rounded-pill bg-surface-active border border-brand text-ok text-[11px] font-medium leading-[26px]">Encrypted</span>
-              <span className="h-[26px] px-3 rounded-pill border border-modal-stroke text-text-modal-2 text-[11px] font-medium leading-[26px]">3 relays</span>
+              <button
+                onClick={toggleEncrypted}
+                className={`h-[26px] px-3 rounded-pill border text-[11px] font-medium leading-[26px] cursor-pointer transition-all duration-150 ${
+                  encrypted
+                    ? "bg-surface-active border-brand text-ok"
+                    : "border-modal-stroke text-text-modal-2 hover:border-brand/50"
+                }`}
+              >
+                {encrypted ? "Encrypted" : "Not encrypted"}
+              </button>
+              <span className="h-[26px] px-3 rounded-pill border border-modal-stroke text-text-modal-2 text-[11px] font-medium leading-[26px]">
+                {draft.relayOverrides.length || relays.length} relays
+              </span>
               <button
                 onClick={toggleGiftWrap}
                 className={`h-[26px] px-3 rounded-pill border text-[11px] font-medium leading-[26px] cursor-pointer transition-all duration-150 ${
@@ -368,8 +555,23 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 {giftWrap ? "Private ✓" : "Private"}
               </button>
               <div className="flex-1" />
-              <button disabled className="text-[11px] font-medium text-text-tertiary cursor-not-allowed opacity-50">Delivery settings</button>
+              <button onClick={() => setShowDeliverySettings((show) => !show)} className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Delivery settings</button>
             </div>
+            {showDeliverySettings && (
+              <div className="mx-5 mb-2 max-h-28 overflow-y-auto rounded-[10px] border border-modal-stroke bg-modal-2 p-2">
+                <p className="mb-1 text-[11px] font-medium text-text-modal-2">Relay overrides</p>
+                {relays.map((relay) => (
+                  <label key={relay.url} className="flex items-center gap-2 py-1 text-[11px] text-text-modal-2">
+                    <input
+                      type="checkbox"
+                      checked={draft.relayOverrides.includes(relay.url)}
+                      onChange={() => toggleRelayOverride(relay.url)}
+                    />
+                    <span>{relay.url}</span>
+                  </label>
+                ))}
+              </div>
+            )}
 
             {/* Error message */}
             {status === "failed" && error && (
@@ -415,9 +617,11 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 {showSendMenu && (
                   <div className="absolute bottom-full left-0 mb-1 w-44 rounded-pill bg-pill-subtle border border-border shadow-lg overflow-hidden z-10">
                     <button onClick={() => { send(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-primary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Send</button>
-                    <button disabled className="w-full px-4 py-2.5 text-[12px] text-text-tertiary text-left cursor-not-allowed opacity-50">Preview</button>
+                    <button onClick={() => { setShowPreview((show) => !show); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">
+                      {showPreview ? "Edit" : "Preview"}
+                    </button>
                     <button onClick={() => { useComposeStore.getState().autosave(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Save Draft</button>
-                    <button onClick={() => { handleDiscard(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-danger text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Discard</button>
+                    <button onClick={() => { requestDiscard(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-danger text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Discard</button>
                   </div>
                 )}
               </div>
@@ -437,7 +641,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 </button>
               )}
               <div className="flex-1" />
-              <button onClick={handleDiscard} disabled={isSending} className="text-[11px] font-medium text-danger cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40">
+              <button onClick={requestDiscard} disabled={isSending} className="text-[11px] font-medium text-danger cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40">
                 Discard
               </button>
             </div>
@@ -460,6 +664,28 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
           totalCount={uploads.length}
           onHide={() => setShowUploadOverlay(false)}
         />
+      )}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(5,7,11,0.44)" }}>
+          <div className="w-[320px] rounded-[14px] border border-border bg-modal-card p-5 shadow-lg">
+            <p className="text-[14px] font-semibold text-text-modal">Discard draft?</p>
+            <p className="mt-2 text-[12px] text-text-modal-2">You will lose any unsaved changes.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowDiscardConfirm(false)}
+                className="h-8 px-4 rounded-[10px] border border-border bg-modal-2 text-[12px] font-medium text-text-modal-2 cursor-pointer hover:brightness-110"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDiscard}
+                className="h-8 px-4 rounded-[10px] bg-danger text-white text-[12px] font-semibold cursor-pointer hover:brightness-110"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <input ref={fileInputRef} type="file" multiple onChange={handleFiles} className="hidden" />
     </>

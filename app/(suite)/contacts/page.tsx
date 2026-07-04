@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { type ContactStatus, type ContactView, useContactsStore } from "@/lib/stores/contacts";
 
 type ContactsTab = "Overview" | "Following" | "Muted" | "Blocked";
 
@@ -9,33 +10,6 @@ const TABS: { icon: string; id: ContactsTab }[] = [
   { icon: "✓", id: "Following" },
   { icon: "–", id: "Muted" },
   { icon: "×", id: "Blocked" },
-];
-
-interface Contact {
-  id: string;
-  initials: string;
-  name: string;
-  handle: string;
-  npub: string;
-  bio: string;
-  status: "Following" | "Muted" | "Blocked";
-  timestamp: string;
-  color: string;
-}
-
-const CONTACTS: Contact[] = [
-  { id: "1", initials: "AL", name: "Alice Nguyen", handle: "@alice", npub: "npub1alice…x9k2", bio: "Designer · Melbourne", status: "Following", timestamp: "Today", color: "var(--color-avatar-1)" },
-  { id: "2", initials: "JB", name: "Jonas Berg", handle: "@jonas", npub: "npub1jonas…m4p8", bio: "Relay developer · Oslo", status: "Following", timestamp: "Yesterday", color: "var(--color-avatar-2)" },
-  { id: "3", initials: "NW", name: "Noise Watch", handle: "@noisewatch", npub: "npub1noise…j7h4", bio: "Photographer · Seoul", status: "Following", timestamp: "Friday", color: "var(--color-avatar-5)" },
-  { id: "4", initials: "SP", name: "Spam Account", handle: "@fastprofit", npub: "npub1spam…z6n1", bio: "Product strategist · Madrid", status: "Following", timestamp: "Thursday", color: "var(--color-avatar-4)" },
-  { id: "5", initials: "RM", name: "Relay Monitor", handle: "@relaymon", npub: "npub1relay…h7j3", bio: "Automated service identity", status: "Following", timestamp: "Wednesday", color: "var(--color-avatar-6)" },
-];
-
-const STATS = [
-  { label: "Following", value: 328 },
-  { label: "Muted", value: 14 },
-  { label: "Blocked", value: 6 },
-  { label: "Groups", value: 9 },
 ];
 
 function StatusChip({ status }: { status: string }) {
@@ -55,10 +29,29 @@ function StatusChip({ status }: { status: string }) {
 
 export default function ContactsPage() {
   const [activeTab, setActiveTab] = useState<ContactsTab>("Overview");
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<ContactView | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const contacts = useContactsStore((s) => s.contacts);
+  const loadContacts = useContactsStore((s) => s.loadContacts);
+  const setStatus = useContactsStore((s) => s.setStatus);
 
-  const filtered = CONTACTS.filter((c) => {
+  useEffect(() => {
+    void loadContacts();
+  }, [loadContacts]);
+
+  const stats = [
+    { label: "Following", value: contacts.filter((contact) => contact.status === "Following").length },
+    { label: "Muted", value: contacts.filter((contact) => contact.status === "Muted").length },
+    { label: "Blocked", value: contacts.filter((contact) => contact.status === "Blocked").length },
+    { label: "Groups", value: 0 },
+  ];
+
+  const updateStatus = async (contact: ContactView, status: ContactStatus) => {
+    await setStatus(contact.id, status);
+    setSelectedContact((current) => current?.id === contact.id ? { ...current, status } : current);
+  };
+
+  const filtered = contacts.filter((c) => {
     if (activeTab === "Following" && c.status !== "Following") return false;
     if (activeTab === "Muted" && c.status !== "Muted") return false;
     if (activeTab === "Blocked" && c.status !== "Blocked") return false;
@@ -102,7 +95,7 @@ export default function ContactsPage() {
 
             {/* Stats cards — single card with 4 sections per Figma */}
             <div className="border border-border rounded-pill bg-sidebar p-6 flex justify-around mb-8">
-              {STATS.map((stat) => (
+              {stats.map((stat) => (
                 <div key={stat.label} className="text-center">
                   <p className="text-[28px] font-semibold text-text-primary">{stat.value}</p>
                   <p className="text-[11px] text-text-tertiary mt-1">{stat.label}</p>
@@ -146,7 +139,13 @@ export default function ContactsPage() {
                   </div>
                   <StatusChip status={contact.status} />
                   <span className="text-[10px] text-text-tertiary flex-shrink-0 w-16 text-right">{contact.timestamp}</span>
-                  <button className="text-text-secondary text-[16px] font-semibold cursor-pointer hover:text-text-near-white">⋮</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); void updateStatus(contact, contact.status === "Muted" ? "Following" : "Muted"); }}
+                    className="text-text-secondary text-[16px] font-semibold cursor-pointer hover:text-text-near-white"
+                    aria-label={`Toggle mute ${contact.name}`}
+                  >
+                    ⋮
+                  </button>
                 </div>
               ))}
             </div>
@@ -171,8 +170,12 @@ export default function ContactsPage() {
                     <p className="text-[10px] text-text-tertiary">{selectedContact.npub}</p>
                     <div className="flex gap-2 mt-2">
                       <StatusChip status={selectedContact.status} />
-                      <button className="h-7 px-3 rounded-pill border border-border text-text-secondary text-[11px] font-medium cursor-pointer hover:border-brand/50 transition-all">Mute</button>
-                      <button className="h-7 px-3 rounded-pill border border-border text-danger text-[11px] font-medium cursor-pointer hover:border-danger/50 transition-all">Block</button>
+                      <button onClick={() => { void updateStatus(selectedContact, selectedContact.status === "Muted" ? "Following" : "Muted"); }} className="h-7 px-3 rounded-pill border border-border text-text-secondary text-[11px] font-medium cursor-pointer hover:border-brand/50 transition-all">
+                        {selectedContact.status === "Muted" ? "Unmute" : "Mute"}
+                      </button>
+                      <button onClick={() => { void updateStatus(selectedContact, selectedContact.status === "Blocked" ? "Following" : "Blocked"); }} className="h-7 px-3 rounded-pill border border-border text-danger text-[11px] font-medium cursor-pointer hover:border-danger/50 transition-all">
+                        {selectedContact.status === "Blocked" ? "Unblock" : "Block"}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -221,7 +224,13 @@ export default function ContactsPage() {
                       </div>
                       <StatusChip status={contact.status} />
                       <span className="text-[10px] text-text-tertiary flex-shrink-0 w-16 text-right">{contact.timestamp}</span>
-                      <button className="text-text-secondary text-[16px] font-semibold cursor-pointer hover:text-text-near-white">⋮</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void updateStatus(contact, contact.status === "Muted" ? "Following" : "Muted"); }}
+                        className="text-text-secondary text-[16px] font-semibold cursor-pointer hover:text-text-near-white"
+                        aria-label={`Toggle mute ${contact.name}`}
+                      >
+                        ⋮
+                      </button>
                     </div>
                   ))}
                 </div>

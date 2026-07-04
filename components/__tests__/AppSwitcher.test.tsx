@@ -27,6 +27,12 @@ describe("AppSwitcher", () => {
     expect(postLink).toHaveAttribute("href", "/mail/inbox");
   });
 
+  it("Drive tile links to /drive", () => {
+    render(<AppSwitcher onClose={vi.fn()} />);
+    const driveLink = screen.getByText("Drive").closest("a");
+    expect(driveLink).toHaveAttribute("href", "/drive");
+  });
+
   it("Contacts tile links to /contacts", () => {
     render(<AppSwitcher onClose={vi.fn()} />);
     const contactsLink = screen.getByText("Contacts").closest("a");

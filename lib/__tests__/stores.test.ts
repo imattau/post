@@ -1,10 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const driveFolderRows: any[] = [];
+const driveFileRows: any[] = [];
+
 vi.mock("@/lib/db/schema", () => ({
   db: {
     messages: { orderBy: vi.fn(() => ({ reverse: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })), put: vi.fn(), delete: vi.fn(), where: vi.fn(() => ({ count: vi.fn(async () => 0) })) },
-    drafts: { put: vi.fn(), delete: vi.fn() },
+    drafts: {
+      put: vi.fn(),
+      delete: vi.fn(),
+      get: vi.fn(async () => null),
+      orderBy: vi.fn(() => ({ reverse: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })),
+    },
     labels: { put: vi.fn(), delete: vi.fn() },
+    contacts: { toArray: vi.fn(async () => []), bulkPut: vi.fn(), put: vi.fn() },
+    relayConfigs: { toArray: vi.fn(async () => []), put: vi.fn(), delete: vi.fn() },
+    driveFiles: {
+      count: vi.fn(async () => driveFileRows.length),
+      bulkPut: vi.fn(async (rows: any[]) => { driveFileRows.splice(0, driveFileRows.length, ...rows); }),
+      toArray: vi.fn(async () => [...driveFileRows]),
+      put: vi.fn(async (row: any) => {
+        const index = driveFileRows.findIndex((item) => item.id === row.id);
+        if (index >= 0) driveFileRows[index] = row;
+        else driveFileRows.push(row);
+      }),
+    },
+    driveFolders: {
+      count: vi.fn(async () => driveFolderRows.length),
+      bulkPut: vi.fn(async (rows: any[]) => { driveFolderRows.splice(0, driveFolderRows.length, ...rows); }),
+      toArray: vi.fn(async () => [...driveFolderRows]),
+      put: vi.fn(async (row: any) => {
+        const index = driveFolderRows.findIndex((item) => item.id === row.id);
+        if (index >= 0) driveFolderRows[index] = row;
+        else driveFolderRows.push(row);
+      }),
+    },
   },
 }));
 
@@ -36,6 +66,10 @@ vi.mock("@post/nostr-core", async (importOriginal: () => Promise<Record<string, 
       publish: vi.fn(async () => new Map()),
     })),
     uploadBlob: vi.fn(async () => ({ id: "sha256", fileName: "test.txt", mimeType: "text/plain", sizeBytes: 100, sha256: "abc", url: "https://example.com/abc", storedInDrive: false, encrypted: true })),
+    encryptDriveBlob: vi.fn(async () => ({
+      ciphertext: new Blob(["ciphertext"], { type: "application/octet-stream" }),
+      metadata: { version: 1, algorithm: "AES-GCM", salt: "salt", wrapIv: "wrap", fileIv: "file", wrappedKey: "key" },
+    })),
   };
 });
 
@@ -296,5 +330,85 @@ describe("blossom store", () => {
     (localStorage.getItem as any).mockReturnValueOnce("https://restored.example.com");
     loadBlossomConfig();
     expect(useBlossomStore.getState().serverUrl).toBe("https://restored.example.com");
+  });
+});
+
+describe("drive store", () => {
+  beforeEach(async () => {
+    driveFolderRows.splice(0, driveFolderRows.length);
+    driveFileRows.splice(0, driveFileRows.length);
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    useDriveStore.setState({
+      files: [],
+      folders: [],
+      selectedFileId: null,
+      query: "",
+      filter: "all",
+      sort: "recent",
+      viewMode: "list",
+      uploadJobs: [],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it("loads seeded demo drive records", async () => {
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    expect(useDriveStore.getState().files.length).toBeGreaterThan(0);
+    expect(useDriveStore.getState().folders.length).toBeGreaterThan(0);
+  });
+
+  it("filters files by query and category", async () => {
+    const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    useDriveStore.getState().setQuery("planning");
+    useDriveStore.getState().setFilter("documents");
+    const visible = getVisibleDriveFiles(useDriveStore.getState());
+    expect(visible.some((file) => file.name.includes("planning"))).toBe(true);
+  });
+
+  it("filters files by drive screen", async () => {
+    const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
+    await useDriveStore.getState().load();
+    const state = useDriveStore.getState();
+
+    const recentCutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
+    expect(getVisibleDriveFiles(state, "recent").every((file) => file.updatedAt >= recentCutoff)).toBe(true);
+    expect(getVisibleDriveFiles(state, "shared").every((file) => file.sharedWith.length >= 3)).toBe(true);
+    expect(getVisibleDriveFiles(state, "offline").every((file) => file.offlineAvailable)).toBe(true);
+    expect(getVisibleDriveFiles(state, "from-post").every((file) => file.source === "post" || file.source === "attachment")).toBe(true);
+    expect(getVisibleDriveFiles(state, "trash").every((file) => file.trashed)).toBe(true);
+  });
+
+  it("rejects uploads without a private key", async () => {
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    useDriveStore.setState({ error: null });
+    await useDriveStore.getState().enqueueUploads([new File(["x"], "test.pdf", { type: "application/pdf" })]);
+    expect(useDriveStore.getState().error).toMatch(/local private key/);
+  });
+
+  it("uploads and persists an encrypted drive file", async () => {
+    const { useDriveStore } = await import("@/lib/stores/drive");
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    const { useBlossomStore } = await import("@/lib/stores/blossom");
+    const { nsecEncode } = await import("nostr-tools/nip19");
+    const secretKey = new Uint8Array(32).fill(7);
+    useIdentityStore.setState({
+      identity: {
+        npub: "npub1drive-test",
+        nsec: nsecEncode(secretKey),
+        pubkey: "a".repeat(64),
+        nip05: null,
+        nip05Verified: false,
+        profile: null,
+      },
+      keyStore: null,
+      usingNip07: false,
+    });
+    useBlossomStore.getState().setServerUrl("https://blossom.example.com");
+    await useDriveStore.getState().enqueueUploads([new File(["drive"], "notes.md", { type: "text/markdown" })]);
+    expect(useDriveStore.getState().files.some((file) => file.name === "notes.md")).toBe(true);
+    expect(useDriveStore.getState().uploadJobs.at(0)?.status).toBe("complete");
   });
 });

@@ -21,21 +21,37 @@ export default function MessageRow({
   message,
   selected,
   onClick,
+  batchMode = false,
+  batchSelected = false,
+  onBatchToggle,
 }: {
   message: MockMessage;
   selected: boolean;
   onClick: () => void;
+  batchMode?: boolean;
+  batchSelected?: boolean;
+  onBatchToggle?: () => void;
 }) {
   return (
     <div
-      onClick={onClick}
+      onClick={batchMode ? onBatchToggle : onClick}
       className={`flex gap-4 px-4 py-4 my-[4px] border border-border rounded-pill bg-sidebar cursor-pointer transition-all duration-150 min-h-[104px] ${
-        selected
+        selected || batchSelected
           ? "ring-1 ring-brand"
           : "hover:bg-sidebar/80"
       }`}
     >
-      <Avatar initials={message.sender.avatarInitials} size={40} />
+      {batchMode ? (
+        <div className="flex items-center flex-shrink-0" onClick={(e) => { e.stopPropagation(); onBatchToggle?.(); }}>
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors duration-150 cursor-pointer ${
+            batchSelected ? "bg-brand border-brand" : "border-border"
+          }`}>
+            {batchSelected && <span className="text-white text-[12px] font-bold">✓</span>}
+          </div>
+        </div>
+      ) : (
+        <Avatar initials={message.sender.avatarInitials} size={40} />
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span

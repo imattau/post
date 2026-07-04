@@ -17,10 +17,12 @@ export default function ReplyComposer({
   subject: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const open = useComposeStore((s) => s.open);
+  const addAttachment = useComposeStore((s) => s.addAttachment);
 
   useLayoutEffect(() => {
     if (pendingSelectionRef.current == null) return;
@@ -48,21 +50,27 @@ export default function ReplyComposer({
     event.preventDefault();
   }, []);
 
+  const replyDraft = useCallback(() => ({
+    to: [{
+      pubkey: recipientPubkey,
+      npub: recipientNpub,
+      name: recipientName,
+      avatarUrl: "",
+      isGroup: false,
+    }],
+    subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+    body: body.trim(),
+    replyTo: messageId,
+  }), [body, messageId, recipientName, recipientNpub, recipientPubkey, subject]);
+
+  const handleExpand = useCallback(() => {
+    open(replyDraft());
+  }, [open, replyDraft]);
+
   const sendReply = useCallback(async () => {
     if (!body.trim() || sending) return;
     setSending(true);
-    open({
-      to: [{
-        pubkey: recipientPubkey,
-        npub: recipientNpub,
-        name: recipientName,
-        avatarUrl: "",
-        isGroup: false,
-      }],
-      subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
-      body: body.trim(),
-      replyTo: messageId,
-    });
+    open(replyDraft());
     try {
       await useComposeStore.getState().send();
       if (useComposeStore.getState().status === "sent") {
@@ -71,7 +79,21 @@ export default function ReplyComposer({
     } finally {
       setSending(false);
     }
-  }, [body, messageId, open, recipientName, recipientNpub, recipientPubkey, sending, subject]);
+  }, [body.trim(), sending, open, replyDraft]);
+
+  const handleAttach = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    for (const file of files) {
+      addAttachment(file);
+    }
+    open(replyDraft());
+    if (e.target) e.target.value = "";
+  }, [addAttachment, open, replyDraft]);
 
   return (
     <div className="mx-10 mb-11 mt-2 w-[560px] max-w-[calc(100%-80px)]">
@@ -124,6 +146,22 @@ export default function ReplyComposer({
           >
             ☺
           </button>
+          <button
+            type="button"
+            aria-label="Attach file"
+            onClick={handleAttach}
+            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
+          >
+            ▣
+          </button>
+          <button
+            type="button"
+            aria-label="Open in full compose"
+            onClick={handleExpand}
+            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
+          >
+            ↗
+          </button>
           <div className="flex-1" />
           <button
             type="button"
@@ -135,6 +173,7 @@ export default function ReplyComposer({
           </button>
         </div>
       </div>
+      <input ref={fileInputRef} type="file" multiple onChange={handleFiles} className="hidden" />
     </div>
   );
 }
