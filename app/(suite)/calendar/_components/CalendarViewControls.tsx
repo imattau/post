@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 type CalendarView = "month" | "week" | "agenda";
 
@@ -9,12 +10,6 @@ const VIEW_TABS: Array<{ id: CalendarView; label: string; href: string }> = [
   { id: "week", label: "Week", href: "/calendar/week" },
   { id: "agenda", label: "Agenda", href: "/calendar/agenda" },
 ];
-
-function tabClass(active: boolean): string {
-  return active
-    ? "border border-brand/70 bg-surface-active text-brand-light"
-    : "text-text-secondary hover:text-text-near-white";
-}
 
 export default function CalendarViewControls({
   activeView,
@@ -32,35 +27,19 @@ export default function CalendarViewControls({
   return (
     <div className="flex items-center gap-2">
       {onToday && (
-        <button
-          type="button"
-          onClick={onToday}
-          className="h-9 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white"
-        >
+        <Button variant="outline" size="sm" onClick={onToday}>
           Today
-        </button>
+        </Button>
       )}
 
       {(onPrevious || onNext) && (
         <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={onPrevious}
-            className="flex h-9 w-9 items-center justify-center rounded-pill border border-border bg-pill-subtle text-[18px] text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="Previous period"
-            disabled={!onPrevious}
-          >
+          <Button variant="outline" size="icon" onClick={onPrevious} aria-label="Previous period">
             ‹
-          </button>
-          <button
-            type="button"
-            onClick={onNext}
-            className="flex h-9 w-9 items-center justify-center rounded-pill border border-border bg-pill-subtle text-[18px] text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="Next period"
-            disabled={!onNext}
-          >
+          </Button>
+          <Button variant="outline" size="icon" onClick={onNext} aria-label="Next period">
             ›
-          </button>
+          </Button>
         </div>
       )}
 
@@ -69,7 +48,11 @@ export default function CalendarViewControls({
           <Link
             key={tab.id}
             href={tab.href}
-            className={`h-8 rounded-pill px-4 text-[12px] no-underline transition-colors ${tabClass(tab.id === activeView)}`}
+            className={`inline-flex h-8 items-center justify-center rounded-pill px-4 text-[12px] font-medium no-underline transition-colors ${
+              tab.id === activeView
+                ? "border border-brand/70 bg-surface-active text-brand-light"
+                : "text-text-secondary hover:text-text-near-white"
+            }`}
           >
             {tab.label}
           </Link>
@@ -77,13 +60,9 @@ export default function CalendarViewControls({
       </div>
 
       {showMore && (
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-pill border border-border bg-pill-subtle text-[16px] text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white"
-          aria-label="More actions"
-        >
+        <Button variant="outline" size="icon" aria-label="More actions">
           ⋮
-        </button>
+        </Button>
       )}
     </div>
   );

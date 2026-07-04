@@ -3,17 +3,12 @@
 import { useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Avatar from "@/components/Avatar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { formatLongDate, formatTimeRange } from "@/lib/calendar";
 import { useCalendarStore } from "@/lib/stores/calendar";
 import CalendarPageFrame from "../../_components/CalendarPageFrame";
-
-function badgeTone(color: string): string {
-  if (color === "var(--color-brand)") return "bg-brand/12 text-brand-light border-brand/40";
-  if (color === "var(--color-info)") return "bg-info/12 text-info border-info/40";
-  if (color === "var(--color-ok)") return "bg-ok/12 text-ok border-ok/40";
-  if (color === "var(--color-warn)") return "bg-warn/12 text-warn border-warn/40";
-  return "bg-danger/12 text-danger border-danger/40";
-}
 
 export default function CalendarEventDetailsPage() {
   const params = useParams<{ eventId: string }>();
@@ -45,13 +40,9 @@ export default function CalendarEventDetailsPage() {
           <div className="rounded-pill border border-border bg-pill-subtle px-4 py-2 text-[12px] text-text-secondary">
             July 2026
           </div>
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-pill border border-border bg-pill-subtle text-[16px] text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white"
-            aria-label="More actions"
-          >
+          <Button variant="outline" size="icon" aria-label="More actions">
             ⋮
-          </button>
+          </Button>
         </div>
       }
       rightRail={
@@ -63,24 +54,21 @@ export default function CalendarEventDetailsPage() {
                 {formatLongDate(new Date(event.startAt))} · {formatTimeRange(event.startAt, event.endAt)}
               </p>
               <div className="mt-3">
-                <span className={`rounded-pill border px-3 py-1 text-[11px] font-medium ${badgeTone(calendar.color)}`}>
+                <Badge variant={calendar.color === "var(--color-info)" ? "info" : calendar.color === "var(--color-ok)" ? "ok" : calendar.color === "var(--color-warn)" ? "warn" : calendar.color === "var(--color-danger)" ? "danger" : "brand"}>
                   {calendar.name}
-                </span>
+                </Badge>
               </div>
             </section>
 
             <section>
               <p className="text-[12px] font-semibold text-text-near-white">Video meeting</p>
               <p className="mt-1 text-[11px] text-text-secondary">{event.meetingLabel ?? "Nostr Room · encrypted"}</p>
-              <button
-                type="button"
-                className="mt-3 h-10 w-full rounded-pill bg-brand px-4 text-[13px] font-semibold text-white transition-colors hover:brightness-110"
-              >
+              <Button size="lg" className="mt-3 w-full">
                 Join meeting
-              </button>
+              </Button>
             </section>
 
-            <div className="h-px bg-border" />
+            <Separator />
 
             <section>
               <p className="text-[12px] font-semibold text-text-near-white">Guests</p>
@@ -101,24 +89,18 @@ export default function CalendarEventDetailsPage() {
               </p>
             </section>
 
-            <div className="h-px bg-border" />
+            <Separator />
 
             <section>
               <p className="text-[12px] font-semibold text-text-near-white">Invitation</p>
               <div className="mt-3 flex gap-2">
-                {[
-                  { label: "Accept", className: "border-brand/70 bg-surface-active text-brand-light" },
-                  { label: "Maybe", className: "border-border bg-pill-subtle text-warn" },
-                  { label: "Decline", className: "border-border bg-pill-subtle text-danger" },
-                ].map((item) => (
-                  <button key={item.label} type="button" className={`h-8 rounded-pill border px-4 text-[12px] font-medium ${item.className}`}>
-                    {item.label}
-                  </button>
-                ))}
+                <Button size="sm" variant="secondary">Accept</Button>
+                <Button size="sm" variant="outline" className="text-warn">Maybe</Button>
+                <Button size="sm" variant="destructive">Decline</Button>
               </div>
             </section>
 
-            <div className="h-px bg-border" />
+            <Separator />
 
             <section>
               <p className="text-[12px] font-semibold text-text-near-white">Description</p>
@@ -127,7 +109,7 @@ export default function CalendarEventDetailsPage() {
               </p>
             </section>
 
-            <div className="h-px bg-border" />
+            <Separator />
 
             <section>
               <p className="text-[12px] font-semibold text-text-near-white">Nostr delivery</p>
@@ -140,12 +122,8 @@ export default function CalendarEventDetailsPage() {
             </section>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
-              <button type="button" className="h-10 rounded-[11px] border border-border bg-[#151922] text-[11px] font-medium text-text-secondary">
-                Edit event
-              </button>
-              <button type="button" className="h-10 rounded-[11px] border border-border bg-[#151922] text-[11px] font-medium text-text-secondary">
-                Message guests
-              </button>
+              <Button variant="outline">Edit event</Button>
+              <Button variant="outline">Message guests</Button>
             </div>
 
             <section className="rounded-[12px] border border-border bg-[#151922] px-4 py-4">

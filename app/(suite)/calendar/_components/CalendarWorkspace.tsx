@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
+import { formatDistanceToNow } from "date-fns";
 import Avatar from "@/components/Avatar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { buildMonthGrid, formatLongDate, formatTimeRange, getEventSpanDays, isSameDay, isSameMonth, monthLabel } from "@/lib/calendar";
 import { useCalendarStore } from "@/lib/stores/calendar";
 import CalendarViewControls from "./CalendarViewControls";
@@ -24,10 +29,7 @@ function eventCardTone(color: string): string {
 }
 
 function formatRelativeTime(updatedAt: number): string {
-  const seconds = Math.max(1, Math.floor((Date.now() - updatedAt) / 1000));
-  if (seconds < 60) return `${seconds} sec ago`;
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes} min ago`;
+  return formatDistanceToNow(updatedAt, { addSuffix: true });
 }
 
 function CalendarEventPill({
@@ -53,6 +55,8 @@ function CalendarEventPill({
   );
 }
 
+import { DayPicker } from "react-day-picker";
+
 function CalendarMiniGrid({
   activeMonth,
   selectedDate,
@@ -64,52 +68,34 @@ function CalendarMiniGrid({
   onPickMonth: (month: Date) => void;
   onPickDate: (date: Date) => void;
 }) {
-  const weeks = useMemo(() => buildMonthGrid(activeMonth), [activeMonth]);
-
   return (
-    <div className="rounded-[10px]">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-[13px] font-semibold text-text-near-white">{monthLabel(activeMonth)}</p>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => onPickMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() - 1, 1))}
-            className="flex h-5 w-5 items-center justify-center rounded-[6px] border border-border text-[12px] text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white"
-            aria-label="Previous month"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={() => onPickMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() + 1, 1))}
-            className="flex h-5 w-5 items-center justify-center rounded-[6px] border border-border text-[12px] text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white"
-            aria-label="Next month"
-          >
-            ›
-          </button>
-        </div>
-      </div>
-      <div className="grid grid-cols-7 gap-y-2 text-center text-[10px] text-text-tertiary">
-        {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
-          <span key={`${day}-${i}`}>{day}</span>
-        ))}
-        {weeks.flat().map((day) => {
-          const selected = isSameDay(day, selectedDate);
-          return (
-            <button
-              type="button"
-              key={day.toISOString()}
-              onClick={() => onPickDate(day)}
-              className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] transition-colors ${
-                selected ? "bg-brand text-white" : "text-text-secondary hover:bg-surface-active hover:text-text-near-white"
-              } ${isSameMonth(day, activeMonth) ? "" : "opacity-40"}`}
-            >
-              {day.getDate()}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <DayPicker
+      mode="single"
+      selected={selectedDate}
+      onSelect={(date) => date && onPickDate(date)}
+      month={activeMonth}
+      onMonthChange={onPickMonth}
+      showOutsideDays={false}
+      className="m-0"
+      classNames={{
+        root: "w-full",
+        months: "flex flex-col",
+        month: "space-y-2",
+        month_grid: "w-full border-collapse",
+        weekdays: "text-center",
+        weekday: "text-[10px] text-text-tertiary font-normal",
+        weeks: "",
+        week: "",
+        day: "text-center p-0 text-[10px]",
+        day_button: "mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-text-secondary hover:bg-surface-active hover:text-text-near-white transition-colors",
+        selected: "bg-brand text-white hover:bg-brand rounded-full",
+        outside: "opacity-40",
+        caption_label: "text-[13px] font-semibold text-text-near-white",
+        nav: "flex gap-1",
+        button_next: "flex h-5 w-5 items-center justify-center rounded-[6px] border border-border text-[12px] text-text-secondary hover:bg-surface-active hover:text-text-near-white transition-colors",
+        button_previous: "flex h-5 w-5 items-center justify-center rounded-[6px] border border-border text-[12px] text-text-secondary hover:bg-surface-active hover:text-text-near-white transition-colors",
+      }}
+    />
   );
 }
 
@@ -235,26 +221,28 @@ export default function CalendarWorkspace() {
           </section>
 
           <section className="mt-auto pt-6">
-            <div className="rounded-[16px] border border-border bg-[#11151D] p-4 shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-text-near-white">Calendar sync</p>
-                <span className="text-[10px] text-text-tertiary">{formatRelativeTime(sync.updatedAt)}</span>
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-[12px] text-text-secondary">
-                <span className="h-2 w-2 rounded-full bg-ok" />
-                <span>{sync.syncedCalendars} calendars synced</span>
-              </div>
-              <div className="mt-3 space-y-1 text-[11px] text-text-secondary">
+            <Card className="shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
+              <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span>Invitations</span>
-                  <span className="font-medium text-warn">{sync.pendingInvitations} pending</span>
+                  <p className="text-[13px] font-semibold text-text-near-white">Calendar sync</p>
+                  <span className="text-[10px] text-text-tertiary">{formatRelativeTime(sync.updatedAt)}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>Relays</span>
-                  <span className="font-medium text-text-near-white">{sync.healthyRelays} healthy</span>
+                <div className="flex items-center gap-2 text-[12px] text-text-secondary">
+                  <span className="h-2 w-2 rounded-full bg-ok" />
+                  <span>{sync.syncedCalendars} calendars synced</span>
                 </div>
-              </div>
-            </div>
+                <div className="space-y-1 text-[11px] text-text-secondary">
+                  <div className="flex items-center justify-between">
+                    <span>Invitations</span>
+                    <span className="font-medium text-warn">{sync.pendingInvitations} pending</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Relays</span>
+                    <span className="font-medium text-text-near-white">{sync.healthyRelays} healthy</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </section>
         </aside>
 
@@ -385,17 +373,18 @@ export default function CalendarWorkspace() {
 
           {selectedEvent && selectedEventCalendar ? (
             <div className="mt-5 space-y-5">
-              <section className="rounded-[14px] border border-brand/70 bg-[#221832] px-4 py-4 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <h3 className="text-[17px] font-semibold text-text-near-white">{selectedEvent.title}</h3>
-                <p className="mt-1 text-[12px] text-text-secondary">
-                  {formatLongDate(new Date(selectedEvent.startAt))} · {formatTimeRange(selectedEvent.startAt, selectedEvent.endAt)}
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <span className={`rounded-pill border px-3 py-1 text-[11px] font-medium ${badgeTone(selectedEventCalendar.color)}`}>
+              <Card className="border-brand/70 bg-[#221832] shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+                <CardContent className="px-4 py-4">
+                  <h3 className="text-[17px] font-semibold text-text-near-white">{selectedEvent.title}</h3>
+                  <p className="mt-1 text-[12px] text-text-secondary">
+                    {formatLongDate(new Date(selectedEvent.startAt))} · {formatTimeRange(selectedEvent.startAt, selectedEvent.endAt)}
+                  </p>
+                  <div className="mt-3 flex items-center gap-2">
+                  <Badge variant={selectedEventCalendar.color === "var(--color-info)" ? "info" : selectedEventCalendar.color === "var(--color-ok)" ? "ok" : selectedEventCalendar.color === "var(--color-warn)" ? "warn" : selectedEventCalendar.color === "var(--color-danger)" ? "danger" : "brand"}>
                     {selectedEventCalendar.name}
-                  </span>
+                  </Badge>
                   {selectedEvent.invitation && (
-                    <span className="rounded-pill border border-border bg-pill-subtle px-3 py-1 text-[11px] font-medium text-text-secondary">
+                    <Badge variant="outline">
                       {selectedEvent.invitation === "accepted"
                         ? "Accepted"
                         : selectedEvent.invitation === "pending"
@@ -403,23 +392,21 @@ export default function CalendarWorkspace() {
                           : selectedEvent.invitation === "maybe"
                             ? "Maybe"
                             : "Declined"}
-                    </span>
+                    </Badge>
                   )}
                 </div>
-              </section>
+                </CardContent>
+              </Card>
 
               <section>
                 <p className="text-[12px] font-semibold text-text-near-white">Video meeting</p>
                 <p className="mt-1 text-[11px] text-text-secondary">{selectedEvent.meetingLabel ?? "Meeting details unavailable"}</p>
-                <button
-                  type="button"
-                  className="mt-3 h-10 w-full rounded-pill bg-brand px-4 text-[13px] font-semibold text-white transition-colors hover:brightness-110"
-                >
+                <Button size="lg" className="mt-3 w-full">
                   Join meeting
-                </button>
+                </Button>
               </section>
 
-              <div className="h-px bg-border" />
+              <Separator />
 
               <section>
                 <p className="text-[12px] font-semibold text-text-near-white">Guests</p>
@@ -433,30 +420,24 @@ export default function CalendarWorkspace() {
                 </div>
               </section>
 
-              <div className="h-px bg-border" />
+              <Separator />
 
               <section>
                 <p className="text-[12px] font-semibold text-text-near-white">Invitation</p>
                 <div className="mt-3 flex gap-2">
                   {["Accept", "Maybe", "Decline"].map((action, index) => (
-                    <button
+                    <Button
                       key={action}
-                      type="button"
-                      className={`h-8 rounded-pill border px-4 text-[12px] font-medium transition-colors ${
-                        index === 0
-                          ? "border-brand/70 bg-surface-active text-brand-light"
-                          : index === 1
-                            ? "border-border bg-pill-subtle text-warn"
-                            : "border-border bg-pill-subtle text-danger"
-                      }`}
+                      size="sm"
+                      variant={index === 0 ? "secondary" : index === 1 ? "outline" : "destructive"}
                     >
                       {action}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </section>
 
-              <div className="h-px bg-border" />
+              <Separator />
 
               <section>
                 <p className="text-[12px] font-semibold text-text-near-white">Description</p>
@@ -465,7 +446,7 @@ export default function CalendarWorkspace() {
                 </p>
               </section>
 
-              <div className="h-px bg-border" />
+              <Separator />
 
               <section>
                 <p className="text-[12px] font-semibold text-text-near-white">Nostr delivery</p>
@@ -478,31 +459,29 @@ export default function CalendarWorkspace() {
               </section>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  className="h-10 rounded-pill border border-border bg-pill-subtle text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white"
-                >
+                <Button variant="outline" size="lg">
                   Edit event
-                </button>
-                <button
-                  type="button"
-                  className="h-10 rounded-pill border border-border bg-pill-subtle text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-active hover:text-text-near-white"
-                >
+                </Button>
+                <Button variant="outline" size="lg">
                   Message guests
-                </button>
+                </Button>
               </div>
 
-              <section className="rounded-[12px] border border-border bg-[#11151D] px-4 py-3">
-                <p className="text-[11px] text-text-tertiary">Attached note</p>
-                <p className="mt-1 text-[12px] font-medium text-brand-light">
-                  {selectedEvent.attachedNote ?? selectedEvent.noteTitle ?? "Event note"}
-                </p>
-              </section>
+              <Card>
+                <CardContent className="px-4 py-3">
+                  <p className="text-[11px] text-text-tertiary">Attached note</p>
+                  <p className="mt-1 text-[12px] font-medium text-brand-light">
+                    {selectedEvent.attachedNote ?? selectedEvent.noteTitle ?? "Event note"}
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           ) : (
-            <div className="mt-8 rounded-[14px] border border-border bg-pill-subtle p-4 text-[12px] text-text-secondary">
-              Select an event to inspect guests, delivery status, and meeting details.
-            </div>
+            <Card className="mt-8 bg-pill-subtle">
+              <CardContent className="p-4 text-[12px] text-text-secondary">
+                Select an event to inspect guests, delivery status, and meeting details.
+              </CardContent>
+            </Card>
           )}
         </aside>
       </div>

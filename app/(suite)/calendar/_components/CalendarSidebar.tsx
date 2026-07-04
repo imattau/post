@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 type ActiveNav = "month" | "week" | "agenda" | "invitations" | "shared" | "settings";
@@ -41,14 +42,6 @@ export default function CalendarSidebar({ activeNav }: { activeNav: ActiveNav })
       <nav className="mt-5 space-y-1">
         {NAV_ITEMS.map((item) => {
           const active = item.id === activeNav;
-          const content = (
-            <>
-              <span className={`text-[13px] ${active ? "text-brand-light" : "text-text-secondary"}`}>{item.icon}</span>
-              <span className={`text-[13px] font-medium ${active ? "text-text-near-white" : "text-text-secondary"}`}>
-                {item.label}
-              </span>
-            </>
-          );
 
           return (
             <Link
@@ -58,7 +51,10 @@ export default function CalendarSidebar({ activeNav }: { activeNav: ActiveNav })
                 active ? "bg-[#2A1F45]" : "hover:bg-pill-subtle"
               }`}
             >
-              {content}
+              <span className={`text-[13px] ${active ? "text-brand-light" : "text-text-secondary"}`}>{item.icon}</span>
+              <span className={`text-[13px] font-medium ${active ? "text-text-near-white" : "text-text-secondary"}`}>
+                {item.label}
+              </span>
             </Link>
           );
         })}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 import { formatLongDate, formatTimeRange } from "@/lib/calendar";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
 import { useCalendarStore } from "@/lib/stores/calendar";
@@ -36,13 +37,13 @@ export default function CalendarInvitationsPage() {
             July 2026
           </div>
           <div className="flex rounded-pill border border-border bg-pill-subtle p-1">
-            <Link href="/calendar" className={`h-8 rounded-pill px-4 text-[12px] no-underline ${viewButtonClass(false)}`}>
+            <Link href="/calendar" className={`h-8 rounded-pill px-4 text-[12px] no-underline inline-flex items-center justify-center font-medium ${viewButtonClass(false)}`}>
               Month
             </Link>
-            <Link href="/calendar/week" className={`h-8 rounded-pill px-4 text-[12px] no-underline ${viewButtonClass(false)}`}>
+            <Link href="/calendar/week" className={`h-8 rounded-pill px-4 text-[12px] no-underline inline-flex items-center justify-center font-medium ${viewButtonClass(false)}`}>
               Week
             </Link>
-            <Link href="/calendar/agenda" className={`h-8 rounded-pill px-4 text-[12px] no-underline ${viewButtonClass(false)}`}>
+            <Link href="/calendar/agenda" className={`h-8 rounded-pill px-4 text-[12px] no-underline inline-flex items-center justify-center font-medium ${viewButtonClass(false)}`}>
               Agenda
             </Link>
           </div>
@@ -68,27 +69,28 @@ export default function CalendarInvitationsPage() {
                   <p className="mt-2 text-[11px] text-text-tertiary">{calendar?.name ?? "Calendar"}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     onClick={async () => updateEvent(event.id, { invitation: "accepted" })}
-                    className="h-8 rounded-pill border border-brand/70 bg-surface-active px-4 text-[12px] font-medium text-brand-light"
                   >
                     Accept
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-warn"
                     onClick={async () => updateEvent(event.id, { invitation: "maybe" })}
-                    className="h-8 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-warn"
                   >
                     Maybe
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
                     onClick={async () => updateEvent(event.id, { invitation: "declined" })}
-                    className="h-8 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-danger"
                   >
                     Decline
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
