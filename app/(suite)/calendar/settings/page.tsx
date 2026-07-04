@@ -2,17 +2,13 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { monthLabel } from "@/lib/calendar";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
+import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
-function viewButtonClass(active: boolean): string {
-  return active
-    ? "border border-brand/70 bg-surface-active text-brand-light"
-    : "text-text-secondary hover:text-text-near-white";
-}
-
 export default function CalendarSettingsPage() {
-  const { calendars, sync, load, toggleCalendar } = useCalendarStore();
+  const { calendars, sync, activeMonth, load, toggleCalendar } = useCalendarStore();
 
   useEffect(() => {
     void load();
@@ -26,7 +22,7 @@ export default function CalendarSettingsPage() {
       headerActions={
         <div className="flex items-center gap-2">
           <div className="rounded-pill border border-border bg-pill-subtle px-4 py-2 text-[12px] text-text-secondary">
-            July 2026
+            {monthLabel(activeMonth)}
           </div>
           <div className="flex rounded-pill border border-border bg-pill-subtle p-1">
             <Link href="/calendar" className={`h-8 rounded-pill px-4 text-[12px] no-underline ${viewButtonClass(false)}`}>

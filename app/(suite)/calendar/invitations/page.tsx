@@ -3,18 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { formatLongDate, formatTimeRange } from "@/lib/calendar";
+import { formatLongDate, formatTimeRange, monthLabel } from "@/lib/calendar";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
+import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
-function viewButtonClass(active: boolean): string {
-  return active
-    ? "border border-brand/70 bg-surface-active text-brand-light"
-    : "text-text-secondary hover:text-text-near-white";
-}
-
 export default function CalendarInvitationsPage() {
-  const { events, calendars, load, updateEvent } = useCalendarStore();
+  const { events, calendars, activeMonth, load, updateEvent } = useCalendarStore();
 
   useEffect(() => {
     void load();
@@ -34,7 +29,7 @@ export default function CalendarInvitationsPage() {
       headerActions={
         <div className="flex items-center gap-2">
           <div className="rounded-pill border border-border bg-pill-subtle px-4 py-2 text-[12px] text-text-secondary">
-            July 2026
+            {monthLabel(activeMonth)}
           </div>
           <div className="flex rounded-pill border border-border bg-pill-subtle p-1">
             <Link href="/calendar" className={`h-8 rounded-pill px-4 text-[12px] no-underline inline-flex items-center justify-center font-medium ${viewButtonClass(false)}`}>

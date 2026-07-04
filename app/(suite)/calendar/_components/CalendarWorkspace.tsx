@@ -5,119 +5,16 @@ import { useEffect, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Avatar from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { buildMonthGrid, formatLongDate, formatTimeRange, getEventSpanDays, isSameDay, isSameMonth, monthLabel } from "@/lib/calendar";
+import { buildMonthGrid, formatTimeRange, getEventSpanDays, isSameDay, isSameMonth, monthLabel } from "@/lib/calendar";
 import { useCalendarStore } from "@/lib/stores/calendar";
 import CalendarViewControls from "./CalendarViewControls";
-
-function badgeTone(color: string): string {
-  if (color === "var(--color-brand)") return "bg-brand/12 text-brand-light border-brand/40";
-  if (color === "var(--color-info)") return "bg-info/12 text-info border-info/40";
-  if (color === "var(--color-ok)") return "bg-ok/12 text-ok border-ok/40";
-  if (color === "var(--color-warn)") return "bg-warn/12 text-warn border-warn/40";
-  return "bg-danger/12 text-danger border-danger/40";
-}
-
-function eventCardTone(color: string): string {
-  if (color === "var(--color-brand)") return "bg-[#4A2F82] border-l-brand";
-  if (color === "var(--color-info)") return "bg-[#1E3E6A] border-l-info";
-  if (color === "var(--color-ok)") return "bg-[#194A3A] border-l-ok";
-  if (color === "var(--color-warn)") return "bg-[#5A4520] border-l-warn";
-  return "bg-[#5A2434] border-l-danger";
-}
+import CalendarEventPill from "./CalendarEventPill";
+import CalendarMiniGrid from "./CalendarMiniGrid";
+import EventDetailsPanel from "./EventDetailsPanel";
 
 function formatRelativeTime(updatedAt: number): string {
   return formatDistanceToNow(updatedAt, { addSuffix: true });
-}
-
-function CalendarEventPill({
-  title,
-  subtitle,
-  color,
-  compact = false,
-}: {
-  title: string;
-  subtitle?: string;
-  color: string;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={`flex min-h-[40px] flex-col justify-center gap-0.5 rounded-[8px] border border-white/5 border-l-[3px] px-2.5 py-1 text-left shadow-[0_10px_18px_rgba(0,0,0,0.12)] ${eventCardTone(color)} ${
-        compact ? "text-[11px]" : "text-[12px]"
-      }`}
-    >
-      <span className="font-medium leading-tight text-white">{title}</span>
-      {subtitle && <span className="text-[10px] leading-tight text-white/70">{subtitle}</span>}
-    </div>
-  );
-}
-
-import { DayPicker } from "react-day-picker";
-
-function CalendarMiniGrid({
-  activeMonth,
-  selectedDate,
-  onPickMonth,
-  onPickDate,
-}: {
-  activeMonth: Date;
-  selectedDate: Date;
-  onPickMonth: (month: Date) => void;
-  onPickDate: (date: Date) => void;
-}) {
-  return (
-    <DayPicker
-      mode="single"
-      selected={selectedDate}
-      onSelect={(date) => date && onPickDate(date)}
-      month={activeMonth}
-      onMonthChange={onPickMonth}
-      showOutsideDays={false}
-      className="m-0"
-      classNames={{
-        root: "w-full",
-        months: "flex flex-col",
-        month: "space-y-2",
-        month_grid: "w-full border-collapse",
-        weekdays: "text-center",
-        weekday: "text-[10px] text-text-tertiary font-normal",
-        weeks: "",
-        week: "",
-        day: "text-center p-0 text-[10px]",
-        day_button: "mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-text-secondary hover:bg-surface-active hover:text-text-near-white transition-colors",
-        selected: "bg-brand text-white hover:bg-brand rounded-full",
-        outside: "opacity-40",
-        caption_label: "text-[13px] font-semibold text-text-near-white",
-        nav: "flex gap-1",
-        button_next: "flex h-5 w-5 items-center justify-center rounded-[6px] border border-border text-[12px] text-text-secondary hover:bg-surface-active hover:text-text-near-white transition-colors",
-        button_previous: "flex h-5 w-5 items-center justify-center rounded-[6px] border border-border text-[12px] text-text-secondary hover:bg-surface-active hover:text-text-near-white transition-colors",
-      }}
-    />
-  );
-}
-
-function GuestsRow({ guests }: { guests: { id: string; initials: string; name: string; accepted: boolean }[] }) {
-  return (
-    <div className="flex items-center">
-      {guests.slice(0, 3).map((guest, index) => (
-        <div
-          key={guest.id}
-          className={`-ml-1 ${index === 0 ? "ml-0" : ""} rounded-full ring-2 ring-[#151922]`}
-          title={guest.name}
-        >
-          <Avatar initials={guest.initials} size={26} />
-        </div>
-      ))}
-      {guests.length > 3 && (
-        <div className="-ml-1 flex h-[26px] w-[26px] items-center justify-center rounded-full border border-border bg-pill-subtle text-[10px] font-medium text-text-secondary ring-2 ring-[#151922]">
-          +{guests.length - 3}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function CalendarWorkspace() {
@@ -129,6 +26,7 @@ export default function CalendarWorkspace() {
     selectedDate,
     selectedEventId,
     viewMode,
+    loading,
     load,
     selectDate,
     selectEvent,
@@ -137,6 +35,7 @@ export default function CalendarWorkspace() {
     previousMonth,
     nextMonth,
     toggleCalendar,
+    updateEvent,
   } = useCalendarStore();
 
   useEffect(() => {
@@ -156,6 +55,17 @@ export default function CalendarWorkspace() {
 
   const selectedEventCalendar = selectedEvent ? calendarById.get(selectedEvent.calendarId) : null;
   const today = new Date();
+
+  if (loading && events.length === 0) {
+    return (
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-canvas text-text-secondary">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+          <p className="mt-4 text-[13px]">Loading calendar…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-canvas text-text-primary">
@@ -269,7 +179,7 @@ export default function CalendarWorkspace() {
                 const weekStart = week[0];
                 return (
                   <div key={weekStart.toISOString()} className="grid grid-cols-7 overflow-visible">
-                    {week.map((day, index) => {
+                    {week.map((day) => {
                       const dayEvents = visibleEvents.filter((event) => isSameDay(new Date(event.startAt), day));
                       const selected = isSameDay(day, selectedDate);
                       const dayInMonth = isSameMonth(day, activeMonth);
@@ -348,7 +258,6 @@ export default function CalendarWorkspace() {
                                 );
                               })}
                           </div>
-
                         </div>
                       );
                     })}
@@ -364,6 +273,7 @@ export default function CalendarWorkspace() {
             <h2 className="text-[18px] font-semibold text-text-near-white">Event details</h2>
             <button
               type="button"
+              onClick={() => selectEvent(null)}
               className="text-[18px] leading-none text-text-tertiary transition-colors hover:text-text-near-white"
               aria-label="Close details"
             >
@@ -372,109 +282,15 @@ export default function CalendarWorkspace() {
           </div>
 
           {selectedEvent && selectedEventCalendar ? (
-            <div className="mt-5 space-y-5">
-              <Card className="border-brand/70 bg-[#221832] shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <CardContent className="px-4 py-4">
-                  <h3 className="text-[17px] font-semibold text-text-near-white">{selectedEvent.title}</h3>
-                  <p className="mt-1 text-[12px] text-text-secondary">
-                    {formatLongDate(new Date(selectedEvent.startAt))} · {formatTimeRange(selectedEvent.startAt, selectedEvent.endAt)}
-                  </p>
-                  <div className="mt-3 flex items-center gap-2">
-                  <Badge variant={selectedEventCalendar.color === "var(--color-info)" ? "info" : selectedEventCalendar.color === "var(--color-ok)" ? "ok" : selectedEventCalendar.color === "var(--color-warn)" ? "warn" : selectedEventCalendar.color === "var(--color-danger)" ? "danger" : "brand"}>
-                    {selectedEventCalendar.name}
-                  </Badge>
-                  {selectedEvent.invitation && (
-                    <Badge variant="outline">
-                      {selectedEvent.invitation === "accepted"
-                        ? "Accepted"
-                        : selectedEvent.invitation === "pending"
-                          ? "Pending"
-                          : selectedEvent.invitation === "maybe"
-                            ? "Maybe"
-                            : "Declined"}
-                    </Badge>
-                  )}
-                </div>
-                </CardContent>
-              </Card>
-
-              <section>
-                <p className="text-[12px] font-semibold text-text-near-white">Video meeting</p>
-                <p className="mt-1 text-[11px] text-text-secondary">{selectedEvent.meetingLabel ?? "Meeting details unavailable"}</p>
-                <Button size="lg" className="mt-3 w-full">
-                  Join meeting
-                </Button>
-              </section>
-
-              <Separator />
-
-              <section>
-                <p className="text-[12px] font-semibold text-text-near-white">Guests</p>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  {selectedEvent.guests ? <GuestsRow guests={selectedEvent.guests} /> : <span className="text-[12px] text-text-secondary">No guests</span>}
-                  {selectedEvent.guests && (
-                    <p className="text-right text-[11px] text-text-tertiary">
-                      {selectedEvent.guests.length} invited · {selectedEvent.guests.filter((guest) => guest.accepted).length} accepted
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              <Separator />
-
-              <section>
-                <p className="text-[12px] font-semibold text-text-near-white">Invitation</p>
-                <div className="mt-3 flex gap-2">
-                  {["Accept", "Maybe", "Decline"].map((action, index) => (
-                    <Button
-                      key={action}
-                      size="sm"
-                      variant={index === 0 ? "secondary" : index === 1 ? "outline" : "destructive"}
-                    >
-                      {action}
-                    </Button>
-                  ))}
-                </div>
-              </section>
-
-              <Separator />
-
-              <section>
-                <p className="text-[12px] font-semibold text-text-near-white">Description</p>
-                <p className="mt-2 text-[12px] leading-6 text-text-secondary">
-                  {selectedEvent.description ?? "No description added."}
-                </p>
-              </section>
-
-              <Separator />
-
-              <section>
-                <p className="text-[12px] font-semibold text-text-near-white">Nostr delivery</p>
-                <div className="mt-2 flex items-center gap-2 text-[12px] text-text-secondary">
-                  <span className="h-2 w-2 rounded-full bg-ok" />
-                  <span>{selectedEvent.syncStatus ?? "Published to 4 relays"}</span>
-                </div>
-                <p className="mt-3 text-[11px] text-text-tertiary">Signed by Alice Nguyen</p>
-                <p className="mt-1 text-[11px] text-text-tertiary">Event ID nostr:event1…</p>
-              </section>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" size="lg">
-                  Edit event
-                </Button>
-                <Button variant="outline" size="lg">
-                  Message guests
-                </Button>
-              </div>
-
-              <Card>
-                <CardContent className="px-4 py-3">
-                  <p className="text-[11px] text-text-tertiary">Attached note</p>
-                  <p className="mt-1 text-[12px] font-medium text-brand-light">
-                    {selectedEvent.attachedNote ?? selectedEvent.noteTitle ?? "Event note"}
-                  </p>
-                </CardContent>
-              </Card>
+            <div className="mt-5">
+              <EventDetailsPanel
+                event={selectedEvent}
+                calendar={selectedEventCalendar}
+                onClose={() => selectEvent(null)}
+                onAccept={() => updateEvent(selectedEvent.id, { invitation: "accepted" })}
+                onMaybe={() => updateEvent(selectedEvent.id, { invitation: "maybe" })}
+                onDecline={() => updateEvent(selectedEvent.id, { invitation: "declined" })}
+              />
             </div>
           ) : (
             <Card className="mt-8 bg-pill-subtle">

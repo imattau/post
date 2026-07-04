@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-type CalendarView = "month" | "week" | "agenda";
+export type CalendarView = "month" | "week" | "agenda";
+
+export function viewButtonClass(active: boolean): string {
+  return active
+    ? "border border-brand/70 bg-surface-active text-brand-light"
+    : "text-text-secondary hover:text-text-near-white";
+}
 
 const VIEW_TABS: Array<{ id: CalendarView; label: string; href: string }> = [
   { id: "month", label: "Month", href: "/calendar" },

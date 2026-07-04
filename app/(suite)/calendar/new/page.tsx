@@ -9,7 +9,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CALENDARS } from "@/lib/mock/calendar";
+import { monthLabel } from "@/lib/calendar";
 import { useCalendarStore } from "@/lib/stores/calendar";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
 
@@ -28,7 +28,7 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function CalendarNewEventPage() {
   const router = useRouter();
-  const { createEvent, load } = useCalendarStore();
+  const { calendars, createEvent, activeMonth, load } = useCalendarStore();
   const [guest, _setGuest] = useState("Alice Nguyen");
 
   const { register, handleSubmit, watch, setValue } = useForm<FormData>({
@@ -80,7 +80,7 @@ export default function CalendarNewEventPage() {
       subtitle="Create a private or shared Nostr calendar event."
       headerActions={
         <div className="rounded-pill border border-border bg-pill-subtle px-4 py-2 text-[12px] text-text-secondary">
-          July 2026
+          {activeMonth ? monthLabel(activeMonth) : "July 2026"}
         </div>
       }
     >
@@ -123,7 +123,7 @@ export default function CalendarNewEventPage() {
             <div>
               <p className="text-[11px] text-text-secondary">Calendar</p>
               <div className="mt-2 flex gap-2">
-                {CALENDARS.filter((item) => item.id !== "public").map((item) => (
+                {calendars.filter((item) => item.id !== "public").map((item) => (
                   <button
                     key={item.id}
                     type="button"

@@ -13,7 +13,7 @@ interface CalendarState {
   loading: boolean;
   load: () => Promise<void>;
   selectDate: (date: Date) => void;
-  selectEvent: (eventId: string) => void;
+  selectEvent: (eventId: string | null) => void;
   setViewMode: (mode: CalendarViewMode) => void;
   setMonth: (month: Date) => void;
   goToToday: () => void;
@@ -22,6 +22,7 @@ interface CalendarState {
   toggleCalendar: (calendarId: string) => Promise<void>;
   createEvent: (event: Omit<CalendarEvent, "id"> & { id?: string }) => Promise<CalendarEvent>;
   updateEvent: (eventId: string, patch: Partial<CalendarEvent>) => Promise<void>;
+  deleteEvent: (eventId: string) => Promise<void>;
   duplicateEvent: (eventId: string) => Promise<CalendarEvent | null>;
 }
 
@@ -70,7 +71,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     set({ selectedDate: date });
   },
 
-  selectEvent(eventId) {
+  selectEvent(eventId: string | null) {
     set({ selectedEventId: eventId });
   },
 
@@ -128,6 +129,13 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     if (!updated) return;
     const { db } = await import("@/lib/db/schema");
     await db.calendarEvents.put(updated);
+  },
+
+  async deleteEvent(eventId) {
+    const events = get().events.filter((event) => event.id !== eventId);
+    set({ events, selectedEventId: get().selectedEventId === eventId ? null : get().selectedEventId });
+    const { db } = await import("@/lib/db/schema");
+    await db.calendarEvents.delete(eventId);
   },
 
   async duplicateEvent(eventId) {
