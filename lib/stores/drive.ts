@@ -33,6 +33,9 @@ interface DriveState {
   uploadJobs: DriveUploadJob[];
   loading: boolean;
   error: string | null;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
   load: () => Promise<void>;
   refresh: () => Promise<void>;
   selectFile: (id: string | null) => void;
@@ -44,6 +47,8 @@ interface DriveState {
   setFilter: (filter: DriveFilter) => void;
   setSort: (sort: DriveSort) => void;
   setViewMode: (viewMode: DriveViewMode) => void;
+  loadMore: () => void;
+  resetPage: () => void;
   toggleStar: (id: string) => Promise<void>;
   toggleTrash: (id: string) => Promise<void>;
   toggleOffline: (id: string) => Promise<void>;
@@ -213,6 +218,9 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   uploadJobs: [],
   loading: false,
   error: null,
+  page: 1,
+  pageSize: 50,
+  hasMore: true,
 
   async load() {
     set({ loading: true, error: null });
@@ -236,6 +244,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
       selectedFileId,
       selectedFileIds: [],
       loading: false,
+      page: 1,
+      hasMore: true,
     });
   },
 
@@ -254,7 +264,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   selectFolder(id) {
-    set({ selectedFolderId: id, selectedFileId: null });
+    set({ selectedFolderId: id, selectedFileId: null, page: 1, hasMore: true });
   },
 
   toggleFileSelection(id) {
@@ -278,19 +288,43 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   setQuery(query) {
-    set({ query });
+    set({ query, page: 1, hasMore: true });
   },
 
   setFilter(filter) {
-    set({ filter });
+    set({ filter, page: 1, hasMore: true });
   },
 
   setSort(sort) {
-    set({ sort });
+    set({ sort, page: 1, hasMore: true });
   },
 
   setViewMode(viewMode) {
     set({ viewMode });
+  },
+
+  loadMore() {
+    const { page, pageSize, files, filter, sort, query, selectedFolderId } = get();
+    const visible = sortFiles(
+      files.filter((file) => {
+        if (!matchesScreen(file, "my-files")) return false;
+        if (!matchesFilter(file, filter)) return false;
+        if (selectedFolderId && file.folderId !== selectedFolderId) return false;
+        if (!query) return true;
+        const haystack = [file.name, file.preview, file.modifiedLabel, file.ownerName, file.tags.join(" "), file.sharedWith.join(" ")].join(" ").toLowerCase();
+        return haystack.includes(query.trim().toLowerCase());
+      }),
+      sort
+    );
+    const nextPage = page + 1;
+    set({
+      page: nextPage,
+      hasMore: nextPage * pageSize < visible.length,
+    });
+  },
+
+  resetPage() {
+    set({ page: 1, hasMore: true });
   },
 
   async toggleStar(id) {
@@ -530,4 +564,10 @@ export function getVisibleDriveFiles(state = useDriveStore.getState(), screen: D
 
 export function getDriveSelection(state = useDriveStore.getState()): DriveFile | null {
   return state.files.find((file) => file.id === state.selectedFileId) ?? state.files[0] ?? null;
+}
+
+export function getPaginatedFiles(state = useDriveStore.getState(), screen: DriveScreen = "my-files"): DriveFile[] {
+  const all = getVisibleDriveFiles(state, screen);
+  const end = state.page * state.pageSize;
+  return all.slice(0, end);
 }

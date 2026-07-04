@@ -7,7 +7,7 @@ import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";
 import FileContextMenu from "@/components/FileContextMenu";
 import ShareDialog from "@/components/ShareDialog";
-import { useDriveStore, getVisibleDriveFiles } from "@/lib/stores/drive";
+import { useDriveStore, getVisibleDriveFiles, getPaginatedFiles } from "@/lib/stores/drive";
 import { decryptDriveBlob } from "@post/nostr-core";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useBlossomStore } from "@/lib/stores/blossom";
@@ -155,6 +155,8 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     clearUploads,
     cancelUpload,
     retryUpload,
+    loadMore,
+    hasMore,
     updateSharedWith,
   } = state;
   const identity = useIdentityStore((s) => s.identity);
@@ -163,6 +165,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const [editingBlossomUrl, setEditingBlossomUrl] = useState(false);
   const [blossomUrlInput, setBlossomUrlInput] = useState(blossomUrl);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -180,6 +183,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   useEffect(() => {
     if (screen !== "my-files" && selectedFolderId) selectFolder(null);
     clearFileSelection();
+    useDriveStore.getState().resetPage();
   }, [screen, selectedFolderId, selectFolder, clearFileSelection]);
 
   useEffect(() => {
@@ -194,7 +198,21 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     return () => clearTimeout(timer);
   }, [searchInput, setQuery]);
 
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMore();
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
+
   const selectedFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
+  const paginatedFiles = getPaginatedFiles(state, screen);
   const totalBytes = files.reduce((sum, f) => sum + f.sizeBytes, 0);
   const totalEncrypted = files.filter((f) => f.encrypted).length;
   const totalOffline = files.filter((f) => f.offlineAvailable).length;
@@ -608,10 +626,15 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                   <span className="text-right">Size</span>
                   <span className="text-right">Modified</span>
                 </div>
-                <div className="space-y-0">{visibleFiles.map((file) => renderFile(file, "list"))}</div>
+                <div className="space-y-0">{paginatedFiles.map((file) => renderFile(file, "list"))}</div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">{visibleFiles.map((file) => renderFile(file, "grid"))}</div>
+              <div className="grid grid-cols-2 gap-4">{paginatedFiles.map((file) => renderFile(file, "grid"))}</div>
+            )}
+            {hasMore && (
+              <div ref={sentinelRef} className="flex justify-center py-4">
+                <span className="text-[11px] text-text-tertiary">Loading more...</span>
+              </div>
             )}
             </>
           )}
