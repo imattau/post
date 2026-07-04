@@ -90,8 +90,8 @@ function CalendarMiniGrid({
         </div>
       </div>
       <div className="grid grid-cols-7 gap-y-2 text-center text-[10px] text-text-tertiary">
-        {["M", "T", "W", "T", "F", "S", "S"].map((day) => (
-          <span key={day}>{day}</span>
+        {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
+          <span key={`${day}-${i}`}>{day}</span>
         ))}
         {weeks.flat().map((day) => {
           const selected = isSameDay(day, selectedDate);

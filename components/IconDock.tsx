@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useCallback, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useMessagesStore } from "@/lib/stores/messages";
 import AppSwitcher from "./AppSwitcher";
@@ -12,13 +12,13 @@ const AVATAR_COLORS = [
   "bg-avatar-5", "bg-avatar-6", "bg-avatar-7",
 ];
 
-const INACTIVE_TILES = [
+const TILES: Array<{ letter: string; label: string; route: string }> = [
   { letter: "M", label: "Post", route: "/mail/inbox" },
-  { letter: "D", label: "Drive" },
-  { letter: "C", label: "Calendar" },
-  { letter: "N", label: "Notes" },
-  { letter: "P", label: "Contacts" },
-  { letter: "T", label: "Tasks" },
+  { letter: "D", label: "Drive", route: "/drive" },
+  { letter: "C", label: "Calendar", route: "/calendar" },
+  { letter: "N", label: "Notes", route: "/coming-soon?app=N" },
+  { letter: "P", label: "Contacts", route: "/contacts" },
+  { letter: "T", label: "Tasks", route: "/coming-soon?app=T" },
 ];
 
 function hashInitials(initials: string): number {
@@ -29,6 +29,7 @@ function hashInitials(initials: string): number {
 
 export default function IconDock() {
   const pathname = usePathname();
+  const router = useRouter();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -42,6 +43,7 @@ export default function IconDock() {
     [messageIds, messagesById]
   );
   const toggleSwitcher = () => setSwitcherOpen((v) => !v);
+  const navigateTo = useCallback((route: string) => router.push(route), [router]);
 
   const avatarInitial = identity?.npub?.slice(5, 6)?.toUpperCase() || "?";
   const colorClass = AVATAR_COLORS[hashInitials(avatarInitial) % AVATAR_COLORS.length];
@@ -52,7 +54,7 @@ export default function IconDock() {
       : pathname.startsWith("/contacts")
         ? "P"
         : "M";
-  const inactiveTiles = INACTIVE_TILES.filter((tile) => tile.letter !== activeLetter);
+  const inactiveTiles = TILES.filter((tile) => tile.letter !== activeLetter);
   const searchResults = messages.filter((message) => {
     const q = query.trim().toLowerCase();
     if (!q) return false;
@@ -74,11 +76,11 @@ export default function IconDock() {
         <span className="text-brand-light text-[14px] font-semibold">{activeLetter}</span>
       </button>
 
-      {/* Inactive apps */}
+      {/* Inactive apps — click navigates directly */}
       {inactiveTiles.map((tile) => (
         <button
           key={tile.letter}
-          onClick={toggleSwitcher}
+          onClick={() => navigateTo(tile.route)}
           className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
         >
           <span className="text-text-secondary text-[14px] font-semibold">{tile.letter}</span>
