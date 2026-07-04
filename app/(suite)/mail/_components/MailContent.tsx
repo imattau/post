@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCallback, useState, useEffect, useMemo } from "react";
+import { Inbox, Star, Clock, ArrowUpRight, FileEdit, Archive, ShieldAlert, SquarePen, Tag, Plus } from "lucide-react";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { useMessagesStore } from "@/lib/stores/messages";
@@ -168,20 +169,20 @@ export default function MailContent({ children }: { children: React.ReactNode })
           href="/mail/inbox?compose=true"
           className="w-[200px] h-12 bg-brand rounded-pill flex items-center gap-[15px] pl-4 no-underline hover:brightness-110 active:scale-[0.97] transition-all duration-150"
         >
-          <span className="text-white text-[21px] font-medium">＋</span>
+          <SquarePen size={21} className="text-white" />
           <span className="text-white text-[14px] font-semibold">Compose</span>
         </a>
 
         <nav className="flex flex-col gap-[6px] mt-6">
-          {[
-            { icon: "▣", label: "Inbox", count: inboxUnreadCount, href: "/mail/inbox" },
-            { icon: "☆", label: "Starred", count: null, href: "/mail/starred" },
-            { icon: "◷", label: "Snoozed", count: null, href: "/mail/snoozed" },
-            { icon: "➤", label: "Sent", count: null, href: "/mail/sent" },
-            { icon: "▤", label: "Drafts", count: draftCount, href: "/mail/drafts" },
-            { icon: "⌁", label: "Archive", count: null, href: "/mail/archive" },
-            { icon: "!", label: "Spam", count: null, href: "/mail/spam" },
-          ].map((item) => {
+          {([
+            { icon: <Inbox size={15} />, label: "Inbox", count: inboxUnreadCount, href: "/mail/inbox" },
+            { icon: <Star size={15} />, label: "Starred", count: null, href: "/mail/starred" },
+            { icon: <Clock size={15} />, label: "Snoozed", count: null, href: "/mail/snoozed" },
+            { icon: <ArrowUpRight size={15} />, label: "Sent", count: null, href: "/mail/sent" },
+            { icon: <FileEdit size={15} />, label: "Drafts", count: draftCount, href: "/mail/drafts" },
+            { icon: <Archive size={15} />, label: "Archive", count: null, href: "/mail/archive" },
+            { icon: <ShieldAlert size={15} />, label: "Spam", count: null, href: "/mail/spam" },
+          ] as const).map((item) => {
             const isActive = pathname === item.href;
             return (
               <a
@@ -193,7 +194,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
                     : "text-text-secondary hover:text-text-near-white hover:brightness-110"
                 }`}
               >
-                <span className={`text-[15px] ${isActive ? "text-brand-light" : ""}`}>{item.icon}</span>
+                <span className={isActive ? "text-brand-light" : "text-text-secondary"}>{item.icon}</span>
                 <span className={`flex-1 text-[13px] ${isActive ? "font-semibold text-white" : "font-medium text-text-secondary"}`}>
                   {item.label}
                 </span>
@@ -209,9 +210,9 @@ export default function MailContent({ children }: { children: React.ReactNode })
           <p className="text-text-tertiary text-[10px] font-semibold tracking-wider">LABELS</p>
           <button
             onClick={() => setShowLabelInput(true)}
-            className="text-text-tertiary text-[14px] cursor-pointer hover:text-text-secondary hover:brightness-110 transition-all duration-150"
+            className="text-text-tertiary cursor-pointer hover:text-text-secondary hover:brightness-110 transition-all duration-150"
           >
-            ＋
+            <Plus size={14} />
           </button>
         </div>
 

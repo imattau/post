@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FileEdit } from "lucide-react";
 import type { Draft } from "@/lib/types";
 import type { MockMessage } from "@/lib/mock/threads";
 import MessageRow from "@/components/MessageRow";
@@ -63,7 +64,7 @@ export default function DraftsPage() {
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-2" role="list" aria-label="Draft list">
         {messages.length === 0 ? (
-          <EmptyState icon="▤" title="No drafts" description="Saved drafts will appear here." />
+          <EmptyState icon={<FileEdit size={32} />} title="No drafts" description="Saved drafts will appear here." />
         ) : (
           messages.map((msg) => (
             <MessageRow

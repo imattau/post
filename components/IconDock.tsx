@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { Search, CircleHelp, X } from "lucide-react";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useMessagesStore } from "@/lib/stores/messages";
 import AppSwitcher from "./AppSwitcher";
@@ -91,13 +92,13 @@ export default function IconDock() {
       <div className="mt-[18px] w-10 h-px bg-border" />
 
       {/* Search */}
-      <button onClick={() => setSearchOpen(true)} className="mt-[19px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
-        <span className="text-text-secondary text-[14px] font-semibold">⌕</span>
+      <button onClick={() => setSearchOpen(true)} aria-label="Search" className="mt-[19px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
+        <Search size={14} className="text-text-secondary" />
       </button>
 
       {/* Help */}
-      <button onClick={() => setHelpOpen(true)} className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
-        <span className="text-text-secondary text-[14px] font-semibold">?</span>
+      <button onClick={() => setHelpOpen(true)} aria-label="Help" className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
+        <CircleHelp size={14} className="text-text-secondary" />
       </button>
 
       {/* Spacer */}
@@ -121,7 +122,7 @@ export default function IconDock() {
           <div className="absolute left-24 top-20 w-[360px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-text-modal">Search messages</p>
-              <button onClick={() => setSearchOpen(false)} className="text-[18px] text-text-modal-2 hover:text-text-modal">×</button>
+              <button onClick={() => setSearchOpen(false)} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
             </div>
             <input
               value={query}
@@ -147,7 +148,7 @@ export default function IconDock() {
           <div className="absolute left-24 top-36 w-[320px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-text-modal">Post help</p>
-              <button onClick={() => setHelpOpen(false)} className="text-[18px] text-text-modal-2 hover:text-text-modal">×</button>
+              <button onClick={() => setHelpOpen(false)} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
             </div>
             <div className="mt-3 space-y-2 text-[12px] text-text-modal-2">
               <p>Use the mailbox sidebar to move between inboxes, labels, drafts, and sent messages.</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowLeft, Star, EllipsisVertical, BadgeCheck, Check } from "lucide-react";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { Menu } from "@base-ui/react/menu";
 
@@ -47,9 +48,10 @@ export default function ReadingTopBar({
     <div className="flex h-[73px] items-center gap-3 border-b border-border px-6">
       <button
         onClick={onBack}
-        className="text-text-secondary text-[20px] font-medium cursor-pointer hover:text-text-near-white transition-colors duration-150"
+        aria-label="Back"
+        className="text-text-secondary cursor-pointer hover:text-text-near-white transition-colors duration-150"
       >
-        ←
+        <ArrowLeft size={20} />
       </button>
       <div className="ml-1 flex gap-2">
         {actions.map((action) => (
@@ -71,18 +73,19 @@ export default function ReadingTopBar({
       <div className="flex-1" />
       <button
         onClick={onToggleStar}
-        className={`text-[19px] font-normal cursor-pointer transition-colors duration-150 ${
+        aria-label={starred ? "Unstar" : "Star"}
+        className={`cursor-pointer transition-colors duration-150 ${
           starred ? "text-warn" : "text-text-secondary hover:text-text-near-white"
         }`}
       >
-        ☆
+        <Star size={19} fill={starred ? "currentColor" : "none"} />
       </button>
       <Menu.Root open={menuOpen} onOpenChange={(open) => setMenuOpen(open)}>
         <Menu.Trigger
           aria-label="More message actions"
-          className="text-[19px] font-semibold text-text-secondary cursor-pointer hover:text-text-near-white transition-colors duration-150"
+          className="text-text-secondary cursor-pointer hover:text-text-near-white transition-colors duration-150"
         >
-          ⋮
+          <EllipsisVertical size={19} />
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner className="z-20" side="bottom" align="end">
@@ -114,7 +117,7 @@ export default function ReadingTopBar({
                   >
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
                     <span className="flex-1">{label.name}</span>
-                    {assigned && <span className="text-brand-light">✓</span>}
+                    {assigned && <Check size={12} className="text-brand-light" />}
                   </Menu.Item>
                 );
               })}

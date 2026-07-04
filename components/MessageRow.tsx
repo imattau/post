@@ -1,4 +1,5 @@
 import type { MockMessage } from "@/lib/mock/threads";
+import { Check } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import Avatar from "./Avatar";
 
@@ -38,7 +39,7 @@ export default function MessageRow({
           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors duration-150 cursor-pointer ${
             batchSelected ? "bg-brand border-brand" : "border-border"
           }`}>
-            {batchSelected && <span className="text-white text-[12px] font-bold">✓</span>}
+            {batchSelected && <Check size={12} className="text-white font-bold" />}
           </div>
         </div>
       ) : (

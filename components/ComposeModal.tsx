@@ -5,6 +5,7 @@ import { useComposeStore } from "@/lib/stores/compose";
 import { useBlossomStore } from "@/lib/stores/blossom";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useContactsStore } from "@/lib/stores/contacts";
+import { Link2, Paperclip, SmilePlus, AtSign, Ellipsis, Minus, X, ChevronDown, LoaderCircle, FileImage, File } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import { toast } from "sonner";
@@ -299,11 +300,11 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("**", "**")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-semibold rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">B</button>
       <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("_", "_")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium italic rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">I</button>
       <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("__", "__")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium underline rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">U</button>
-      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("[", "](url)", "text")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">⌁</button>
-      <button onClick={handleAttach} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">▣</button>
-      <button onClick={() => applyFormat("☺")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">☺</button>
-      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary text-[13px] rounded cursor-not-allowed opacity-50">@</button>
-      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary text-[13px] rounded cursor-not-allowed opacity-50">⋯</button>
+      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("[", "](url)", "text")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150"><Link2 size={13} /></button>
+      <button onClick={handleAttach} className="w-7 h-7 flex items-center justify-center text-text-modal-2 rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150"><Paperclip size={13} /></button>
+      <button onClick={() => applyFormat("☺")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150"><SmilePlus size={13} /></button>
+      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary rounded cursor-not-allowed opacity-50"><AtSign size={13} /></button>
+      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary rounded cursor-not-allowed opacity-50"><Ellipsis size={13} /></button>
       <span className="text-[10px] text-text-placeholder ml-auto">Markdown supported</span>
     </div>
   );
@@ -320,7 +321,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         <button
           onClick={(e) => { e.stopPropagation(); handleClose(); }}
           className="w-6 h-6 flex items-center justify-center text-text-modal-2 hover:text-text-modal cursor-pointer"
-        >×</button>
+        ><X size={14} /></button>
       </div>
     );
   }
@@ -351,14 +352,14 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                   disabled={isSending}
                   className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
                 >
-                  <span className="text-text-modal-2 text-[15px]">–</span>
+                  <Minus size={15} className="text-text-modal-2" />
                 </button>
                 <button
                   onClick={requestDiscard}
                   disabled={isSending}
                   className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
                 >
-                  <span className="text-text-modal-2 text-[15px]">×</span>
+                  <X size={15} className="text-text-modal-2" />
                 </button>
               </div>
             </div>
@@ -510,7 +511,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 {uploads.map((u) => (
                   <div key={u.id} className="flex items-center gap-3 h-[74px] px-3 border border-modal-stroke rounded-pill bg-modal-attach">
                     <div className="w-12 h-14 rounded-[8px] bg-pill-subtle flex items-center justify-center flex-shrink-0">
-                      <span className="text-text-tertiary text-[11px] font-bold">▣</span>
+                      <File size={18} className="text-text-tertiary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] font-semibold text-text-modal truncate">{u.fileName}</p>
@@ -531,8 +532,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                         setUploads((prev) => prev.filter((x) => x.id !== u.id));
                         removeAttachment(u.fileName);
                       }}
-                      className="text-text-modal-2 text-[15px] cursor-pointer hover:text-text-modal"
-                    >×</button>
+                      className="text-text-modal-2 cursor-pointer hover:text-text-modal"
+                    ><X size={15} /></button>
                   </div>
                 ))}
               </div>
@@ -611,7 +612,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                   className="h-10 px-5 rounded-l-[12px] bg-brand text-white text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isSending ? (
-                    <><span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending</>
+                    <><LoaderCircle size={14} className="animate-spin" /> Sending</>
                   ) : (
                     "Send"
                   )}
@@ -621,7 +622,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                     disabled={isSending}
                     className="h-10 w-[34px] rounded-r-[12px] bg-brand text-white flex items-center justify-center cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 border-l border-white/20 disabled:opacity-40"
                   >
-                    <span className="text-[12px]">⌄</span>
+                    <ChevronDown size={12} />
                   </Menu.Trigger>
                   <Menu.Portal>
                     <Menu.Positioner className="absolute bottom-full left-0 mb-1 z-10" side="top" align="start">

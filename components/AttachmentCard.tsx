@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FileImage, File, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { formatSize } from "@/lib/utils";
 
@@ -44,9 +45,9 @@ export default function AttachmentCard({
     <div className="flex items-center gap-3 h-[88px] px-3 border border-border rounded-[12px] bg-sidebar w-[274px]">
       <div className="w-12 h-14 rounded-[8px] bg-pill-subtle flex items-center justify-center flex-shrink-0">
         {isImage() ? (
-          <span className="text-text-tertiary text-[11px] font-bold">▣</span>
+          <FileImage size={18} className="text-text-tertiary" />
         ) : (
-          <span className="text-text-tertiary text-[11px] font-bold">▤</span>
+          <File size={18} className="text-text-tertiary" />
         )}
       </div>
       <div className="flex-1 min-w-0">
@@ -87,7 +88,7 @@ export default function AttachmentCard({
         <Dialog.Popup className="fixed z-50 max-w-[720px] rounded-[12px] border border-border bg-modal-card p-4 shadow-lg" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
           <div className="mb-3 flex items-center justify-between gap-4">
             <p className="truncate text-[13px] font-semibold text-text-modal">{fileName}</p>
-            <Dialog.Close className="text-[18px] text-text-modal-2 hover:text-text-modal cursor-pointer">×</Dialog.Close>
+            <Dialog.Close className="text-text-modal-2 hover:text-text-modal cursor-pointer"><X size={18} /></Dialog.Close>
           </div>
           {url ? (
             <img src={url} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />

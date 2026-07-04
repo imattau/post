@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Progress } from "@base-ui/react/progress";
 import { formatSize } from "@/lib/utils";
 
 export interface UploadFile {
@@ -96,30 +98,36 @@ export default function UploadProgress({
                     <span className="text-[10px] text-text-tertiary">{formatSize(file.sizeBytes)}</span>
                     <div className="flex gap-2">
                       {(file.status === "uploading" || file.status === "pending") && onCancel && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => onCancel(file.id)}
-                          className="text-[10px] font-medium text-danger hover:brightness-110"
+                          className="text-danger hover:text-danger"
                         >
                           Cancel
-                        </button>
+                        </Button>
                       )}
                       {file.status === "failed" && onRetry && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => onRetry(file.id)}
-                          className="text-[10px] font-medium text-brand-light hover:brightness-110"
+                          className="text-brand-light hover:text-brand-light"
                         >
                           Retry
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
                   {file.status !== "pending" && file.status !== "cancelled" && (
-                    <div className="w-[288px] h-1 bg-pill-subtle rounded-[2px] mt-1.5">
-                      <div
-                        className="h-full rounded-[2px] transition-all duration-300"
-                        style={{ width: `${barWidth}%`, backgroundColor: colors.bar }}
-                      />
-                    </div>
+                    <Progress.Root value={barWidth} className="w-[288px] h-1 mt-1.5">
+                      <Progress.Track className="h-full rounded-[2px] bg-pill-subtle">
+                        <Progress.Indicator
+                          className="h-full rounded-[2px] transition-all duration-300"
+                          style={{ backgroundColor: colors.bar }}
+                        />
+                      </Progress.Track>
+                    </Progress.Root>
                   )}
                 </div>
               </div>
@@ -131,12 +139,14 @@ export default function UploadProgress({
           <span className="text-[10px] text-text-secondary">
             Encrypting before upload · {totalCount} {totalCount === 1 ? "provider selected" : "providers selected"}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onHide}
-            className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110"
+            className="text-brand-light hover:text-brand-light"
           >
             Hide
-          </button>
+          </Button>
         </div>
       </div>
     </>

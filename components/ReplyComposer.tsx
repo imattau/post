@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { Link2, Paperclip, SmilePlus, Maximize2 } from "lucide-react";
 import { useComposeStore } from "@/lib/stores/compose";
 import { wrapTextareaSelection } from "@/lib/utils";
 
@@ -132,34 +133,34 @@ export default function ReplyComposer({
             aria-label="Insert link"
             onMouseDown={handleToolbarMouseDown}
             onClick={() => applyFormat("[", "](url)", "text")}
-            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
           >
-            ⌁
+            <Link2 size={13} />
           </button>
           <button
             type="button"
             aria-label="Insert emoji"
             onMouseDown={handleToolbarMouseDown}
             onClick={() => applyFormat("☺")}
-            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
           >
-            ☺
+            <SmilePlus size={13} />
           </button>
           <button
             type="button"
             aria-label="Attach file"
             onClick={handleAttach}
-            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
           >
-            ▣
+            <Paperclip size={13} />
           </button>
           <button
             type="button"
             aria-label="Open in full compose"
             onClick={handleExpand}
-            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
           >
-            ↗
+            <Maximize2 size={13} />
           </button>
           <div className="flex-1" />
           <button

@@ -1,5 +1,71 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useIdentityStore } from "@/lib/stores/identity";
+import { createKeyStore } from "@post/nostr-core";
+import LoginLayout from "@/components/LoginLayout";
 
 export default function Home() {
-  redirect("/login");
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const keyStore = createKeyStore();
+    const existing = keyStore.load();
+    if (existing) {
+      useIdentityStore.getState().setIdentity(existing);
+      router.replace("/mail/inbox");
+    } else {
+      setChecking(false);
+    }
+  }, [router]);
+
+  if (checking) return null;
+
+  return (
+    <LoginLayout>
+      <div className="pt-[82px] pl-[48px]">
+        <h1 className="text-[30px] font-semibold text-text-primary">
+          Post
+        </h1>
+        <p className="text-[13px] text-text-secondary mt-1">
+          Private messaging for Nostr.
+        </p>
+
+        <div className="mt-[52px] max-w-[624px]">
+          <button
+            onClick={() => router.push("/login")}
+            className="flex items-center w-full h-[88px] rounded-[14px] border border-brand bg-surface-active px-4 text-left transition-all hover:bg-brand/20 cursor-pointer"
+          >
+            <div className="flex items-center justify-center w-[48px] h-[48px] rounded-[12px] bg-pill-subtle shrink-0">
+              <span className="font-bold text-[14px] text-brand-light">P</span>
+            </div>
+            <div className="ml-4 flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-text-near-white">
+                Log in to Post
+              </p>
+              <p className="text-[10px] font-normal text-text-tertiary mt-1">
+                Sign in with passkey, browser extension, or your nsec key.
+              </p>
+            </div>
+            <span className="text-[20px] font-medium text-brand-light ml-2 shrink-0">
+              ›
+            </span>
+          </button>
+        </div>
+
+        <div className="mt-[52px]">
+          <p className="text-[12px] font-semibold text-text-primary">
+            Email-styled inbox
+          </p>
+          <p className="text-[11px] text-text-secondary mt-2 max-w-[600px]">
+            Post brings the familiar email experience to Nostr. End-to-end
+            encrypted direct messages organized in an intuitive inbox with
+            labels, threading, and search.
+          </p>
+        </div>
+      </div>
+    </LoginLayout>
+  );
 }

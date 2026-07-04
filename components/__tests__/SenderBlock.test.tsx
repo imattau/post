@@ -29,7 +29,7 @@ describe("SenderBlock", () => {
 
   it("shows verified badge when verified is true", () => {
     render(<SenderBlock {...baseProps} verified={true} />);
-    expect(screen.getByText("✓ verified")).toBeInTheDocument();
+    expect(screen.getByText(/verified/)).toBeInTheDocument();
   });
 
   it("hides verified badge when verified is false", () => {

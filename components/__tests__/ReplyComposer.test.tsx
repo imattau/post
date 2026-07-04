@@ -39,8 +39,8 @@ describe("ReplyComposer", () => {
     render(<ReplyComposer {...props} />);
     expect(screen.getByText("B")).toBeInTheDocument();
     expect(screen.getByText("I")).toBeInTheDocument();
-    expect(screen.getByText("⌁")).toBeInTheDocument();
-    expect(screen.getByText("☺")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Insert link" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Insert emoji" })).toBeInTheDocument();
   });
 
   it("renders send button", () => {

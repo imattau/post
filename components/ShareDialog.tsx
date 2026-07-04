@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "./Avatar";
+import { Button } from "@/components/ui/button";
 import type { DriveFile } from "@/lib/types";
 
 interface ShareDialogProps {
@@ -62,12 +63,9 @@ export default function ShareDialog({ file, onClose, onUpdate }: ShareDialogProp
             placeholder="Enter initials or npub..."
             className="h-9 flex-1 rounded-pill border border-border bg-sidebar px-3 text-[12px] text-text-primary outline-none placeholder:text-text-placeholder"
           />
-          <button
-            onClick={addRecipient}
-            className="h-9 rounded-pill bg-brand px-4 text-[12px] font-medium text-white"
-          >
+          <Button onClick={addRecipient}>
             Add
-          </button>
+          </Button>
         </div>
 
         <div className="mt-5 space-y-2">
@@ -80,24 +78,22 @@ export default function ShareDialog({ file, onClose, onUpdate }: ShareDialogProp
                   <Avatar initials={initials} size={28} />
                   <span className="text-[12px] font-medium text-text-near-white">{initials}</span>
                 </div>
-                <button
-                  onClick={() => removeRecipient(initials)}
-                  className="text-[11px] font-medium text-danger"
-                >
+                <Button variant="ghost" size="sm" onClick={() => removeRecipient(initials)}
+                  className="text-danger hover:text-danger">
                   Remove
-                </button>
+                </Button>
               </div>
             ))
           )}
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="h-9 rounded-pill border border-border px-4 text-[12px] font-medium text-text-secondary">
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button onClick={() => void handleSave()} className="h-9 rounded-pill bg-brand px-4 text-[12px] font-medium text-white">
+          </Button>
+          <Button onClick={() => void handleSave()}>
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </>

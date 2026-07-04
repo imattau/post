@@ -27,7 +27,7 @@ function renderTopBar(overrides: Partial<ComponentProps<typeof ReadingTopBar>> =
 describe("ReadingTopBar", () => {
   it("renders back button", () => {
     renderTopBar();
-    expect(screen.getByText("←")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
   });
 
   it("renders action pills", () => {
@@ -40,14 +40,14 @@ describe("ReadingTopBar", () => {
   it("back button click calls onBack", async () => {
     const onBack = vi.fn();
     renderTopBar({ onBack });
-    await userEvent.click(screen.getByText("←"));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalledOnce();
   });
 
   it("star button calls onToggleStar", async () => {
     const onToggleStar = vi.fn();
     renderTopBar({ onToggleStar });
-    await userEvent.click(screen.getByText("☆"));
+    await userEvent.click(screen.getByRole("button", { name: "Star" }));
     expect(onToggleStar).toHaveBeenCalledOnce();
   });
 
@@ -68,7 +68,7 @@ describe("ReadingTopBar", () => {
 
   it("renders more button", () => {
     renderTopBar();
-    expect(screen.getByText("⋮")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More message actions" })).toBeInTheDocument();
   });
 
   it("dedicated read/unread button calls onToggleRead", async () => {
@@ -83,9 +83,9 @@ describe("ReadingTopBar", () => {
     const onCopyEventId = vi.fn();
     renderTopBar({ onToggleSpam, onCopyEventId });
 
-    await userEvent.click(screen.getByText("⋮"));
+    await userEvent.click(screen.getByRole("button", { name: "More message actions" }));
     await userEvent.click(await screen.findByText("Mark spam"));
-    await userEvent.click(screen.getByText("⋮"));
+    await userEvent.click(screen.getByRole("button", { name: "More message actions" }));
     await userEvent.click(await screen.findByText("Copy event id"));
 
     expect(onToggleSpam).toHaveBeenCalledOnce();

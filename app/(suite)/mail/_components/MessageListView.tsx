@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useState, useMemo, useRef } from "react";
 import { useVirtualizer, measureElement } from "@tanstack/react-virtual";
+import { Search, Ellipsis, Inbox, SearchX } from "lucide-react";
 import type { MockMessage } from "@/lib/mock/threads";
 import MessageRow from "@/components/MessageRow";
 import EmptyState from "@/components/EmptyState";
@@ -136,7 +137,7 @@ export default function MessageListView({
 
       <div className="px-6 pt-[21px]">
         <div className="flex h-[42px] w-[400px] max-w-full items-center gap-[18px] rounded-[12px] border border-border bg-sidebar px-4">
-          <span className="text-[15px] text-text-secondary" aria-hidden="true">⌕</span>
+          <Search size={15} className="text-text-secondary" aria-hidden="true" />
           <input
             type="text"
             value={searchQuery}
@@ -166,10 +167,10 @@ export default function MessageListView({
         ))}
         <button
           disabled
-          className="text-text-tertiary text-[18px] font-semibold ml-1 cursor-not-allowed opacity-50"
+          className="text-text-tertiary ml-1 cursor-not-allowed opacity-50"
           aria-label="No more filters available"
         >
-          ⋮
+          <Ellipsis size={18} />
         </button>
       </div>
 
@@ -203,9 +204,9 @@ export default function MessageListView({
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <EmptyState icon="▣" title="No messages yet" description="Start by composing a new message." />
+          <EmptyState icon={<Inbox size={32} />} title="No messages yet" description="Start by composing a new message." />
         ) : searchQuery ? (
-          <EmptyState icon="⌕" title="No results" description="No messages match your search." />
+          <EmptyState icon={<SearchX size={32} />} title="No results" description="No messages match your search." />
         ) : (
           <EmptyState title={`No ${title.toLowerCase()} messages`} />
         )}

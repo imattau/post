@@ -2,7 +2,8 @@
 
 import Avatar from "./Avatar";
 import FilePreview from "./FilePreview";
-import FileContextMenu from "./FileContextMenu";
+import { Button } from "@/components/ui/button";
+import { MenuRoot, MenuTrigger, MenuPopup, MenuItem } from "@/components/ui/menu";
 import type { DriveFile, DriveScreen } from "@/lib/types";
 import type { Identity } from "@post/nostr-core";
 
@@ -69,23 +70,23 @@ export default function DrivePreview({
       <div className="flex items-center justify-between">
         <h3 className="text-[18px] font-semibold text-text-near-white">Preview</h3>
         <div className="relative">
-          <span
-            onClick={(e) => { e.stopPropagation(); onToggleMenu(openMenuFileId === file.id ? null : file.id); }}
-            className="cursor-pointer text-[18px] text-text-secondary"
-          >
-            ⋮
-          </span>
-          {openMenuFileId === file.id && (
-            <FileContextMenu
-              file={file}
-              onClose={() => onToggleMenu(null)}
-              onDownload={onDownload}
-              onShare={onShare}
-              onStar={onStar}
-              onTrash={onTrash}
-              onRename={onRename}
-            />
-          )}
+          <MenuRoot open={openMenuFileId === file.id} onOpenChange={(open) => onToggleMenu(open ? file.id : null)}>
+            <MenuTrigger className="inline-flex items-center justify-center text-[18px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
+              render={<span />}
+              onClick={(e) => e.stopPropagation()}>
+              ⋮
+            </MenuTrigger>
+            <MenuPopup>
+              <MenuItem onClick={() => { onDownload(file); }}>Download</MenuItem>
+              <MenuItem onClick={() => { onShare(file); }}>Share</MenuItem>
+              <MenuItem onClick={() => { onStar(file); }}>{file.starred ? "Unstar" : "Star"}</MenuItem>
+              {onRename && <MenuItem onClick={() => { onRename(file); }}>Rename</MenuItem>}
+              <MenuItem onClick={() => { onTrash(file); }}
+                className={!file.trashed ? "text-danger" : ""}>
+                {file.trashed ? "Restore" : "Trash"}
+              </MenuItem>
+            </MenuPopup>
+          </MenuRoot>
         </div>
       </div>
 
@@ -137,26 +138,26 @@ export default function DrivePreview({
         </div>
       </div>
 
-      <button
+      <Button
         onClick={onOpenFile}
-        className="mt-6 h-[42px] rounded-pill bg-brand text-[12px] font-semibold text-white"
+        className="mt-6 h-[42px] w-full text-[12px] font-semibold"
       >
         {screen === "trash" ? "Restore file" : "Open file"}
-      </button>
+      </Button>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <button
+        <Button
+          variant="outline"
           onClick={() => onSetShareFile(file)}
-          className="h-10 rounded-pill border border-border bg-sidebar text-[12px] font-medium text-text-secondary"
         >
           Share
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
           onClick={() => onDownload(file)}
-          className="h-10 rounded-pill border border-border bg-sidebar text-[12px] font-medium text-text-secondary"
         >
           Download
-        </button>
+        </Button>
       </div>
 
       <div className="mt-6 rounded-pill border border-border bg-sidebar p-4">
@@ -171,12 +172,12 @@ export default function DrivePreview({
       </div>
 
       <div className="mt-3 flex gap-2">
-        <button onClick={() => onTrash(file)} className="h-9 rounded-pill border border-border px-4 text-[12px] text-text-secondary">
+        <Button variant="outline" onClick={() => onTrash(file)}>
           {file.trashed ? "Restore" : "Trash"}
-        </button>
-        <button onClick={() => onStar(file)} className="h-9 rounded-pill border border-border px-4 text-[12px] text-text-secondary">
+        </Button>
+        <Button variant="outline" onClick={() => onStar(file)}>
           {file.starred ? "Unstar" : "Star"}
-        </button>
+        </Button>
       </div>
     </aside>
   );

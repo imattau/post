@@ -1,3 +1,4 @@
+import { BadgeCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Avatar from "./Avatar";
 
@@ -26,7 +27,7 @@ export default function SenderBlock({
       </div>
       <div className="flex-shrink-0 text-right">
         <p className="text-[11px] text-text-tertiary">{formatDate(createdAt)}</p>
-        {verified && <p className="mt-1 text-[10px] font-medium text-ok">✓ verified</p>}
+        {verified && <p className="mt-1 text-[10px] font-medium text-ok flex items-center gap-1"><BadgeCheck size={10} /> verified</p>}
       </div>
     </div>
   );

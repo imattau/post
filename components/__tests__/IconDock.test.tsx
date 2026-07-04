@@ -41,14 +41,14 @@ describe("IconDock", () => {
     expect(screen.getByText("P")).toBeInTheDocument();
   });
 
-  it("renders search glyph", () => {
+  it("renders search button", () => {
     render(<IconDock />);
-    expect(screen.getByText("⌕")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
   });
 
-  it("renders help glyph", () => {
+  it("renders help button", () => {
     render(<IconDock />);
-    expect(screen.getByText("?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Help" })).toBeInTheDocument();
   });
 
   it("renders avatar with initial from npub", () => {

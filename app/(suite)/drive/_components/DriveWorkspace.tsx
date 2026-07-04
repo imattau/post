@@ -5,12 +5,13 @@ import { useSearchParams } from "next/navigation";
 import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";
-import FileContextMenu from "@/components/FileContextMenu";
 import ShareDialog from "@/components/ShareDialog";
 import { useDriveStore, getVisibleDriveFiles, getPaginatedFiles } from "@/lib/stores/drive";
 import { decryptDriveBlob } from "@post/nostr-core";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useBlossomStore } from "@/lib/stores/blossom";
+import { Button } from "@/components/ui/button";
+import { MenuRoot, MenuTrigger, MenuPopup, MenuItem } from "@/components/ui/menu";
 import type { DriveFile, DriveScreen } from "@/lib/types";
 
 const FILTERS = [
@@ -371,21 +372,9 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
           autoFocus
           className="h-8 flex-1 rounded-lg border border-border bg-sidebar px-3 text-[12px] text-text-primary outline-none"
         />
-        <button onClick={() => void handleRenameSubmit()} className="text-[11px] font-medium text-brand-light">Save</button>
-        <button onClick={() => setRenameFileId(null)} className="text-[11px] font-medium text-text-secondary">Cancel</button>
+        <Button variant="ghost" size="sm" onClick={() => void handleRenameSubmit()}>Save</Button>
+        <Button variant="ghost" size="sm" onClick={() => setRenameFileId(null)} className="text-text-secondary">Cancel</Button>
       </div>
-    );
-
-    const contextMenu = menuOpen && (
-      <FileContextMenu
-        file={file}
-        onClose={() => setOpenMenuFileId(null)}
-        onDownload={handleDownload}
-        onShare={handleShare}
-        onStar={handleStar}
-        onTrash={handleTrash}
-        onRename={handleRename}
-      />
     );
 
     if (view === "list") {
@@ -409,9 +398,23 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
               <span className="text-right text-[11px] text-text-secondary">{formatSize(file.sizeBytes)}</span>
               <span className="text-right text-[11px] text-text-secondary">{file.modifiedLabel}</span>
               <div className="relative flex justify-end">
-                <span onClick={(e) => { e.stopPropagation(); setOpenMenuFileId(menuOpen ? null : file.id); }}
-                  className="cursor-pointer text-[15px] text-text-secondary">⋮</span>
-                {contextMenu}
+                <MenuRoot open={menuOpen} onOpenChange={(open) => setOpenMenuFileId(open ? file.id : null)}>
+                  <MenuTrigger className="inline-flex items-center justify-center text-[15px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
+                    render={<span />}
+                    onClick={(e) => e.stopPropagation()}>
+                    ⋮
+                  </MenuTrigger>
+                  <MenuPopup>
+                    <MenuItem onClick={() => { handleDownload(file); }}>Download</MenuItem>
+                    <MenuItem onClick={() => { handleShare(file); }}>Share</MenuItem>
+                    <MenuItem onClick={() => { handleStar(file); }}>{file.starred ? "Unstar" : "Star"}</MenuItem>
+                    <MenuItem onClick={() => { handleRename(file); }}>Rename</MenuItem>
+                    <MenuItem onClick={() => { handleTrash(file); }}
+                      className={!file.trashed ? "text-danger" : ""}>
+                      {file.trashed ? "Restore" : "Trash"}
+                    </MenuItem>
+                  </MenuPopup>
+                </MenuRoot>
               </div>
             </button>
           )}
@@ -432,9 +435,23 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                 <div className="absolute -left-1 -top-1">{checkbox}</div>
               </div>
               <div className="relative">
-                <span onClick={(e) => { e.stopPropagation(); setOpenMenuFileId(menuOpen ? null : file.id); }}
-                  className="cursor-pointer text-[16px] text-text-secondary">⋮</span>
-                {contextMenu}
+                <MenuRoot open={menuOpen} onOpenChange={(open) => setOpenMenuFileId(open ? file.id : null)}>
+                  <MenuTrigger className="inline-flex items-center justify-center text-[16px] text-text-secondary outline-none border-none bg-transparent p-0 cursor-pointer"
+                    render={<span />}
+                    onClick={(e) => e.stopPropagation()}>
+                    ⋮
+                  </MenuTrigger>
+                  <MenuPopup>
+                    <MenuItem onClick={() => { handleDownload(file); }}>Download</MenuItem>
+                    <MenuItem onClick={() => { handleShare(file); }}>Share</MenuItem>
+                    <MenuItem onClick={() => { handleStar(file); }}>{file.starred ? "Unstar" : "Star"}</MenuItem>
+                    <MenuItem onClick={() => { handleRename(file); }}>Rename</MenuItem>
+                    <MenuItem onClick={() => { handleTrash(file); }}
+                      className={!file.trashed ? "text-danger" : ""}>
+                      {file.trashed ? "Restore" : "Trash"}
+                    </MenuItem>
+                  </MenuPopup>
+                </MenuRoot>
               </div>
             </div>
             <p className="mt-4 truncate text-[13px] font-semibold text-text-near-white">{highlightText(file.name, query)}</p>
@@ -482,10 +499,10 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             <div>
               <div className="flex items-center gap-3">
                 {selectedFolder && (
-                  <button onClick={() => selectFolder(null)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-sidebar text-[13px] text-text-secondary hover:text-text-near-white">
+                  <Button variant="outline" size="icon" onClick={() => selectFolder(null)}
+                    className="h-8 w-8 rounded-full text-[13px]">
                     ←
-                  </button>
+                  </Button>
                 )}
                 <h2 className="text-[24px] font-semibold text-text-near-white">
                   {selectedFolder ? selectedFolder.name : meta.title}
@@ -505,27 +522,29 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                 placeholder="Search files, folders or people"
                 className="h-full flex-1 bg-transparent text-[12px] text-text-primary outline-none placeholder:text-text-placeholder" />
             </div>
-            <button onClick={() => setSort(sort === "recent" ? "name" : sort === "name" ? "size" : "recent")}
-              className="h-[42px] w-[112px] rounded-pill border border-border bg-sidebar text-[11px] font-medium text-text-secondary">
+            <Button variant="outline" onClick={() => setSort(sort === "recent" ? "name" : sort === "name" ? "size" : "recent")}
+              className="h-[42px] w-[112px] text-[11px] font-medium">
               Sort: {sort === "recent" ? "Recent" : sort === "name" ? "Name" : "Size"}
-            </button>
-            <button onClick={() => setViewMode("grid")}
-              className={`h-[42px] w-[42px] rounded-pill border text-[15px] font-semibold ${viewMode === "grid" ? "border-brand bg-surface-active text-brand-light" : "border-border bg-sidebar text-text-secondary"}`}>
+            </Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "outline"} size="icon"
+              onClick={() => setViewMode("grid")}
+              className="h-[42px] w-[42px] rounded-pill text-[15px] font-semibold">
               ▦
-            </button>
-            <button onClick={() => setViewMode("list")}
-              className={`h-[42px] w-[42px] rounded-pill border text-[15px] font-semibold ${viewMode === "list" ? "border-brand bg-surface-active text-brand-light" : "border-border bg-sidebar text-text-secondary"}`}>
+            </Button>
+            <Button variant={viewMode === "list" ? "secondary" : "outline"} size="icon"
+              onClick={() => setViewMode("list")}
+              className="h-[42px] w-[42px] rounded-pill text-[15px] font-semibold">
               ☷
-            </button>
+            </Button>
           </div>
 
           {meta.showFolders && (
             <>
               <div className="mt-8 flex items-center justify-between">
                 <h3 className="text-[14px] font-semibold text-text-near-white">Folders</h3>
-                <button onClick={() => setShowNewFolderInput(true)} className="text-[11px] font-medium text-brand-light">
+                <Button variant="ghost" onClick={() => setShowNewFolderInput(true)} className="text-brand-light">
                   + New Folder
-                </button>
+                </Button>
               </div>
               {showNewFolderInput && (
                 <div className="mt-3 flex items-center gap-2">
@@ -533,8 +552,8 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                     onKeyDown={(e) => { if (e.key === "Enter") void handleCreateFolder(); if (e.key === "Escape") { setShowNewFolderInput(false); setNewFolderName(""); } }}
                     placeholder="Folder name" autoFocus
                     className="h-9 flex-1 rounded-pill border border-border bg-sidebar px-3 text-[12px] text-text-primary outline-none placeholder:text-text-placeholder" />
-                  <button onClick={() => void handleCreateFolder()} className="h-9 rounded-pill bg-brand px-4 text-[12px] font-medium text-white">Create</button>
-                  <button onClick={() => { setShowNewFolderInput(false); setNewFolderName(""); }} className="h-9 rounded-pill border border-border px-4 text-[12px] font-medium text-text-secondary">Cancel</button>
+                  <Button variant="default" onClick={() => void handleCreateFolder()}>Create</Button>
+                  <Button variant="outline" onClick={() => { setShowNewFolderInput(false); setNewFolderName(""); }}>Cancel</Button>
                 </div>
               )}
               <div className="mt-4 grid grid-cols-3 gap-4">
@@ -560,10 +579,10 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             <h3 className="mr-2 text-[14px] font-semibold text-text-near-white">Files</h3>
             <div className="flex gap-2">
               {FILTERS.map((item) => (
-                <button key={item.value} onClick={() => setFilter(item.value)}
-                  className={`h-7 rounded-pill border px-3 text-[12px] font-medium ${filter === item.value ? "border-brand bg-surface-active text-brand-light" : "border-border bg-sidebar text-text-secondary"}`}>
+                <Button key={item.value} variant={filter === item.value ? "secondary" : "outline"} size="sm"
+                  onClick={() => setFilter(item.value)}>
                   {item.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -594,22 +613,19 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                       {selectedFileIds.length} selected
                     </span>
                     <div className="ml-auto flex items-center gap-2">
-                      <button onClick={() => void handleBatchTrash()}
-                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-danger">
+                      <Button variant="outline" size="sm" onClick={() => void handleBatchTrash()}
+                        className="text-danger">
                         {screen === "trash" ? "Delete permanently" : "Trash"}
-                      </button>
-                      <button onClick={() => void handleBatchStar()}
-                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-text-secondary">
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => void handleBatchStar()}>
                         Star
-                      </button>
-                      <button onClick={() => void handleBatchDownload()}
-                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-text-secondary">
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => void handleBatchDownload()}>
                         Download
-                      </button>
-                      <button onClick={clearFileSelection}
-                        className="h-7 rounded-pill border border-border bg-sidebar px-3 text-[10px] font-medium text-text-secondary">
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={clearFileSelection}>
                         Clear
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -647,10 +663,9 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
               <div className="text-[26px] font-semibold text-brand-light">⇧</div>
               <p className="mt-3 text-[13px] font-semibold text-text-near-white">Drop files here to upload</p>
               <p className="mt-2 text-[10px] text-text-tertiary">Files are encrypted before upload when required</p>
-              <button onClick={(e) => { e.stopPropagation(); handleChooseFiles(); }}
-                className="mt-4 h-7 rounded-pill border border-brand bg-surface-active px-4 text-[12px] font-medium text-brand-light">
+              <Button variant="secondary" onClick={(e) => { e.stopPropagation(); handleChooseFiles(); }}>
                 Choose files
-              </button>
+              </Button>
             </div>
           )}
         </main>
