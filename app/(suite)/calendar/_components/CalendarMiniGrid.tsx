@@ -1,6 +1,8 @@
 "use client";
 
-import { DayPicker } from "react-day-picker";
+import dynamic from "next/dynamic";
+
+const DayPicker = dynamic(() => import("react-day-picker").then((mod) => mod.DayPicker), { ssr: false });
 
 export default function CalendarMiniGrid({
   activeMonth,

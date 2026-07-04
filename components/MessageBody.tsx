@@ -1,5 +1,10 @@
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { memo } from "react";
+import dynamic from "next/dynamic";
+import type { Components } from "react-markdown";
+
+const MarkdownRenderer = dynamic(() => import("./MarkdownRenderer"), {
+  ssr: false,
+});
 
 const components: Components = {
   p: ({ children }) => (
@@ -44,13 +49,13 @@ const components: Components = {
   ),
 };
 
-export default function MessageBody({ body }: { body: string }) {
+const MessageBody = memo(function MessageBody({ body }: { body: string }) {
   if (!body) return null;
   return (
     <div className="max-w-[570px]">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {body}
-      </ReactMarkdown>
+      <MarkdownRenderer body={body} components={components} />
     </div>
   );
-}
+});
+
+export default MessageBody;

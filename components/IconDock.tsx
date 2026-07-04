@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Search, CircleHelp, X } from "lucide-react";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useMessagesStore } from "@/lib/stores/messages";
+import type { Message } from "@post/nostr-core";
 import AppSwitcher from "./AppSwitcher";
 import IdentityDialog from "./IdentityDialog";
 
@@ -37,30 +39,51 @@ export default function IconDock() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [query, setQuery] = useState("");
   const identity = useIdentityStore((s) => s.identity);
-  const messageIds = useMessagesStore((s) => s.ids);
-  const messagesById = useMessagesStore((s) => s.byId);
-  const messages = useMemo(
-    () => messageIds.map((id) => messagesById[id]).filter(Boolean),
-    [messageIds, messagesById]
-  );
-  const toggleSwitcher = () => setSwitcherOpen((v) => !v);
-  const navigateTo = useCallback((route: string) => router.push(route), [router]);
+  const toggleSwitcher = useCallback(() => setSwitcherOpen((v) => !v), []);
+  const closeSwitcher = useCallback(() => setSwitcherOpen(false), []);
+  const closeIdentity = useCallback(() => setIdentityOpen(false), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
 
   const avatarInitial = identity?.npub?.slice(5, 6)?.toUpperCase() || "?";
-  const colorClass = AVATAR_COLORS[hashInitials(avatarInitial) % AVATAR_COLORS.length];
-  const activeLetter = pathname.startsWith("/calendar")
+  const colorClass = useMemo(
+    () => AVATAR_COLORS[hashInitials(avatarInitial) % AVATAR_COLORS.length],
+    [avatarInitial]
+  );
+  const activeLetter = useMemo(() => pathname.startsWith("/calendar")
     ? "C"
     : pathname.startsWith("/drive")
       ? "D"
       : pathname.startsWith("/contacts")
         ? "P"
-        : "M";
-  const inactiveTiles = TILES.filter((tile) => tile.letter !== activeLetter);
-  const searchResults = messages.filter((message) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return false;
-    return message.subject.toLowerCase().includes(q) || message.content.toLowerCase().includes(q) || message.pubkey.toLowerCase().includes(q);
-  }).slice(0, 5);
+        : "M", [pathname]);
+  const inactiveTiles = useMemo(
+    () => TILES.filter((tile) => tile.letter !== activeLetter),
+    [activeLetter]
+  );
+
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  useEffect(() => {
+    if (!searchOpen) {
+      setMessages([]);
+      return;
+    }
+    const state = useMessagesStore.getState();
+    setMessages(state.ids.map((id) => state.byId[id]).filter(Boolean));
+    const unsub = useMessagesStore.subscribe((s) => {
+      setMessages(s.ids.map((id) => s.byId[id]).filter(Boolean));
+    });
+    return unsub;
+  }, [searchOpen]);
+
+  const searchResults = useMemo(() => {
+    if (!query.trim()) return [];
+    return messages.filter((message) => {
+      const q = query.trim().toLowerCase();
+      return message.subject.toLowerCase().includes(q) || message.content.toLowerCase().includes(q) || message.pubkey.toLowerCase().includes(q);
+    }).slice(0, 5);
+  }, [messages, query]);
 
   return (
     <div className="w-[72px] h-dvh flex-shrink-0 bg-dock border-r border-border flex flex-col items-center pt-[18px]">
@@ -79,13 +102,13 @@ export default function IconDock() {
 
       {/* Inactive apps — click navigates directly */}
       {inactiveTiles.map((tile) => (
-        <button
+        <Link
           key={tile.letter}
-          onClick={() => navigateTo(tile.route)}
-          className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
+          href={tile.route}
+          className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock"
         >
           <span className="text-text-secondary text-[14px] font-semibold">{tile.letter}</span>
-        </button>
+        </Link>
       ))}
 
       {/* Hairline divider */}
@@ -113,16 +136,16 @@ export default function IconDock() {
       </button>
 
       {/* App Switcher popover */}
-      {switcherOpen && <AppSwitcher onClose={() => setSwitcherOpen(false)} />}
+      {switcherOpen && <AppSwitcher onClose={closeSwitcher} />}
 
       {/* Identity dialog */}
-      {identityOpen && <IdentityDialog onClose={() => setIdentityOpen(false)} />}
+      {identityOpen && <IdentityDialog onClose={closeIdentity} />}
       {searchOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setSearchOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-black/40" onClick={closeSearch}>
           <div className="absolute left-24 top-20 w-[360px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-text-modal">Search messages</p>
-              <button onClick={() => setSearchOpen(false)} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
+              <button onClick={closeSearch} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
             </div>
             <input
               value={query}
@@ -144,11 +167,11 @@ export default function IconDock() {
         </div>
       )}
       {helpOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setHelpOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-black/40" onClick={closeHelp}>
           <div className="absolute left-24 top-36 w-[320px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-text-modal">Post help</p>
-              <button onClick={() => setHelpOpen(false)} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
+              <button onClick={closeHelp} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
             </div>
             <div className="mt-3 space-y-2 text-[12px] text-text-modal-2">
               <p>Use the mailbox sidebar to move between inboxes, labels, drafts, and sent messages.</p>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import Link from "next/link";
 
 interface AppTile {
   letter: string;
@@ -20,7 +20,6 @@ const APPS: AppTile[] = [
 ];
 
 export default function AppSwitcher({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,11 +38,6 @@ export default function AppSwitcher({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  const navigate = useCallback((route: string) => {
-    onClose();
-    router.push(route);
-  }, [onClose, router]);
-
   return (
     <div
       ref={ref}
@@ -52,14 +46,15 @@ export default function AppSwitcher({ onClose }: { onClose: () => void }) {
     >
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <span className="text-text-primary text-[13px] font-semibold">Nostr Suite</span>
-        <button onClick={() => navigate("/coming-soon?app=all")} className="text-brand-light text-[11px] font-medium hover:brightness-110 cursor-pointer">All apps</button>
+        <Link href="/coming-soon?app=all" onClick={onClose} className="text-brand-light text-[11px] font-medium hover:brightness-110">All apps</Link>
       </div>
       <div className="grid grid-cols-3 gap-3 px-5 py-2">
         {APPS.map((app) => (
-          <button
+          <Link
             key={app.letter}
-            onClick={() => navigate(app.route)}
-            className="flex flex-col items-center gap-1.5 w-16 h-16 rounded-[16px] border border-border bg-transparent hover:brightness-125 transition-[brightness] duration-150 cursor-pointer"
+            href={app.route}
+            onClick={onClose}
+            className="flex flex-col items-center gap-1.5 w-16 h-16 rounded-[16px] border border-border bg-transparent hover:brightness-125 transition-[brightness] duration-150"
           >
             <div
               className="w-10 h-10 rounded-[11px] flex items-center justify-center mt-1.5"
@@ -70,7 +65,7 @@ export default function AppSwitcher({ onClose }: { onClose: () => void }) {
               </span>
             </div>
             <span className="text-text-secondary text-[10px] font-medium">{app.name}</span>
-          </button>
+          </Link>
         ))}
       </div>
       <p className="text-text-tertiary text-[10px] text-center mt-1 px-5">

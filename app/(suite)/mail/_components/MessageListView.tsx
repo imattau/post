@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useState, useMemo, useRef } from "react";
+import { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import { useVirtualizer, measureElement } from "@tanstack/react-virtual";
 import { Search, Inbox, SearchX } from "lucide-react";
 import type { MockMessage } from "@/lib/mock/threads";
@@ -47,7 +47,13 @@ export default function MessageListView({
   const selectedId = searchParams.get("c");
   const effectiveSelectedId = selectedId ?? messages[0]?.id ?? null;
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("Primary");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelection, setBatchSelection] = useState<Set<string>>(new Set());
 
@@ -70,12 +76,15 @@ export default function MessageListView({
   const batchMarkRead = useMessagesStore((s) => s.markRead);
   const batchMarkUnread = useMessagesStore((s) => s.markUnread);
 
+  const batchSelectionRef = useRef(batchSelection);
+  batchSelectionRef.current = batchSelection;
+
   const performBatchAction = useCallback(async (action: (id: string) => Promise<void>) => {
-    for (const id of batchSelection) {
+    for (const id of batchSelectionRef.current) {
       await action(id);
     }
     setBatchSelection(new Set());
-  }, [batchSelection]);
+  }, []);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -96,8 +105,8 @@ export default function MessageListView({
     else if (activeFilter === "Starred") result = result.filter((m) => m.starred);
     else if (activeFilter === "Attachments") result = result.filter((m) => m.attachments.length > 0);
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase();
       result = result.filter(
         (m) =>
           m.subject.toLowerCase().includes(q) ||
@@ -106,7 +115,7 @@ export default function MessageListView({
       );
     }
     return result;
-  }, [messages, activeFilter, searchQuery]);
+  }, [messages, activeFilter, debouncedQuery]);
 
   const virtualizer = useVirtualizer({
     count: filtered.length,
@@ -173,29 +182,32 @@ export default function MessageListView({
           Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
         ) : filtered.length > 0 ? (
           <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-            {virtualizer.getVirtualItems().map((virtualItem) => (
-              <div
-                key={virtualItem.key}
-                ref={virtualizer.measureElement}
-                data-index={virtualItem.index}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${virtualItem.start}px)`,
-                }}
-              >
-                <MessageRow
-                  message={filtered[virtualItem.index]}
-                  selected={effectiveSelectedId === filtered[virtualItem.index].id}
-                  onClick={() => handleSelect(filtered[virtualItem.index].id)}
-                  batchMode={batchMode}
-                  batchSelected={batchSelection.has(filtered[virtualItem.index].id)}
-                  onBatchToggle={() => handleBatchToggle(filtered[virtualItem.index].id)}
-                />
-              </div>
-            ))}
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const message = filtered[virtualItem.index];
+              return (
+                <div
+                  key={virtualItem.key}
+                  ref={virtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  <MessageRow
+                    message={message}
+                    selected={effectiveSelectedId === message.id}
+                    onClick={() => handleSelect(message.id)}
+                    batchMode={batchMode}
+                    batchSelected={batchSelection.has(message.id)}
+                    onBatchToggle={() => handleBatchToggle(message.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
         ) : messages.length === 0 ? (
           <EmptyState icon={<Inbox size={32} />} title="No messages yet" description="Start by composing a new message." />

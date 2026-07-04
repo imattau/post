@@ -3,7 +3,7 @@ import { useLabelsStore } from "@/lib/stores/labels";
 import { useProfilesStore } from "@/lib/stores/profiles";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useIdentityStore } from "@/lib/stores/identity";
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useRef } from "react";
 import type { MockMessage, MockContact } from "@/lib/mock/threads";
 import type { AttachmentRef, Draft } from "@/lib/types";
 import type { Message, Profile } from "@post/nostr-core";
@@ -60,14 +60,20 @@ export function useMailboxMessages(mailbox: string): {
     return () => { active = false; };
   }, [mailbox, draftVersion]);
 
+  const fetchedPubkeysRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (ids.length > 0) {
       const msgs = ids.map((id) => byId[id]).filter(Boolean);
       const pubkeys = msgs.flatMap((m) => [m!.pubkey, m!.recipientPubkey]);
       const unique = [...new Set(pubkeys)];
-      batchFetchProfiles(unique);
+      const uncached = unique.filter((pk) => !fetchedPubkeysRef.current.has(pk));
+      if (uncached.length > 0) {
+        for (const pk of uncached) fetchedPubkeysRef.current.add(pk);
+        batchFetchProfiles(uncached);
+      }
     }
-  }, [ids, byId, batchFetchProfiles]);
+  }, [ids, batchFetchProfiles]);
 
   return useMemo(() => {
     if (mailbox === "drafts") {
@@ -156,7 +162,6 @@ export function realToMock(
     kind: real.kind,
     pubkey: real.pubkey,
     recipientPubkey: real.recipientPubkey,
-    raw: real.raw,
     tags: real.tags,
     snoozedUntil: real.snoozedUntil,
     mailbox: real.mailbox,
