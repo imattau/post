@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { useCalendarStore } from "@/lib/stores/calendar";
-import CalendarPageFrame from "../_components/CalendarPageFrame";
 import { addDays, formatMonthDay, formatTimeRange, isSameDay, monthLabel, startOfWeekMonday } from "@/lib/calendar";
+import CalendarPageFrame from "../_components/CalendarPageFrame";
 import CalendarViewControls from "../_components/CalendarViewControls";
+import CalendarEventPill from "../_components/CalendarEventPill";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function CalendarWeekPage() {
-  const { activeMonth, events, calendars, load, previousMonth, nextMonth, goToToday } = useCalendarStore();
+  const { activeMonth, events, calendars, load, previousWeek, nextWeek, goToToday } = useCalendarStore();
 
   useEffect(() => {
     void load();
@@ -36,7 +37,7 @@ export default function CalendarWeekPage() {
       activeNav="week"
       title={monthLabel(activeMonth)}
       subtitle="Seven-day overview of events across your calendars."
-      headerActions={<CalendarViewControls activeView="week" onToday={goToToday} onPrevious={previousMonth} onNext={nextMonth} />}
+      headerActions={<CalendarViewControls activeView="week" onToday={goToToday} onPrevious={previousWeek} onNext={nextWeek} />}
     >
       <div className="mt-5 overflow-hidden rounded-[16px] border border-border shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
         <div className="grid grid-cols-7 border-b border-border bg-[#121721] text-[11px] text-text-tertiary">
@@ -69,15 +70,13 @@ export default function CalendarWeekPage() {
                       <Link
                         key={event.id}
                         href={`/calendar/events/${event.id}`}
-                        className="block rounded-[12px] border border-white/5 border-l-[3px] px-3 py-3 no-underline shadow-[0_10px_18px_rgba(0,0,0,0.12)] transition-transform hover:-translate-y-[1px]"
-                        style={{
-                          backgroundColor: "rgba(34, 28, 50, 0.9)",
-                          borderLeftColor: calendar?.color ?? "var(--color-brand)",
-                        }}
+                        className="block no-underline"
                       >
-                        <p className="text-[12px] font-medium text-white">{event.title}</p>
-                        <p className="mt-1 text-[10px] text-text-secondary">{formatTimeRange(event.startAt, event.endAt)}</p>
-                        <p className="mt-2 text-[10px] text-text-tertiary">{calendar?.name ?? "Calendar"}</p>
+                        <CalendarEventPill
+                          title={event.title}
+                          subtitle={formatTimeRange(event.startAt, event.endAt)}
+                          color={calendar?.color ?? "var(--color-brand)"}
+                        />
                       </Link>
                     );
                   })}

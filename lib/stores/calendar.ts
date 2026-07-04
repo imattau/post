@@ -11,6 +11,7 @@ interface CalendarState {
   selectedEventId: string | null;
   viewMode: CalendarViewMode;
   loading: boolean;
+  error: string | null;
   load: () => Promise<void>;
   selectDate: (date: Date) => void;
   selectEvent: (eventId: string | null) => void;
@@ -19,6 +20,8 @@ interface CalendarState {
   goToToday: () => void;
   previousMonth: () => void;
   nextMonth: () => void;
+  previousWeek: () => void;
+  nextWeek: () => void;
   toggleCalendar: (calendarId: string) => Promise<void>;
   createEvent: (event: Omit<CalendarEvent, "id"> & { id?: string }) => Promise<CalendarEvent>;
   updateEvent: (eventId: string, patch: Partial<CalendarEvent>) => Promise<void>;
@@ -39,32 +42,37 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   selectedEventId: "suite-planning",
   viewMode: "month",
   loading: false,
+  error: null,
 
   async load() {
-    set({ loading: true });
-    const { db } = await import("@/lib/db/schema");
-    const [calendarCount, eventCount] = await Promise.all([
-      db.calendarCalendars.count(),
-      db.calendarEvents.count(),
-    ]);
+    set({ loading: true, error: null });
+    try {
+      const { db } = await import("@/lib/db/schema");
+      const [calendarCount, eventCount] = await Promise.all([
+        db.calendarCalendars.count(),
+        db.calendarEvents.count(),
+      ]);
 
-    if (calendarCount === 0) {
-      await db.calendarCalendars.bulkPut(CALENDARS);
-    }
-    if (eventCount === 0) {
-      await db.calendarEvents.bulkPut(CALENDAR_EVENTS);
-    }
+      if (calendarCount === 0) {
+        await db.calendarCalendars.bulkPut(CALENDARS);
+      }
+      if (eventCount === 0) {
+        await db.calendarEvents.bulkPut(CALENDAR_EVENTS);
+      }
 
-    const [calendars, events] = await Promise.all([
-      db.calendarCalendars.toArray(),
-      db.calendarEvents.toArray(),
-    ]);
-    set({
-      calendars,
-      events,
-      loading: false,
-      selectedEventId: get().selectedEventId ?? events[0]?.id ?? null,
-    });
+      const [calendars, events] = await Promise.all([
+        db.calendarCalendars.toArray(),
+        db.calendarEvents.toArray(),
+      ]);
+      set({
+        calendars,
+        events,
+        loading: false,
+        selectedEventId: get().selectedEventId ?? events[0]?.id ?? null,
+      });
+    } catch (err) {
+      set({ loading: false, error: err instanceof Error ? err.message : "Failed to load calendar data" });
+    }
   },
 
   selectDate(date) {
@@ -98,56 +106,94 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     set({ activeMonth: new Date(current.getFullYear(), current.getMonth() + 1, 1) });
   },
 
+  previousWeek() {
+    const current = get().activeMonth;
+    set({ activeMonth: new Date(current.getFullYear(), current.getMonth(), current.getDate() - 7) });
+  },
+
+  nextWeek() {
+    const current = get().activeMonth;
+    set({ activeMonth: new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7) });
+  },
+
   async toggleCalendar(calendarId) {
-    const calendars = get().calendars.map((calendar) =>
-      calendar.id === calendarId ? { ...calendar, enabled: !calendar.enabled } : calendar
-    );
-    set({ calendars });
-    const { db } = await import("@/lib/db/schema");
-    const updated = calendars.find((calendar) => calendar.id === calendarId);
-    if (updated) {
-      await db.calendarCalendars.put(updated);
+    set({ error: null });
+    try {
+      const calendars = get().calendars.map((calendar) =>
+        calendar.id === calendarId ? { ...calendar, enabled: !calendar.enabled } : calendar
+      );
+      set({ calendars });
+      const { db } = await import("@/lib/db/schema");
+      const updated = calendars.find((calendar) => calendar.id === calendarId);
+      if (updated) {
+        await db.calendarCalendars.put(updated);
+      }
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to toggle calendar" });
     }
   },
 
   async createEvent(event) {
-    const created: CalendarEvent = {
-      ...event,
-      id: event.id ?? crypto.randomUUID(),
-    };
-    const events = [...get().events, created].sort((a, b) => a.startAt - b.startAt);
-    set({ events, selectedEventId: created.id });
-    const { db } = await import("@/lib/db/schema");
-    await db.calendarEvents.put(created);
-    return created;
+    set({ error: null });
+    try {
+      const created: CalendarEvent = {
+        ...event,
+        id: event.id ?? crypto.randomUUID(),
+      };
+      const events = [...get().events, created].sort((a, b) => a.startAt - b.startAt);
+      set({ events, selectedEventId: created.id });
+      const { db } = await import("@/lib/db/schema");
+      await db.calendarEvents.put(created);
+      return created;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to create event" });
+      throw err;
+    }
   },
 
   async updateEvent(eventId, patch) {
-    const events = get().events.map((event) => (event.id === eventId ? { ...event, ...patch } : event));
-    set({ events });
-    const updated = events.find((event) => event.id === eventId);
-    if (!updated) return;
-    const { db } = await import("@/lib/db/schema");
-    await db.calendarEvents.put(updated);
+    set({ error: null });
+    try {
+      const events = get().events.map((event) => (event.id === eventId ? { ...event, ...patch } : event));
+      set({ events });
+      const updated = events.find((event) => event.id === eventId);
+      if (!updated) return;
+      const { db } = await import("@/lib/db/schema");
+      await db.calendarEvents.put(updated);
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to update event" });
+    }
   },
 
   async deleteEvent(eventId) {
-    const events = get().events.filter((event) => event.id !== eventId);
-    set({ events, selectedEventId: get().selectedEventId === eventId ? null : get().selectedEventId });
-    const { db } = await import("@/lib/db/schema");
-    await db.calendarEvents.delete(eventId);
+    set({ error: null });
+    try {
+      const events = get().events.filter((event) => event.id !== eventId);
+      set({ events, selectedEventId: get().selectedEventId === eventId ? null : get().selectedEventId });
+      const { db } = await import("@/lib/db/schema");
+      await db.calendarEvents.delete(eventId);
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to delete event" });
+    }
   },
 
   async duplicateEvent(eventId) {
-    const source = get().events.find((event) => event.id === eventId);
-    if (!source) return null;
-    const copy = await get().createEvent({
-      ...source,
-      title: `${source.title} copy`,
-      startAt: source.startAt + 3_600_000,
-      endAt: source.endAt + 3_600_000,
-      guests: source.guests ? source.guests.map((guest) => ({ ...guest })) : undefined,
-    });
-    return copy;
+    set({ error: null });
+    try {
+      const source = get().events.find((event) => event.id === eventId);
+      if (!source) return null;
+      const { id: _originalId, ...sourceData } = source;
+      const copy = await get().createEvent({
+        ...sourceData,
+        title: `${source.title} copy`,
+        startAt: source.startAt + 3_600_000,
+        endAt: source.endAt + 3_600_000,
+        guests: source.guests ? source.guests.map((guest) => ({ ...guest })) : undefined,
+      });
+      return copy;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to duplicate event" });
+      return null;
+    }
   },
 }));
