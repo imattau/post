@@ -11,12 +11,26 @@ export function isTauri(): boolean {
   return typeof window !== "undefined" && !!window.__TAURI__;
 }
 
+async function getOrCreateVaultPassword(): Promise<string> {
+  if (!isTauri()) throw new Error("Not in Tauri environment");
+  const { Store } = await import("@tauri-apps/plugin-store");
+  const store = await (Store.load("post-vault.json") as Promise<any>);
+  const existing = await store.get("vault-password") as string | null;
+  if (existing) return existing;
+  const password = crypto.randomUUID();
+  await store.set("vault-password", password);
+  await store.save();
+  return password;
+}
+
 async function getStrongholdStore() {
+  if (!isTauri()) throw new Error("Not in Tauri environment");
   const { Stronghold } = await import("@tauri-apps/plugin-stronghold");
   const { appDataDir } = await import("@tauri-apps/api/path");
 
+  const vaultPassword = await getOrCreateVaultPassword();
   const vaultPath = `${await appDataDir()}/post-vault.hold`;
-  const stronghold = await Stronghold.load(vaultPath, "post-vault-password");
+  const stronghold = await Stronghold.load(vaultPath, vaultPassword);
 
   let client;
   try {
@@ -48,7 +62,7 @@ export function createTauriKeyStore(): KeyStore {
     save(identity: Identity): void {
       cached = identity;
       try {
-        localStorage.setItem(SESSION_KEY, JSON.stringify(identity));
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ ...identity, nsec: null }));
       } catch {}
       if (identity.nsec) {
         getStrongholdStore().then(({ stronghold, store }) => {
