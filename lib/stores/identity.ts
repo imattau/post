@@ -62,6 +62,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
 
   setIdentity(identity: Identity) {
     const keyStore = getKeyStore();
+    keyStore.save(identity);
     set({ identity, keyStore, isNewUser: false });
   },
 
@@ -212,9 +213,11 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
     const { useProfilesStore } = await import("@/lib/stores/profiles");
     const profile = await useProfilesStore.getState().fetchProfile(identity.pubkey);
     if (profile) {
-      set((state) => ({
-        identity: state.identity ? { ...state.identity, profile, nip05: profile.nip05 ?? null } : null,
-      }));
+      set((state) => {
+        const updated = state.identity ? { ...state.identity, profile, nip05: profile.nip05 ?? null } : null;
+        if (updated) get().keyStore?.save(updated);
+        return { identity: updated };
+      });
     }
   },
 
@@ -283,8 +286,8 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
 
     await pool.publish(signedEvent);
 
-    set((state) => ({
-      identity: state.identity ? {
+    set((state) => {
+      const updated = state.identity ? {
         ...state.identity,
         profile: {
           name: profileData.username,
@@ -297,9 +300,10 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
           lud06: "",
           lud16: "",
         },
-      } : null,
-      isNewUser: false,
-    }));
+      } : null;
+      if (updated) get().keyStore?.save(updated);
+      return { identity: updated, isNewUser: false };
+    });
   },
 
   getSigner: () => {
