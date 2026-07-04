@@ -1,5 +1,5 @@
 import type { MockMessage } from "@/lib/mock/threads";
-import { Check, CheckCheck, X } from "lucide-react";
+import { Check, CheckCheck, X, Reply } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import Avatar from "./Avatar";
 
@@ -43,7 +43,10 @@ export default function MessageRow({
           </div>
         </div>
       ) : (
-        <Avatar initials={message.sender.avatarInitials} size={40} />
+        <div className="relative flex-shrink-0">
+          <Avatar initials={message.sender.avatarInitials} size={40} />
+          {message.replyTo && <Reply size={10} className="absolute -bottom-0.5 -right-0.5 text-text-tertiary bg-sidebar rounded-full" />}
+        </div>
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

@@ -41,8 +41,8 @@ export default function LabelPage() {
   return (
     <MessageListView
       messages={messages}
-      title={label?.name ?? "Label"}
-      subtitle={`${messages.length} messages`}
+      title={label?.name ?? "Label not found"}
+      subtitle={label ? `${messages.length} messages` : "This label may have been deleted."}
     />
   );
 }

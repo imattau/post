@@ -33,6 +33,7 @@ export interface MockMessage {
   relayCount: number;
   threadLength: number;
   deliveryStatus?: "pending" | "sent" | "delivered" | "failed";
+  replyTo?: string | null;
 }
 
 const now = Date.now();

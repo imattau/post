@@ -164,5 +164,6 @@ export function realToMock(
     relayCount: real.relayUrls?.length ?? 3,
     threadLength: 1,
     deliveryStatus: (real as any).deliveryStatus as MockMessage["deliveryStatus"],
+    replyTo: (real as any).replyTo as string | null | undefined,
   };
 }
