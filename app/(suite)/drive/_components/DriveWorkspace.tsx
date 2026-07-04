@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";
@@ -98,6 +98,7 @@ function labelForKind(kind: DriveFile["fileKind"]): string {
     case "markdown": return "Markdown";
     case "json": return "JSON";
     case "image": return "Image";
+    case "document": return "Document";
     default: return "File";
   }
 }
@@ -182,9 +183,12 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const [renameFileId, setRenameFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [shareFile, setShareFile] = useState<DriveFile | null>(null);
-  const [searchInput, setSearchInput] = useState(query);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const blobParam = searchParams.get("blob");
+  const queryParam = searchParams.get("q");
+  const [searchInput, setSearchInput] = useState(queryParam ?? query);
   const meta = SCREEN_META[screen];
 
   useEffect(() => { void load(); }, [load]);
@@ -196,16 +200,28 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   }, [screen, selectedFolderId, selectFolder, clearFileSelection]);
 
   useEffect(() => {
-    if (blobParam && files.length > 0) {
-      const match = files.find((f) => f.sha256 === blobParam);
+    if (blobParam) {
+      const state = useDriveStore.getState();
+      const screenFiles = getVisibleDriveFiles(state, screen);
+      const match = screenFiles.find((f) => f.sha256 === blobParam);
       if (match) selectFile(match.id);
     }
-  }, [blobParam, files, selectFile]);
+  }, [blobParam, screen, selectFile]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setQuery(searchInput), 300);
+    const timer = setTimeout(() => {
+      setQuery(searchInput);
+      const params = new URLSearchParams(searchParams.toString());
+      if (searchInput.trim()) {
+        params.set("q", searchInput.trim());
+      } else {
+        params.delete("q");
+      }
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+      router.replace(newUrl, { scroll: false });
+    }, 300);
     return () => clearTimeout(timer);
-  }, [searchInput, setQuery]);
+  }, [searchInput, setQuery, searchParams, pathname, router]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -539,6 +555,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             if (e.key === "Escape") { setBlossomUrlInput(blossomUrl); setEditingBlossomUrl(false); }
           }}
           onChooseFiles={handleChooseFiles}
+          identity={identity}
         />
 
         <main className="flex min-h-0 flex-col overflow-hidden bg-canvas px-6 pt-[22px] pb-5">
@@ -723,7 +740,37 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
           </aside>
         )}
       </div>
-      {loading && <div className="sr-only">Loading Drive</div>}
+      {loading && files.length === 0 && (
+        <div className="grid min-h-0 flex-1 grid-cols-[248px_minmax(0,1fr)_352px] divide-x divide-border">
+          <div className="animate-pulse bg-sidebar px-6 pt-[25px]">
+            <div className="mb-4 h-[22px] w-16 rounded bg-pill-subtle" />
+            <div className="mb-6 h-[11px] w-40 rounded bg-pill-subtle" />
+            <div className="mb-4 h-12 w-[200px] rounded-pill bg-pill-subtle" />
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-[24px] w-full rounded-[10px] bg-pill-subtle" />
+              ))}
+            </div>
+          </div>
+          <div className="animate-pulse bg-canvas px-6 pt-[22px]">
+            <div className="mb-4 h-[28px] w-32 rounded bg-pill-subtle" />
+            <div className="mb-6 h-[42px] w-full rounded-pill bg-pill-subtle" />
+            <div className="space-y-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-[52px] w-full rounded-[10px] bg-pill-subtle" />
+              ))}
+            </div>
+          </div>
+          <div className="animate-pulse bg-dock px-6 pt-[22px]">
+            <div className="mb-4 h-[20px] w-20 rounded bg-pill-subtle" />
+            <div className="mb-4 h-[174px] w-full rounded-[12px] bg-pill-subtle" />
+            <div className="space-y-3">
+              <div className="h-[14px] w-3/4 rounded bg-pill-subtle" />
+              <div className="h-[11px] w-1/2 rounded bg-pill-subtle" />
+            </div>
+          </div>
+        </div>
+      )}
       {shareFile && (
         <ShareDialog file={shareFile} onClose={() => setShareFile(null)}
           onUpdate={(sharedWith) => updateSharedWith(shareFile.id, sharedWith)} />

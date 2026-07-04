@@ -125,6 +125,8 @@ function colorForKind(kind: DriveFileKind): string {
       return "var(--color-pill-subtle)";
     case "image":
       return "var(--color-info)";
+    case "document":
+      return "var(--color-ok)";
     default:
       return "var(--color-text-secondary)";
   }

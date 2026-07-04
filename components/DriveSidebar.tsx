@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@base-ui/react/progress";
 import { Folder, Clock, Star, Share2, CloudOff, Paperclip, Trash2, Plus, ChevronDown } from "lucide-react";
 import type { DriveScreen } from "@/lib/types";
+import type { Identity } from "@post/nostr-core";
+
+function identityInitials(identity: Identity | null): string {
+  if (!identity) return "?";
+  const name = identity.profile?.displayName ?? identity.profile?.name ?? "";
+  if (name.length >= 2) return name.slice(0, 2).toUpperCase();
+  return identity.pubkey.slice(0, 2).toUpperCase();
+}
 
 interface DriveSidebarProps {
   screen: DriveScreen;
@@ -22,6 +30,7 @@ interface DriveSidebarProps {
   onCancelEditBlossom: () => void;
   onBlossomKeyDown: (e: React.KeyboardEvent) => void;
   onChooseFiles: () => void;
+  identity: Identity | null;
 }
 
 const NAV_ITEMS: Array<{ icon: React.ReactNode; label: string; screen?: DriveScreen; href: string }> = [
@@ -57,6 +66,7 @@ export default function DriveSidebar({
   onCancelEditBlossom,
   onBlossomKeyDown,
   onChooseFiles,
+  identity,
 }: DriveSidebarProps) {
   return (
     <aside className="flex min-h-0 flex-col overflow-y-auto bg-sidebar px-6 pt-[25px] pb-4">
@@ -152,7 +162,7 @@ export default function DriveSidebar({
 
       <div className="mt-auto pt-4">
         <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full p-0">
-          <Avatar initials="MT" size={36} />
+          <Avatar initials={identityInitials(identity)} size={36} />
           <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-[1.5px] border-dock bg-ok" />
         </Button>
       </div>

@@ -54,8 +54,7 @@ export default function UploadProgress({
         style={{ backgroundColor: "rgba(5, 7, 11, 0.35)" }}
       />
       <div
-        className="fixed z-50 rounded-[18px] border border-border bg-dock shadow-lg"
-        style={{ width: 500, height: 340, left: 886, top: 594 }}
+        className="fixed left-1/2 top-1/2 z-50 w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-border bg-dock shadow-lg"
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-2">
           <span className="text-[16px] font-semibold text-text-modal">

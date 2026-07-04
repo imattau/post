@@ -135,7 +135,7 @@ export default function DrivePreview({
               year: "numeric",
             })}
           />
-          <DetailRow label="Storage" value={file.sharedWith.length > 0 ? `${file.sharedWith.length} replicas` : "3 replicas"} />
+          <DetailRow label="Storage" value={file.sharedWith.length > 0 ? `${file.sharedWith.length} replicas` : "1 provider"} />
           <DetailRow label="Access" value={file.trashed ? "In trash" : file.storedInDrive ? "Private" : "Shared"} />
         </div>
       </div>
@@ -187,8 +187,7 @@ export default function DrivePreview({
             {file.offlineAvailable ? "Available offline" : "Offline unavailable"}
           </p>
         </div>
-        <p className="mt-2 text-[10px] text-text-tertiary">Synced across 3 providers and this device.</p>
-        <p className="mt-3 text-[10px] font-medium text-ok">Last verified 18 sec ago</p>
+        <p className="mt-2 text-[10px] text-text-tertiary">Stored on Blossom server and available on this device.</p>
       </div>
 
       <div className="mt-3 flex gap-2">
