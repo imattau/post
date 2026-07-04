@@ -3,9 +3,10 @@ import type { DriveFile, DriveFolder } from "@/lib/types";
 
 export async function syncDriveFromRelays(
   pool: RelayPool,
-  pubkey: string
+  pubkey: string,
+  sk?: Uint8Array
 ): Promise<{ files: DriveFile[]; folders: DriveFolder[] }> {
-  const { parseFileMetadataEvent, parseFolderEvent } = await import("@post/nostr-core");
+  const { parseFileMetadataEvent, parseFolderEvent, decryptContentForOwner } = await import("@post/nostr-core");
   const { db } = await import("@/lib/db/schema");
 
   const [fileEvents, folderEvents] = await Promise.all([
@@ -19,6 +20,13 @@ export async function syncDriveFromRelays(
 
   for (const event of fileEvents) {
     const file = parseFileMetadataEvent(event);
+    if (event.tags.some((t) => t[0] === "content-encryption") && sk) {
+      try {
+        file.name = decryptContentForOwner(event.content, sk);
+      } catch {
+        // Keep placeholder name
+      }
+    }
     if (!existingFileIds.has(file.id)) {
       newFiles.push(file);
     }
@@ -34,6 +42,13 @@ export async function syncDriveFromRelays(
 
   for (const event of folderEvents) {
     const folder = parseFolderEvent(event);
+    if (event.tags.some((t) => t[0] === "content-encryption") && sk) {
+      try {
+        folder.name = decryptContentForOwner(event.content, sk);
+      } catch {
+        // Keep placeholder name
+      }
+    }
     if (!existingFolderIds.has(folder.id)) {
       newFolders.push(folder);
     }

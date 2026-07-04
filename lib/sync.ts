@@ -1,5 +1,5 @@
 import type { RelayPool } from "@post/nostr-core";
-import { decryptEvent } from "@post/nostr-core";
+import { decryptEvent, createKeyStore } from "@post/nostr-core";
 import type { Message } from "@post/nostr-core";
 import { db } from "./db/schema";
 import { useMessagesStore } from "./stores/messages";
@@ -100,14 +100,8 @@ export function startSync() {
   const pool = useRelaysStore.getState().pool;
   if (!pool) return;
 
-  const identity = (() => {
-    try {
-      const raw = localStorage.getItem("nostr-identity");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  })();
+  const keyStore = createKeyStore();
+  const identity = keyStore.load();
 
   if (!identity?.pubkey) return;
 

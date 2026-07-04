@@ -1,3 +1,5 @@
+import { nip44 } from "nostr-tools";
+import { getPublicKey } from "nostr-tools/pure";
 import { decode } from "nostr-tools/nip19";
 import type { Identity, EncryptedBlobMetadata, DriveFile, DriveFolder } from "./types";
 
@@ -96,6 +98,18 @@ export function isDriveEncryptionAvailable(identity: Identity | null): boolean {
   return !!identity?.nsec;
 }
 
+export function encryptContentForOwner(content: string, sk: Uint8Array): string {
+  const pubkey = getPublicKey(sk);
+  const conversationKey = nip44.v2.utils.getConversationKey(sk, pubkey);
+  return nip44.v2.encrypt(content, conversationKey);
+}
+
+export function decryptContentForOwner(content: string, sk: Uint8Array): string {
+  const pubkey = getPublicKey(sk);
+  const conversationKey = nip44.v2.utils.getConversationKey(sk, pubkey);
+  return nip44.v2.decrypt(content, conversationKey);
+}
+
 export function createFileMetadataEvent(file: DriveFile): {
   kind: 1063;
   tags: string[][];
@@ -157,9 +171,10 @@ export function parseFileMetadataEvent(event: {
   const sizeStr = tagValue(event.tags, "size") ?? "0";
   const folderId = tagValue(event.tags, "folder") ?? null;
   const encrypted = tagValue(event.tags, "encrypted") === "true";
+  const contentEncrypted = tagValue(event.tags, "content-encryption") != null;
   const createdAt = event.created_at * 1000;
 
-  const name = event.content || sha256 || "Untitled";
+  const name = encrypted && contentEncrypted ? "Encrypted file" : (event.content || sha256 || "Untitled");
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
 
   return {
@@ -200,7 +215,8 @@ export function parseFolderEvent(event: {
   created_at: number;
 }): DriveFolder {
   const d = tagValue(event.tags, "d") ?? event.id;
-  const title = tagValue(event.tags, "title") ?? event.content;
+  const contentEncrypted = tagValue(event.tags, "content-encryption") != null;
+  const title = contentEncrypted ? "Encrypted folder" : (tagValue(event.tags, "title") ?? event.content);
   const parentId = tagValue(event.tags, "parent") ?? null;
 
   return {

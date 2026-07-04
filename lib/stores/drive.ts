@@ -615,7 +615,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
 
 async function publishFileMetadataEvent(file: DriveFile, sk: Uint8Array): Promise<void> {
   try {
-    const { createFileMetadataEvent } = await import("@post/nostr-core");
+    const { createFileMetadataEvent, encryptContentForOwner } = await import("@post/nostr-core");
     const { finalizeEvent } = await import("nostr-tools/pure");
     const { useRelaysStore } = await import("@/lib/stores/relays");
 
@@ -623,6 +623,12 @@ async function publishFileMetadataEvent(file: DriveFile, sk: Uint8Array): Promis
     if (!pool) return;
 
     const eventTemplate = createFileMetadataEvent(file);
+
+    if (file.encrypted) {
+      eventTemplate.content = encryptContentForOwner(eventTemplate.content, sk);
+      eventTemplate.tags.push(["content-encryption", "nip44-v2"]);
+    }
+
     const signedEvent = finalizeEvent(eventTemplate, sk);
     await pool.publish(signedEvent);
   } catch {
@@ -632,7 +638,7 @@ async function publishFileMetadataEvent(file: DriveFile, sk: Uint8Array): Promis
 
 async function publishFolderEvent(folder: DriveFolder): Promise<void> {
   try {
-    const { createFolderEvent } = await import("@post/nostr-core");
+    const { createFolderEvent, encryptContentForOwner } = await import("@post/nostr-core");
     const { finalizeEvent } = await import("nostr-tools/pure");
     const { useIdentityStore } = await import("@/lib/stores/identity");
     const { useRelaysStore } = await import("@/lib/stores/relays");
@@ -647,6 +653,14 @@ async function publishFolderEvent(folder: DriveFolder): Promise<void> {
     const sk = decoded.data;
 
     const eventTemplate = createFolderEvent(folder);
+
+    const encryptedContent = encryptContentForOwner(eventTemplate.content, sk);
+    eventTemplate.content = encryptedContent;
+    // Replace plaintext title tag with encrypted content
+    const titleIdx = eventTemplate.tags.findIndex((t) => t[0] === "title");
+    if (titleIdx >= 0) eventTemplate.tags[titleIdx] = ["title", encryptedContent];
+    eventTemplate.tags.push(["content-encryption", "nip44-v2"]);
+
     const signedEvent = finalizeEvent(eventTemplate, sk);
     await pool.publish(signedEvent);
   } catch {
@@ -664,7 +678,14 @@ async function syncFromRelays(): Promise<void> {
     const identity = useIdentityStore.getState().identity;
     if (!pool || !identity?.pubkey) return;
 
-    const { files, folders } = await syncDriveFromRelays(pool, identity.pubkey);
+    let sk: Uint8Array | undefined;
+    if (identity?.nsec) {
+      const { decode } = await import("nostr-tools/nip19");
+      const decoded = decode(identity.nsec);
+      if (decoded.type === "nsec") sk = decoded.data;
+    }
+
+    const { files, folders } = await syncDriveFromRelays(pool, identity.pubkey, sk);
     const countedFolders = folders.map((folder) => ({
       ...folder,
       fileCount: files.filter((file) => file.folderId === folder.id && !file.trashed).length,

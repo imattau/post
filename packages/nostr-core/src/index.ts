@@ -8,4 +8,4 @@ export type { SendOptions, SendResult } from "./messages";
 export { fetchProfile, resolveNip05, searchProfiles, batchFetchProfiles } from "./profiles";
 export { uploadBlob, downloadBlob, deleteBlob } from "./blossom";
 export type { BlossomServer } from "./blossom";
-export { encryptDriveBlob, decryptDriveBlob, isDriveEncryptionAvailable, createFileMetadataEvent, createFolderEvent, parseFileMetadataEvent, parseFolderEvent } from "./drive";
+export { encryptDriveBlob, decryptDriveBlob, isDriveEncryptionAvailable, encryptContentForOwner, decryptContentForOwner, createFileMetadataEvent, createFolderEvent, parseFileMetadataEvent, parseFolderEvent } from "./drive";
