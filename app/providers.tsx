@@ -38,6 +38,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       await loadCachedMessages();
       await useMailboxStore.getState().refreshUnreadCounts();
       await connect();
+      useIdentityStore.getState().refreshProfile();
       startSync();
     })();
   }, [identity]);

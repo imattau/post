@@ -20,7 +20,7 @@ export default function ExistingKeyPage() {
     setError(null);
     try {
       await createOrImport(nsec.trim());
-      router.push("/login/profile-setup");
+      router.push("/mail/inbox");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid nsec");
     } finally {
