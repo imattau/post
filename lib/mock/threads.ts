@@ -32,6 +32,7 @@ export interface MockMessage {
   encrypted: boolean;
   relayCount: number;
   threadLength: number;
+  deliveryStatus?: "pending" | "sent" | "delivered" | "failed";
 }
 
 const now = Date.now();

@@ -62,7 +62,8 @@ export function useMailboxMessages(mailbox: string): {
 
   useEffect(() => {
     if (ids.length > 0) {
-      const pubkeys = ids.map((id) => byId[id]).filter(Boolean).map((m) => m!.pubkey);
+      const msgs = ids.map((id) => byId[id]).filter(Boolean);
+      const pubkeys = msgs.flatMap((m) => [m!.pubkey, m!.recipientPubkey]);
       const unique = [...new Set(pubkeys)];
       batchFetchProfiles(unique);
     }
@@ -97,7 +98,7 @@ export function useMailboxMessages(mailbox: string): {
         })
         .sort((a, b) => b.createdAt - a.createdAt);
 
-      const asMock = filtered.map((m) => realToMock(m, labels, profiles));
+      const asMock = filtered.map((m) => realToMock(m, labels, profiles, myPubkey));
       return {
         messages: asMock,
         unreadCount: filtered.filter((m) => !m.read).length,
@@ -123,28 +124,34 @@ export function realToMock(
     attachments?: AttachmentRef[];
     isEncrypted?: boolean;
     relayUrls?: string[];
+    deliveryStatus?: string;
   },
   labels: Record<string, { name: string }> = {},
-  profiles: Record<string, Profile> = {}
+  profiles: Record<string, Profile> = {},
+  myPubkey: string | null = null
 ): MockMessage {
-  const profile = profiles[real.pubkey];
-  const displayName = profile?.name || profile?.displayName || real.pubkey.slice(0, 8);
+  const isSent = myPubkey !== null && real.pubkey === myPubkey;
+  const targetPubkey = isSent ? (real.recipientPubkey ?? real.pubkey) : real.pubkey;
+  const profile = profiles[targetPubkey];
+  const displayName = profile?.name || profile?.displayName || targetPubkey.slice(0, 8);
   const initials = profile?.name
     ? profile.name.slice(0, 2).toUpperCase()
-    : real.pubkey.slice(0, 2).toUpperCase();
+    : targetPubkey.slice(0, 2).toUpperCase();
 
   const contact: MockContact = {
-    id: real.pubkey,
-    name: displayName,
-    npub: `${real.pubkey.slice(0, 10)}…`,
-    avatarInitials: initials,
-    verified: profile?.nip05 ? true : false,
+    id: targetPubkey,
+    name: isSent ? "Me" : displayName,
+    npub: isSent ? "" : `${targetPubkey.slice(0, 10)}…`,
+    avatarInitials: isSent ? "ME" : initials,
+    verified: isSent ? false : (profile?.nip05 ? true : false),
   };
+
+  const recipientName = isSent ? displayName : "me";
 
   return {
     id: real.id,
     sender: contact,
-    recipientName: "me",
+    recipientName,
     subject: real.subject || "(no subject)",
     preview: real.preview || real.content.slice(0, 120),
     body: real.content,
@@ -156,5 +163,6 @@ export function realToMock(
     encrypted: real.isEncrypted ?? true,
     relayCount: real.relayUrls?.length ?? 3,
     threadLength: 1,
+    deliveryStatus: (real as any).deliveryStatus as MockMessage["deliveryStatus"],
   };
 }

@@ -45,6 +45,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const snooze = useMessagesStore((s) => s.snooze);
   const deleteMessage = useMessagesStore((s) => s.deleteMessage);
 
+  const refreshUnreadCounts = useMailboxStore((s) => s.refreshUnreadCounts);
   const relayStatuses = useRelaysStore((s) => s.statuses);
   const healthPercent = useRelaysStore((s) => s.healthPercent);
   const syncedAgo = useRelaysStore((s) => s.syncedAgo);
@@ -126,6 +127,11 @@ export default function MailContent({ children }: { children: React.ReactNode })
     const cleanup = startSnoozeWatcher();
     return cleanup;
   }, [startSnoozeWatcher]);
+
+  const messageCount = useMessagesStore((s) => s.ids.length);
+  useEffect(() => {
+    refreshUnreadCounts();
+  }, [messageCount, refreshUnreadCounts]);
 
   return (
     <>

@@ -1,5 +1,5 @@
 import type { MockMessage } from "@/lib/mock/threads";
-import { Check } from "lucide-react";
+import { Check, CheckCheck, X } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import Avatar from "./Avatar";
 
@@ -57,6 +57,8 @@ export default function MessageRow({
             {message.sender.name}
           </span>
           {!message.read && <div className="w-[7px] h-[7px] rounded-full bg-brand-light flex-shrink-0" />}
+          {message.deliveryStatus === "delivered" && <CheckCheck size={12} className="text-ok flex-shrink-0" />}
+          {message.deliveryStatus === "failed" && <X size={12} className="text-danger flex-shrink-0" />}
           <span className={`ml-auto text-[11px] flex-shrink-0 ${!message.read ? "font-semibold text-white" : "text-text-tertiary"}`}>
             {formatRelativeTime(message.createdAt)}
           </span>
