@@ -106,7 +106,7 @@ export interface DriveUploadJob {
   fileName: string;
   sizeBytes: number;
   progress: number;
-  status: "pending" | "uploading" | "complete" | "failed";
+  status: "pending" | "uploading" | "complete" | "failed" | "cancelled";
   error: string | null;
   fileId: string | null;
 }

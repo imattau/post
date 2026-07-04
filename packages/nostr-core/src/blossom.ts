@@ -15,7 +15,8 @@ export async function uploadBlob(
   server: BlossomServer,
   file: File,
   sk: Uint8Array,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal
 ): Promise<AttachmentRef> {
   const authToken = await nip98.getToken(
     `${server.url}/upload`,
@@ -24,10 +25,18 @@ export async function uploadBlob(
     true
   );
 
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", `${server.url}/upload`);
     xhr.setRequestHeader("Authorization", authToken);
+
+    const onAbort = () => {
+      xhr.abort();
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     if (onProgress) {
       xhr.upload.onprogress = (e) => {
@@ -36,6 +45,7 @@ export async function uploadBlob(
     }
 
     xhr.onload = () => {
+      signal?.removeEventListener("abort", onAbort);
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response = JSON.parse(xhr.responseText);

@@ -17,6 +17,9 @@ import type {
   DriveViewMode,
 } from "@/lib/types";
 
+const uploadAbortControllers = new Map<string, AbortController>();
+const uploadOriginalFiles = new Map<string, File>();
+
 interface DriveState {
   files: DriveFile[];
   folders: DriveFolder[];
@@ -47,6 +50,8 @@ interface DriveState {
   createFolder: (name: string) => Promise<string>;
   enqueueUploads: (files: File[]) => Promise<void>;
   clearUploads: () => void;
+  cancelUpload: (id: string) => void;
+  retryUpload: (id: string) => Promise<void>;
   updateSharedWith: (id: string, sharedWith: string[]) => Promise<void>;
   importAttachment: (attachment: { fileName: string; mimeType: string; sizeBytes: number; sha256: string; url: string; encrypted: boolean }, sourceMessageId?: string) => Promise<string>;
 }
@@ -335,7 +340,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   async enqueueUploads(files) {
     const identity = useIdentityStore.getState().identity;
     const serverUrl = useBlossomStore.getState().serverUrl;
-    const targetFolderId = get().folders[0]?.id ?? null;
+    const targetFolderId = get().selectedFolderId ?? get().folders[0]?.id ?? null;
     const jobs = files.map((file) => ({
       id: crypto.randomUUID(),
       fileName: file.name,
@@ -371,12 +376,19 @@ export const useDriveStore = create<DriveState>((set, get) => ({
 
     for (const [index, file] of files.entries()) {
       const jobId = jobs[index]?.id ?? crypto.randomUUID();
+      uploadOriginalFiles.set(jobId, file);
+
+      const controller = new AbortController();
+      uploadAbortControllers.set(jobId, controller);
+
       set((state) => ({
         uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, status: "uploading" } : job)),
       }));
 
       try {
         const encrypted = await encryptDriveBlob(file, identity);
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+
         set((state) => ({
           uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, progress: 45 } : job)),
         }));
@@ -385,7 +397,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
           set((state) => ({
             uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, progress: Math.max(progress, 45) } : job)),
           }));
-        });
+        }, controller.signal);
         const driveFile = buildFileFromUpload(file, encrypted.ciphertext, ref.url, ref.sha256, targetFolderId);
         const { db } = await import("@/lib/db/schema");
         await db.driveFiles.put({ ...driveFile, encryption: encrypted.metadata, blobUrl: ref.url, sha256: ref.sha256, encryptedBlob: encrypted.ciphertext });
@@ -398,17 +410,52 @@ export const useDriveStore = create<DriveState>((set, get) => ({
           selectedFileId: driveFile.id,
         }));
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Upload failed";
-        set((state) => ({
-          uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, status: "failed", error: message } : job)),
-          error: message,
-        }));
+        if (err instanceof DOMException && err.name === "AbortError") {
+          set((state) => ({
+            uploadJobs: state.uploadJobs.map((job) =>
+              job.id === jobId ? { ...job, status: "cancelled" as const } : job
+            ),
+          }));
+        } else {
+          const message = err instanceof Error ? err.message : "Upload failed";
+          set((state) => ({
+            uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, status: "failed", error: message } : job)),
+            error: message,
+          }));
+        }
+      } finally {
+        uploadAbortControllers.delete(jobId);
       }
     }
   },
 
   clearUploads() {
     set({ uploadJobs: [] });
+  },
+
+  cancelUpload(id) {
+    const controller = uploadAbortControllers.get(id);
+    controller?.abort();
+    uploadAbortControllers.delete(id);
+    uploadOriginalFiles.delete(id);
+    set((state) => ({
+      uploadJobs: state.uploadJobs.map((job) =>
+        job.id === id ? { ...job, status: "cancelled" as const } : job
+      ),
+    }));
+  },
+
+  async retryUpload(id) {
+    const file = uploadOriginalFiles.get(id);
+    if (!file) {
+      set((state) => ({
+        uploadJobs: state.uploadJobs.map((job) =>
+          job.id === id ? { ...job, status: "failed" as const, error: "Original file not available for retry" } : job
+        ),
+      }));
+      return;
+    }
+    await get().enqueueUploads([file]);
   },
 
   async updateSharedWith(id, sharedWith) {

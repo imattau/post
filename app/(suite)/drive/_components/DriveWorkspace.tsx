@@ -153,6 +153,8 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     createFolder,
     enqueueUploads,
     clearUploads,
+    cancelUpload,
+    retryUpload,
     updateSharedWith,
   } = state;
   const identity = useIdentityStore((s) => s.identity);
@@ -310,13 +312,15 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     <UploadProgress
       files={uploadJobs.map((job) => ({
         id: job.id, name: job.fileName, sizeBytes: job.sizeBytes, progress: job.progress,
-        status: job.status === "complete" ? "complete" : job.status === "failed" ? "failed" : job.status === "uploading" ? "uploading" : "pending",
+        status: job.status === "complete" ? "complete" : job.status === "failed" ? "failed" : job.status === "cancelled" ? "cancelled" : job.status === "uploading" ? "uploading" : "pending",
         letter: job.fileName.slice(0, 1).toUpperCase() || "?",
         color: "var(--color-brand)",
       }))}
       totalComplete={uploadJobs.filter((job) => job.status === "complete").length}
       totalCount={uploadJobs.length}
       onHide={clearUploads}
+      onCancel={cancelUpload}
+      onRetry={retryUpload}
     />
   ) : null;
 
