@@ -677,7 +677,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
               <div>
                 <div className="grid grid-cols-[24px_1fr_78px_110px] px-[16px] pb-2 text-[10px] font-semibold text-text-tertiary">
                   <span
-                    onClick={() => selectAllFiles()}
+                    onClick={() => selectAllFiles(screen)}
                     className="cursor-pointer"
                   >
                     {selectedFileIds.length === visibleFiles.length ? "☑" : "☐"}

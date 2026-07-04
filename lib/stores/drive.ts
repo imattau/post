@@ -42,7 +42,7 @@ interface DriveState {
   selectFile: (id: string | null) => void;
   selectFolder: (id: string | null) => void;
   toggleFileSelection: (id: string) => void;
-  selectAllFiles: () => void;
+  selectAllFiles: (screen?: DriveScreen) => void;
   clearFileSelection: () => void;
   setQuery: (query: string) => void;
   setFilter: (filter: DriveFilter) => void;
@@ -282,8 +282,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     }));
   },
 
-  selectAllFiles() {
-    const screen = "my-files";
+  selectAllFiles(screen: DriveScreen = "my-files") {
     const allIds = getVisibleDriveFiles(get(), screen).map((f) => f.id);
     set((state) => ({
       selectedFileIds: state.selectedFileIds.length === allIds.length ? [] : allIds,
