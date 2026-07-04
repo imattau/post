@@ -1,14 +1,30 @@
 "use client";
 
-import type { Message } from "@post/nostr-core";
+import type { Message, Profile } from "@post/nostr-core";
 import { formatRelativeTime } from "@/lib/utils";
+
+function senderName(pubkey: string, profiles: Record<string, Profile>): string {
+  const profile = profiles[pubkey];
+  if (profile?.name) return profile.name;
+  if (profile?.displayName) return profile.displayName;
+  return `${pubkey.slice(0, 12)}…`;
+}
+
+function senderInitials(pubkey: string, profiles: Record<string, Profile>): string {
+  const profile = profiles[pubkey];
+  if (profile?.name) return profile.name.slice(0, 2).toUpperCase();
+  if (profile?.displayName) return profile.displayName.slice(0, 2).toUpperCase();
+  return pubkey.slice(0, 2).toUpperCase();
+}
 
 export default function ThreadView({
   messages,
   onSelect,
+  profiles = {},
 }: {
   messages: Message[];
   onSelect: (id: string) => void;
+  profiles?: Record<string, Profile>;
 }) {
   if (messages.length === 0) return null;
 
@@ -28,13 +44,13 @@ export default function ThreadView({
           >
             <div className="w-8 h-8 rounded-full bg-pill-subtle flex items-center justify-center flex-shrink-0">
               <span className="text-[10px] font-semibold text-text-secondary">
-                {msg.pubkey.slice(0, 2).toUpperCase()}
+                {senderInitials(msg.pubkey, profiles)}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[12px] font-medium text-text-primary truncate">
-                  {msg.pubkey.slice(0, 12)}…
+                  {senderName(msg.pubkey, profiles)}
                 </span>
                 <span className="ml-auto text-[10px] text-text-tertiary flex-shrink-0">
                   {formatRelativeTime(msg.createdAt)}

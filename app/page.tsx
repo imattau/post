@@ -14,7 +14,6 @@ export default function Home() {
     const keyStore = createKeyStore();
     const existing = keyStore.load();
     if (existing) {
-      useIdentityStore.getState().setIdentity(existing);
       router.replace("/mail/inbox");
     } else {
       setChecking(false);

@@ -1,26 +1,26 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Settings", () => {
-  test("settings tabs switch content", async ({ page }) => {
+  test("settings categories switch content", async ({ page }) => {
     await page.goto("/settings");
 
-    // General tab is active by default
-    await expect(page.locator("text=Core behaviour for Post")).toBeVisible();
+    // Account category is active by default, Profile sub-category
+    await expect(page.locator("text=Manage your shared identity and profile")).toBeVisible();
 
-    // Click Identity tab
-    await page.locator("button:has-text('Identity')").click();
-    await expect(page.locator("text=Manage your Nostr identity")).toBeVisible();
+    // Click General category → Compose sub-category
+    await page.locator("button:has-text('General')").first().click();
+    await expect(page.locator("text=Control how new posts and drafts behave")).toBeVisible();
 
-    // Click Relays tab
-    await page.locator("button:has-text('Relays')").click();
-    await expect(page.locator("text=Control how Post discovers")).toBeVisible();
+    // Click Post category → Compose & replies sub-category
+    await page.locator("button:has-text('Post')").first().click();
+    await expect(page.locator("text=Control how new posts, replies and drafts behave")).toBeVisible();
 
-    // Click Privacy tab
-    await page.locator("button:has-text('Privacy')").click();
-    await expect(page.locator("text=Encryption, metadata exposure")).toBeVisible();
+    // Click Notifications category
+    await page.locator("button:has-text('Notifications')").first().click();
+    await expect(page.locator("text=Choose what appears in the suite notification centre")).toBeVisible();
 
-    // Click Notifications tab
-    await page.locator("button:has-text('Notifications')").click();
-    await expect(page.locator("text=Choose what appears")).toBeVisible();
+    // Click Privacy & security category
+    await page.locator("button:has-text('Privacy & security')").first().click();
+    await expect(page.locator("text=Encryption, metadata exposure and local data controls")).toBeVisible();
   });
 });

@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { Link2, Paperclip, SmilePlus, Maximize2 } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import { useComposeStore } from "@/lib/stores/compose";
 import { wrapTextareaSelection } from "@/lib/utils";
+import FormatToolbar from "./FormatToolbar";
 
 export default function ReplyComposer({
   recipientName,
@@ -46,10 +47,6 @@ export default function ReplyComposer({
     setBody(next);
   }, [body]);
 
-  const handleToolbarMouseDown = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-  }, []);
-
   const replyDraft = useCallback(() => ({
     to: [{
       pubkey: recipientPubkey,
@@ -70,16 +67,16 @@ export default function ReplyComposer({
   const sendReply = useCallback(async () => {
     if (!body.trim() || sending) return;
     setSending(true);
-    open(replyDraft());
     try {
-      await useComposeStore.getState().send();
-      if (useComposeStore.getState().status === "sent") {
+      const draft = replyDraft();
+      const ok = await useComposeStore.getState().sendDirect(draft.to, draft.subject, draft.body, draft.replyTo);
+      if (ok) {
         setBody("");
       }
     } finally {
       setSending(false);
     }
-  }, [body.trim(), sending, open, replyDraft]);
+  }, [body.trim(), sending, replyDraft]);
 
   const handleAttach = useCallback(() => {
     fileInputRef.current?.click();
@@ -110,58 +107,16 @@ export default function ReplyComposer({
         />
         <div className="mx-5 h-px bg-border" />
         <div className="flex h-[63px] items-center gap-1 px-5">
-          <button
-            type="button"
-            aria-label="Bold"
-            onMouseDown={handleToolbarMouseDown}
-            onClick={() => applyFormat("**", "**")}
-            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
-          >
-            B
-          </button>
-          <button
-            type="button"
-            aria-label="Italic"
-            onMouseDown={handleToolbarMouseDown}
-            onClick={() => applyFormat("_", "_")}
-            className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
-          >
-            I
-          </button>
-          <button
-            type="button"
-            aria-label="Insert link"
-            onMouseDown={handleToolbarMouseDown}
-            onClick={() => applyFormat("[", "](url)", "text")}
-            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
-          >
-            <Link2 size={13} />
-          </button>
-          <button
-            type="button"
-            aria-label="Insert emoji"
-            onMouseDown={handleToolbarMouseDown}
-            onClick={() => applyFormat("☺")}
-            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
-          >
-            <SmilePlus size={13} />
-          </button>
-          <button
-            type="button"
-            aria-label="Attach file"
-            onClick={handleAttach}
-            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
-          >
-            <Paperclip size={13} />
-          </button>
-          <button
-            type="button"
-            aria-label="Open in full compose"
-            onClick={handleExpand}
-            className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
-          >
-            <Maximize2 size={13} />
-          </button>
+          <FormatToolbar onFormat={applyFormat} onAttach={handleAttach}>
+            <button
+              type="button"
+              aria-label="Open in full compose"
+              onClick={handleExpand}
+              className="flex h-7 w-7 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-pill-subtle cursor-pointer"
+            >
+              <Maximize2 size={13} />
+            </button>
+          </FormatToolbar>
           <div className="flex-1" />
           <button
             type="button"

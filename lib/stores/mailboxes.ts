@@ -6,7 +6,6 @@ interface MailboxState {
   current: MailboxTab;
   unreadCounts: Record<MailboxTab, number>;
   filter: "primary" | "unread" | "starred" | "attachments";
-  navigate: (tab: MailboxTab) => void;
   setFilter: (filter: string) => void;
   refreshUnreadCounts: () => Promise<void>;
 }
@@ -24,22 +23,23 @@ export const useMailboxStore = create<MailboxState>((set) => ({
   },
   filter: "primary",
 
-  navigate: (tab: MailboxTab) => {
-    set({ current: tab });
-  },
-
   setFilter: (filter: string) => {
     set({ filter: filter as MailboxState["filter"] });
   },
 
   async refreshUnreadCounts() {
-    const { db } = await import("@/lib/db/schema");
-    const inbox = await db.messages.where({ mailbox: "inbox", archived: 0, spam: 0 }).count();
-    const drafts = await db.drafts.count();
-    set({ unreadCounts: { ...get().unreadCounts, inbox, drafts } });
+    const { useMessagesStore } = await import("@/lib/stores/messages");
+    const { byId, ids } = useMessagesStore.getState();
+    const now = Date.now();
+    const all = ids.map((id) => byId[id]).filter(Boolean);
+    const inboxUnread = all.filter((m) => !m!.archived && !m!.spam && m!.snoozedUntil === null && !m!.read).length;
+    const starred = all.filter((m) => m!.starred).length;
+    const snoozed = all.filter((m) => m!.snoozedUntil !== null && m!.snoozedUntil > now).length;
+    const sent = all.filter((m) => m!.mailbox === "sent").length;
+    const archive = all.filter((m) => m!.archived).length;
+    const spam = all.filter((m) => m!.spam).length;
+    const { useComposeStore } = await import("@/lib/stores/compose");
+    const drafts = await useComposeStore.getState().listDrafts();
+    set({ unreadCounts: { inbox: inboxUnread, starred, snoozed, sent, drafts: drafts.length, archive, spam } });
   },
 }));
-
-function get() {
-  return useMailboxStore.getState();
-}

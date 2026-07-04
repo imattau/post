@@ -2,8 +2,9 @@
 
 import { useCallback } from "react";
 import type { MockMessage } from "@/lib/mock/threads";
-import type { Message } from "@post/nostr-core";
+import type { Message, Profile } from "@post/nostr-core";
 import { useDriveStore } from "@/lib/stores/drive";
+import { useProfilesStore } from "@/lib/stores/profiles";
 import ReadingTopBar from "./ReadingTopBar";
 import SubjectPills from "./SubjectPills";
 import SenderBlock from "./SenderBlock";
@@ -43,6 +44,7 @@ export default function ReadingPane({
 }) {
   const driveFiles = useDriveStore((s) => s.files);
   const importAttachment = useDriveStore((s) => s.importAttachment);
+  const profiles = useProfilesStore((s) => s.byPubkey);
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
       <ReadingTopBar
@@ -64,6 +66,7 @@ export default function ReadingPane({
         <ThreadView
           messages={threadMessages ?? []}
           onSelect={onThreadSelect ?? (() => {})}
+          profiles={profiles}
         />
         <div>
           <h1 className="max-w-[560px] text-[26px] font-semibold leading-tight text-text-near-white">

@@ -1,10 +1,40 @@
 import { useMessagesStore } from "@/lib/stores/messages";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { useProfilesStore } from "@/lib/stores/profiles";
-import { useMemo, useEffect } from "react";
+import { useComposeStore } from "@/lib/stores/compose";
+import { useIdentityStore } from "@/lib/stores/identity";
+import { useMemo, useEffect, useState } from "react";
 import type { MockMessage, MockContact } from "@/lib/mock/threads";
-import type { AttachmentRef } from "@/lib/types";
+import type { AttachmentRef, Draft } from "@/lib/types";
 import type { Profile } from "@post/nostr-core";
+
+function draftToMessage(draft: Draft): MockMessage {
+  const recipientNames = draft.to.map((r) => r.name).join(", ") || "No recipient";
+  return {
+    id: draft.id,
+    sender: {
+      id: "me",
+      name: "Me",
+      npub: "",
+      avatarInitials: "ME",
+      verified: false,
+    },
+    recipientName: recipientNames,
+    subject: draft.subject || "(no subject)",
+    preview: draft.body || "Draft message",
+    body: draft.body,
+    createdAt: draft.updatedAt,
+    read: true,
+    starred: false,
+    labels: [],
+    attachments: draft.attachments
+      .filter((upload) => upload.result)
+      .map((upload) => upload.result!),
+    encrypted: true,
+    relayCount: draft.relayOverrides.length || 3,
+    threadLength: 1,
+  };
+}
 
 export function useMailboxMessages(mailbox: string): {
   messages: MockMessage[];
@@ -15,6 +45,20 @@ export function useMailboxMessages(mailbox: string): {
   const labels = useLabelsStore((s) => s.byId);
   const profiles = useProfilesStore((s) => s.byPubkey);
   const batchFetchProfiles = useProfilesStore((s) => s.batchFetchProfiles);
+  const myPubkey = useIdentityStore((s) => s.identity?.pubkey ?? null);
+
+  const draftVersion = useComposeStore((s) => s.draftVersion);
+  const [draftMessages, setDraftMessages] = useState<MockMessage[]>([]);
+
+  useEffect(() => {
+    if (mailbox !== "drafts") return;
+    let active = true;
+    (async () => {
+      const drafts = await useComposeStore.getState().listDrafts();
+      if (active) setDraftMessages(drafts.map(draftToMessage));
+    })();
+    return () => { active = false; };
+  }, [mailbox, draftVersion]);
 
   useEffect(() => {
     if (ids.length > 0) {
@@ -25,6 +69,10 @@ export function useMailboxMessages(mailbox: string): {
   }, [ids, byId, batchFetchProfiles]);
 
   return useMemo(() => {
+    if (mailbox === "drafts") {
+      return { messages: draftMessages, unreadCount: draftMessages.length };
+    }
+
     if (ids.length > 0) {
       const filtered = ids
         .map((id) => byId[id])
@@ -32,7 +80,7 @@ export function useMailboxMessages(mailbox: string): {
         .filter((m) => {
           switch (mailbox) {
             case "inbox":
-              return !m.archived && !m.spam && m.snoozedUntil === null;
+              return !m.archived && !m.spam && m.snoozedUntil === null && (myPubkey === null || m.recipientPubkey === myPubkey);
             case "starred":
               return m.starred;
             case "snoozed":
@@ -42,9 +90,7 @@ export function useMailboxMessages(mailbox: string): {
             case "spam":
               return m.spam;
             case "sent":
-              return m.mailbox === "sent";
-            case "drafts":
-              return false;
+              return m.mailbox === "sent" && (myPubkey === null || m.pubkey === myPubkey);
             default:
               return true;
           }
@@ -58,12 +104,8 @@ export function useMailboxMessages(mailbox: string): {
       };
     }
 
-    const { MESSAGES } = require("@/lib/mock/threads") as { MESSAGES: MockMessage[] };
-    return {
-      messages: MESSAGES,
-      unreadCount: MESSAGES.filter((m) => !m.read).length,
-    };
-  }, [byId, ids, labels, mailbox, profiles]);
+    return { messages: [], unreadCount: 0 };
+  }, [byId, ids, labels, mailbox, profiles, draftMessages, myPubkey]);
 }
 
 export function realToMock(

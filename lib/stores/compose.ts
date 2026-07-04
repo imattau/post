@@ -11,6 +11,8 @@ interface ComposeState {
   giftWrap: boolean;
   relayOverrides: string[];
   error: string | null;
+  draftVersion: number;
+  sendDirect: (to: RecipientEntry[], subject: string, body: string, replyTo: string | null) => Promise<boolean>;
   open: (draft?: Partial<Draft>) => void;
   openSavedDraft: (id: string) => Promise<void>;
   close: () => void;
@@ -61,6 +63,7 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
   giftWrap: false,
   relayOverrides: [],
   error: null,
+  draftVersion: 0,
 
   open: (draft?: Partial<Draft>) => {
     const next = { ...emptyDraft(), ...draft, updatedAt: Date.now() };
@@ -74,21 +77,21 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
     set({ status: "composing", draft, uploads: draft.attachments, relayOverrides: draft.relayOverrides, error: null });
   },
 
-  close: () => {
+  close: async () => {
     const { draft } = get();
     const hasContent = draft.to.length > 0 || draft.subject || draft.body;
     if (hasContent) {
-      get().autosave();
+      await get().autosave();
     }
     set({ status: "closed", draft: emptyDraft(), uploads: [], error: null });
   },
 
-  minimize: () => {
+  minimize: async () => {
     const { draft } = get();
     if (draft.to.length === 0 && !draft.subject && !draft.body) {
       return;
     }
-    get().autosave();
+    await get().autosave();
     set({ status: "minimized" });
   },
 
@@ -245,6 +248,7 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
     await db.drafts.put({ ...draft, attachments: uploads, savedAt: Date.now(), updatedAt: Date.now() });
     set((state) => ({
       draft: { ...state.draft, savedAt: Date.now() },
+      draftVersion: state.draftVersion + 1,
     }));
   },
 
@@ -259,7 +263,7 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
       const { db } = await import("@/lib/db/schema");
       await db.drafts.delete(draft.id);
     })();
-    set({ status: "closed", draft: emptyDraft(), uploads: [], error: null });
+    set((state) => ({ status: "closed", draft: emptyDraft(), uploads: [], error: null, draftVersion: state.draftVersion + 1 }));
   },
 
   resetDraft: () => {
@@ -268,5 +272,66 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
 
   returnToComposing: () => {
     set({ status: "composing" });
+  },
+
+  async sendDirect(to: RecipientEntry[], subject: string, body: string, replyTo: string | null): Promise<boolean> {
+    try {
+      const { sendMessage, createKeyStore } = await import("@post/nostr-core");
+      const keyStore = createKeyStore();
+      const identity = keyStore.load();
+      if (!identity?.nsec) throw new Error("No private key");
+
+      if (to.length === 0) throw new Error("No recipient");
+
+      const { decode } = await import("nostr-tools/nip19");
+      const nsecDecoded = decode(identity.nsec);
+      if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+
+      const { useRelaysStore } = await import("@/lib/stores/relays");
+      const pool = useRelaysStore.getState().pool;
+      if (!pool) throw new Error("Relay pool not connected");
+
+      const result = await sendMessage(pool, keyStore, {
+        to: to[0].pubkey,
+        content: body,
+        subject: subject || undefined,
+        replyTo: replyTo ?? undefined,
+      });
+
+      const { db } = await import("@/lib/db/schema");
+      const now = Date.now();
+      const sentMessage = {
+        id: result.eventId,
+        kind: 14,
+        pubkey: identity.pubkey,
+        recipientPubkey: to[0].pubkey,
+        content: body,
+        raw: "",
+        createdAt: now,
+        tags: replyTo ? [["e", replyTo]] : [],
+        subject: subject || "(no subject)",
+        preview: body.replace(/\n/g, " ").slice(0, 120),
+        read: true,
+        starred: false,
+        archived: false,
+        snoozedUntil: null,
+        spam: false,
+        mailbox: "sent" as const,
+        labelIds: [],
+        replyTo,
+        relayUrls: [],
+        attachments: [],
+        isEncrypted: true,
+        isGiftWrapped: false,
+        deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
+      };
+      await db.messages.put(sentMessage);
+      const { useMessagesStore } = await import("@/lib/stores/messages");
+      await useMessagesStore.getState().upsertMessage(sentMessage);
+
+      return result.delivered > 0;
+    } catch {
+      return false;
+    }
   },
 }));

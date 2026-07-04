@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useIdentityStore } from "@/lib/stores/identity";
 
 export default function IdentityDialog({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
   const identity = useIdentityStore((s) => s.identity);
   const usingNip07 = useIdentityStore((s) => s.usingNip07);
   const logout = useIdentityStore((s) => s.logout);
@@ -95,10 +97,10 @@ export default function IdentityDialog({ onClose }: { onClose: () => void }) {
 
           <div className="px-5 py-3 border-t border-modal-stroke flex justify-between">
             <button
-              onClick={() => { logout(); onClose(); }}
+              onClick={() => { logout(); onClose(); router.push("/login"); }}
               className="text-[11px] font-medium text-danger cursor-pointer hover:brightness-110 transition-all"
             >
-              Disconnect
+              Sign out
             </button>
             <button
               onClick={onClose}

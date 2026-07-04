@@ -50,51 +50,8 @@ describe("sync", () => {
     useMessagesStore.setState({ byId: {}, ids: [] });
   });
 
-  it("searchMessages returns all messages when query is empty", async () => {
-    const { searchMessages } = await import("@/lib/sync");
-    const result = searchMessages("");
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it("searchMessages filters by subject", async () => {
-    const { searchMessages } = await import("@/lib/sync");
-    const { useMessagesStore } = await import("@/lib/stores/messages");
-
-    useMessagesStore.getState().ingestFromRelay({
-      id: "msg1", kind: 14, pubkey: "x", recipientPubkey: "y", content: "hello", raw: "",
-      createdAt: Date.now(), tags: [], subject: "Important meeting", preview: "hello",
-      read: false, starred: false, archived: false, snoozedUntil: null, spam: false,
-      mailbox: "inbox", labelIds: [], replyTo: null, relayUrls: [],
-      attachments: [], isEncrypted: true, isGiftWrapped: false, deliveryStatus: "delivered",
-    });
-
-    const result = searchMessages("Important");
-    expect(result.length).toBe(1);
-    expect(result[0].id).toBe("msg1");
-  });
-
-  it("searchMessages returns empty for no match", async () => {
-    const { searchMessages } = await import("@/lib/sync");
-    const result = searchMessages("nonexistent");
-    expect(result.length).toBe(0);
-  });
-
-  it("getMailboxMessages filters inbox messages", async () => {
-    const { getMailboxMessages } = await import("@/lib/sync");
-    const { useMessagesStore } = await import("@/lib/stores/messages");
-
-    useMessagesStore.getState().ingestFromRelay({
-      id: "inbox-msg", kind: 14, pubkey: "x", recipientPubkey: "y", content: "hello", raw: "",
-      createdAt: Date.now(), tags: [], subject: "Test", preview: "hello",
-      read: false, starred: false, archived: false, snoozedUntil: null, spam: false,
-      mailbox: "inbox", labelIds: [], replyTo: null, relayUrls: [],
-      attachments: [], isEncrypted: true, isGiftWrapped: false, deliveryStatus: "delivered",
-    });
-
-    const inbox = getMailboxMessages("inbox");
-    expect(inbox.length).toBe(1);
-
-    const archive = getMailboxMessages("archive");
-    expect(archive.length).toBe(0);
+  it("loadCachedMessages returns early when no messages", async () => {
+    const { loadCachedMessages } = await import("@/lib/sync");
+    await expect(loadCachedMessages()).resolves.not.toThrow();
   });
 });

@@ -7,6 +7,95 @@ import { useRelaysStore } from "./stores/relays";
 
 let unsubscribe: (() => void) | null = null;
 
+import type { NostrEvent } from "nostr-tools";
+
+async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
+  try {
+    const { createKeyStore } = await import("@post/nostr-core");
+    const keyStore = createKeyStore();
+    const plaintext = await decryptEvent(event, keyStore);
+    const msg: Message = {
+      id: event.id,
+      kind: event.kind,
+      pubkey: event.pubkey,
+      recipientPubkey: identity.pubkey,
+      content: plaintext,
+      raw: event.content,
+      createdAt: event.created_at,
+      tags: event.tags,
+      subject: extractSubject(event, plaintext),
+      preview: plaintext.replace(/\n/g, " ").slice(0, 120),
+      read: false,
+      starred: false,
+      archived: false,
+      snoozedUntil: null,
+      spam: false,
+      mailbox: "inbox",
+      labelIds: [],
+      replyTo: event.tags.find((t) => t[0] === "e")?.[1] ?? null,
+      relayUrls: [],
+      attachments: [],
+      isEncrypted: true,
+      isGiftWrapped: false,
+      deliveryStatus: "delivered",
+    };
+
+    useMessagesStore.getState().ingestFromRelay(msg);
+    await db.messages.put(msg);
+  } catch {
+    // Skip events that fail to decrypt
+  }
+}
+
+async function handleKind1059(event: NostrEvent, identity: { pubkey: string }) {
+  try {
+    const { createKeyStore } = await import("@post/nostr-core");
+    const keyStore = createKeyStore();
+    const storedIdentity = keyStore.load();
+    if (!storedIdentity?.nsec) return;
+
+    const { decode } = await import("nostr-tools/nip19");
+    const nsecDecoded = decode(storedIdentity.nsec);
+    if (nsecDecoded.type !== "nsec") return;
+    const sk = nsecDecoded.data;
+
+    const { nip17 } = await import("nostr-tools");
+    const rumor = nip17.unwrapEvent(event, sk) as unknown as { id: string; kind: number; pubkey: string; content: string; created_at: number; tags: string[][] };
+
+    const plaintext = rumor.content;
+    const msg: Message = {
+      id: event.id,
+      kind: 1059,
+      pubkey: rumor.pubkey,
+      recipientPubkey: identity.pubkey,
+      content: plaintext,
+      raw: event.content,
+      createdAt: rumor.created_at,
+      tags: rumor.tags,
+      subject: extractSubject(rumor, plaintext),
+      preview: plaintext.replace(/\n/g, " ").slice(0, 120),
+      read: false,
+      starred: false,
+      archived: false,
+      snoozedUntil: null,
+      spam: false,
+      mailbox: "inbox",
+      labelIds: [],
+      replyTo: rumor.tags.find((t) => t[0] === "e")?.[1] ?? null,
+      relayUrls: [],
+      attachments: [],
+      isEncrypted: true,
+      isGiftWrapped: true,
+      deliveryStatus: "delivered",
+    };
+
+    useMessagesStore.getState().ingestFromRelay(msg);
+    await db.messages.put(msg);
+  } catch {
+    // Skip events that fail to decrypt
+  }
+}
+
 export function startSync() {
   const pool = useRelaysStore.getState().pool;
   if (!pool) return;
@@ -25,42 +114,27 @@ export function startSync() {
   stopSync();
 
   unsubscribe = pool.subscribe(
-    [{ kinds: [14], "#p": [identity.pubkey], limit: 100 }],
+    [{ kinds: [14, 1059], "#p": [identity.pubkey], limit: 100 }],
     async (event) => {
-      try {
-        const { createKeyStore } = await import("@post/nostr-core");
-        const keyStore = createKeyStore();
-        const plaintext = await decryptEvent(event, keyStore);
-        const msg: Message = {
-          id: event.id,
-          kind: event.kind,
-          pubkey: event.pubkey,
-          recipientPubkey: identity.pubkey,
-          content: plaintext,
-          raw: event.content,
-          createdAt: event.created_at,
-          tags: event.tags,
-          subject: extractSubject(event, plaintext),
-          preview: plaintext.replace(/\n/g, " ").slice(0, 120),
-          read: false,
-          starred: false,
-          archived: false,
-          snoozedUntil: null,
-          spam: false,
-          mailbox: "inbox",
-          labelIds: [],
-          replyTo: event.tags.find((t) => t[0] === "e")?.[1] ?? null,
-          relayUrls: [],
-          attachments: [],
-          isEncrypted: true,
-          isGiftWrapped: false,
-          deliveryStatus: "delivered",
-        };
+      if (event.kind === 1059) {
+        await handleKind1059(event, identity);
+      } else {
+        await handleKind14(event, identity);
+      }
+    }
+  );
 
-        useMessagesStore.getState().ingestFromRelay(msg);
-        await db.messages.put(msg);
-      } catch {
-        // Skip events that fail to decrypt
+  pool.subscribe(
+    [{ kinds: [5], authors: [identity.pubkey], limit: 50 }],
+    async (event) => {
+      for (const tag of event.tags) {
+        if (tag[0] === "e") {
+          const deletedId = tag[1];
+          const msg = useMessagesStore.getState().byId[deletedId];
+          if (msg) {
+            await useMessagesStore.getState().deleteMessage(deletedId);
+          }
+        }
       }
     }
   );
@@ -93,55 +167,5 @@ export async function loadCachedMessages(): Promise<void> {
   useMessagesStore.setState({ byId, ids, loading: false });
 }
 
-export function searchMessages(query: string): Message[] {
-  const { byId, ids } = useMessagesStore.getState();
-  if (!query.trim()) return ids.map((id) => byId[id]).filter(Boolean);
 
-  const lower = query.toLowerCase();
-  return ids
-    .map((id) => byId[id])
-    .filter((m): m is Message => {
-      if (!m) return false;
-      return (
-        m.subject.toLowerCase().includes(lower) ||
-        m.content.toLowerCase().includes(lower) ||
-        m.preview.toLowerCase().includes(lower) ||
-        m.pubkey.toLowerCase().includes(lower)
-      );
-    });
-}
 
-export function getMailboxMessages(mailbox: string): Message[] {
-  const { byId, ids } = useMessagesStore.getState();
-  return ids
-    .map((id) => byId[id])
-    .filter((m): m is Message => {
-      if (!m) return false;
-      switch (mailbox) {
-        case "inbox":
-          return !m.archived && !m.spam && m.snoozedUntil === null;
-        case "starred":
-          return m.starred;
-        case "snoozed":
-          return m.snoozedUntil !== null && m.snoozedUntil > Date.now();
-        case "sent":
-          return m.pubkey === identityPubkey();
-        case "archive":
-          return m.archived;
-        case "spam":
-          return m.spam;
-        default:
-          return true;
-      }
-    });
-}
-
-function identityPubkey(): string {
-  try {
-    const raw = localStorage.getItem("nostr-identity");
-    if (!raw) return "";
-    return JSON.parse(raw).pubkey ?? "";
-  } catch {
-    return "";
-  }
-}

@@ -18,10 +18,8 @@ describe("ReplyComposer", () => {
     useComposeStore.setState({
       status: "composing",
       open: vi.fn(),
-      send: vi.fn(async () => {
-        useComposeStore.setState({ status: "sent" });
-        return { eventId: "reply-event", published: new Map(), delivered: 1 };
-      }),
+      send: vi.fn(),
+      sendDirect: vi.fn(async () => true),
     });
   });
 
@@ -110,36 +108,27 @@ describe("ReplyComposer", () => {
     expect(textarea).toHaveValue("Hi ☺");
   });
 
-  it("opens a reply draft and sends it", async () => {
-    const open = vi.fn();
-    const send = vi.fn(async () => {
-      useComposeStore.setState({ status: "sent" });
-      return { eventId: "reply-event", published: new Map(), delivered: 1 };
-    });
-    useComposeStore.setState({ open, send });
+  it("sends a reply directly", async () => {
+    const sendDirect = vi.fn(async () => true);
+    useComposeStore.setState({ sendDirect });
 
     render(<ReplyComposer {...props} />);
     const textarea = screen.getByLabelText("Reply to Alice");
     await userEvent.type(textarea, "Reply body");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({
-      body: "Reply body",
-      replyTo: "msg-1",
-      subject: "Re: Hello",
-      to: [expect.objectContaining({ pubkey: props.recipientPubkey, name: "Alice" })],
-    }));
-    expect(send).toHaveBeenCalledOnce();
+    expect(sendDirect).toHaveBeenCalledWith(
+      [expect.objectContaining({ pubkey: props.recipientPubkey, name: "Alice" })],
+      "Re: Hello",
+      "Reply body",
+      "msg-1",
+    );
     await waitFor(() => expect(textarea).toHaveValue(""));
   });
 
   it("preserves body when send fails", async () => {
     useComposeStore.setState({
-      open: vi.fn(),
-      send: vi.fn(async () => {
-        useComposeStore.setState({ status: "failed" });
-        return { eventId: "", published: new Map(), delivered: 0 };
-      }),
+      sendDirect: vi.fn(async () => false),
     });
 
     render(<ReplyComposer {...props} />);

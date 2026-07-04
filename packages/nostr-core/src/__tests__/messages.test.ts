@@ -4,10 +4,18 @@ import { sendMessage } from "../messages";
 const mockWrapEvent = vi.fn((..._args: unknown[]) => ({ id: "wrapped-id", kind: 14, pubkey: "x", content: "encrypted", tags: [], created_at: 0, sig: "y" }));
 const mockPublish = vi.fn(async () => new Map([["wss://relay.damus.io", true], ["wss://nos.lol", true]]));
 
+const mockFinalizeEvent = vi.fn((event: any, _sk: Uint8Array) => ({
+  ...event,
+  id: "finalized-id",
+  pubkey: "a".repeat(64),
+  sig: "s".repeat(128),
+}));
+
 vi.mock("nostr-tools", () => ({
   nip44: { v2: { utils: { getConversationKey: vi.fn(() => new Uint8Array(32)) }, encrypt: vi.fn(() => "encrypted"), decrypt: vi.fn(() => "decrypted") } },
   nip17: { wrapEvent: (...args: unknown[]) => mockWrapEvent(...args) },
   nip59: {},
+  finalizeEvent: (...args: unknown[]) => (mockFinalizeEvent as any)(...args),
 }));
 
 const validIdentity = {
@@ -80,8 +88,17 @@ describe("sendMessage", () => {
     await expect(sendMessage(mockPool, mockKeys, { to: "b".repeat(64), content: "Hello" })).rejects.toThrow("No private key");
   });
 
-  it("passes subject to wrapEvent when provided", async () => {
-    await sendMessage(mockPool, mockKeys, { to: "b".repeat(64), content: "Body", subject: "Subject" });
+  it("passes subject to wrapEvent when giftWrap is true", async () => {
+    await sendMessage(mockPool, mockKeys, { to: "b".repeat(64), content: "Body", subject: "Subject", giftWrap: true });
     expect(mockWrapEvent).toHaveBeenCalled();
+  });
+
+  it("uses finalizeEvent when giftWrap is false", async () => {
+    await sendMessage(mockPool, mockKeys, { to: "b".repeat(64), content: "Body", subject: "Subject" });
+    expect(mockFinalizeEvent).toHaveBeenCalled();
+    const event = mockFinalizeEvent.mock.calls[0][0];
+    expect(event.kind).toBe(14);
+    expect(event.tags[0]).toEqual(["p", "b".repeat(64)]);
+    expect(event.tags[1]).toEqual(["subject", "Subject"]);
   });
 });

@@ -1,9 +1,10 @@
-import { nip44 } from "nostr-tools";
-import { nip17 } from "nostr-tools";
-import type { Event } from "nostr-tools/core";
+import { nip44, nip17, finalizeEvent } from "nostr-tools";
+import type { NostrEvent } from "nostr-tools";
 import type { RelayPool } from "./relays";
 import type { KeyStore } from "./keys";
 import type { Message, AttachmentRef } from "./types";
+
+type Event = NostrEvent;
 
 export interface SendOptions {
   to: string;
@@ -34,13 +35,30 @@ export async function sendMessage(
   if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
   const sk = nsecDecoded.data;
 
-  const event = nip17.wrapEvent(
-    sk,
-    { publicKey: opts.to },
-    opts.content,
-    opts.subject,
-    opts.replyTo ? { eventId: opts.replyTo } : undefined
-  );
+  let event: NostrEvent;
+
+  if (opts.giftWrap) {
+    event = nip17.wrapEvent(
+      sk,
+      { publicKey: opts.to },
+      opts.content,
+      opts.subject,
+      opts.replyTo ? { eventId: opts.replyTo } : undefined
+    );
+  } else {
+    const conversationKey = nip44.v2.utils.getConversationKey(sk, opts.to);
+    const encrypted = nip44.v2.encrypt(opts.content, conversationKey);
+    const tags: string[][] = [["p", opts.to]];
+    if (opts.subject) tags.push(["subject", opts.subject]);
+    if (opts.replyTo) tags.push(["e", opts.replyTo]);
+
+    event = finalizeEvent({
+      kind: 14,
+      content: encrypted,
+      created_at: Math.floor(Date.now() / 1000),
+      tags,
+    }, sk);
+  }
 
   const published = await pool.publish(event, opts.relayOverrides);
   let delivered = 0;
@@ -57,11 +75,12 @@ export async function replyToThread(
   pool: RelayPool,
   keys: KeyStore,
   rootEventId: string,
+  recipientPubkey: string,
   content: string,
   attachments?: AttachmentRef[]
 ): Promise<SendResult> {
   return sendMessage(pool, keys, {
-    to: keys.load()?.pubkey ?? "",
+    to: recipientPubkey,
     content,
     attachments,
     replyTo: rootEventId,
@@ -101,17 +120,10 @@ class IncomingStream implements AsyncGenerator<Message> {
   private closed = false;
   private unsubscribe: () => void;
 
-  constructor(pool: RelayPool, keys: KeyStore) {
-    const identity = keys.load();
-    if (!identity || !identity.nsec) throw new Error("No identity or private key");
-
-    const { decode } = require("nostr-tools/nip19") as typeof import("nostr-tools/nip19");
-    const nsecDecoded = decode(identity.nsec);
-    if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
-    const sk = nsecDecoded.data;
+  constructor(pool: RelayPool, sk: Uint8Array, pubkey: string) {
 
     this.unsubscribe = pool.subscribe(
-      [{ kinds: [14], "#p": [identity.pubkey] }],
+      [{ kinds: [14], "#p": [pubkey] }],
       (event: Event) => {
         try {
           const conversationKey = nip44.v2.utils.getConversationKey(sk, event.pubkey);
@@ -120,7 +132,7 @@ class IncomingStream implements AsyncGenerator<Message> {
             id: event.id,
             kind: event.kind,
             pubkey: event.pubkey,
-            recipientPubkey: identity.pubkey,
+            recipientPubkey: pubkey,
             content: plaintext,
             raw: event.content,
             createdAt: event.created_at,
@@ -186,9 +198,17 @@ class IncomingStream implements AsyncGenerator<Message> {
   }
 }
 
-export function decryptIncoming(
+export async function decryptIncoming(
   pool: RelayPool,
   keys: KeyStore
-): AsyncGenerator<Message> {
-  return new IncomingStream(pool, keys);
+): Promise<AsyncGenerator<Message>> {
+  const identity = keys.load();
+  if (!identity || !identity.nsec) throw new Error("No identity or private key");
+
+  const { decode } = await import("nostr-tools/nip19");
+  const nsecDecoded = decode(identity.nsec);
+  if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+  const sk = nsecDecoded.data;
+
+  return new IncomingStream(pool, sk, identity.pubkey);
 }

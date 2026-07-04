@@ -19,6 +19,7 @@ interface MessagesState {
   deleteMessage: (id: string) => Promise<void>;
   ingestFromRelay: (message: Message) => void;
   upsertMessage: (message: Message) => Promise<void>;
+  startSnoozeWatcher: () => () => void;
 }
 
 export const useMessagesStore = create<MessagesState>((set, get) => ({
@@ -129,5 +130,29 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       byId: { ...byId, [message.id]: message },
       ids: ids.includes(message.id) ? ids : [message.id, ...ids],
     });
+  },
+
+  startSnoozeWatcher: () => {
+    const check = () => {
+      const { byId } = get();
+      const now = Date.now();
+      const updates: Record<string, Message> = {};
+      for (const msg of Object.values(byId)) {
+        if (msg.snoozedUntil !== null && msg.snoozedUntil <= now) {
+          updates[msg.id] = { ...msg, snoozedUntil: null, mailbox: "inbox" };
+        }
+      }
+      if (Object.keys(updates).length > 0) {
+        set((state) => ({ byId: { ...state.byId, ...updates } }));
+        import("@/lib/db/schema").then(({ db }) => {
+          for (const msg of Object.values(updates)) {
+            db.messages.put(msg);
+          }
+        });
+      }
+    };
+    const interval = setInterval(check, 30000);
+    check();
+    return () => clearInterval(interval);
   },
 }));

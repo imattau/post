@@ -14,6 +14,7 @@ export interface MockAttachment {
   sha256: string;
   url: string;
   encrypted: boolean;
+  storedInDrive?: boolean;
 }
 
 export interface MockMessage {

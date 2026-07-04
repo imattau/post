@@ -176,12 +176,6 @@ describe("messages store", () => {
 });
 
 describe("mailboxes store", () => {
-  it("navigate sets current tab", async () => {
-    const { useMailboxStore } = await import("@/lib/stores/mailboxes");
-    useMailboxStore.getState().navigate("starred");
-    expect(useMailboxStore.getState().current).toBe("starred");
-  });
-
   it("setFilter updates filter", async () => {
     const { useMailboxStore } = await import("@/lib/stores/mailboxes");
     useMailboxStore.getState().setFilter("unread");
@@ -228,7 +222,7 @@ describe("compose store", () => {
     const { useComposeStore } = await import("@/lib/stores/compose");
     useComposeStore.getState().open();
     useComposeStore.getState().updateSubject("Test");
-    useComposeStore.getState().minimize();
+    await useComposeStore.getState().minimize();
     expect(useComposeStore.getState().status).toBe("minimized");
   });
 
@@ -236,7 +230,7 @@ describe("compose store", () => {
     const { useComposeStore } = await import("@/lib/stores/compose");
     useComposeStore.getState().open();
     useComposeStore.getState().updateSubject("Test");
-    useComposeStore.getState().minimize();
+    await useComposeStore.getState().minimize();
     useComposeStore.getState().restore();
     expect(useComposeStore.getState().status).toBe("composing");
   });

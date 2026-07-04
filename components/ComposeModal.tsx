@@ -5,11 +5,12 @@ import { useComposeStore } from "@/lib/stores/compose";
 import { useBlossomStore } from "@/lib/stores/blossom";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useContactsStore } from "@/lib/stores/contacts";
-import { Link2, Paperclip, SmilePlus, AtSign, Ellipsis, Minus, X, ChevronDown, LoaderCircle, FileImage, File } from "lucide-react";
+import { AtSign, Ellipsis, Minus, X, ChevronDown, LoaderCircle, FileImage, File } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import { toast } from "sonner";
 import { formatSize, wrapTextareaSelection } from "@/lib/utils";
+import FormatToolbar from "./FormatToolbar";
 import MessageBody from "./MessageBody";
 import UploadProgress from "./UploadProgress";
 
@@ -282,10 +283,6 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     textareaRef.current?.setSelectionRange(position, position);
   }, [draft.body]);
 
-  const handleToolbarMouseDown = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-  }, []);
-
   const handleSchedule = useCallback(async () => {
     if (!scheduleDate || !scheduleTime) return;
     const at = new Date(`${scheduleDate}T${scheduleTime}`).getTime();
@@ -294,20 +291,6 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       setShowSchedule(false);
     }
   }, [scheduleDate, scheduleTime, scheduleSend]);
-
-  const formatToolbar = (
-    <div className="flex items-center gap-0.5 px-5 py-1.5 border-t border-modal-stroke">
-      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("**", "**")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-semibold rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">B</button>
-      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("_", "_")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium italic rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">I</button>
-      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("__", "__")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium underline rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">U</button>
-      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("[", "](url)", "text")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150"><Link2 size={13} /></button>
-      <button onClick={handleAttach} className="w-7 h-7 flex items-center justify-center text-text-modal-2 rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150"><Paperclip size={13} /></button>
-      <button onClick={() => applyFormat("☺")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150"><SmilePlus size={13} /></button>
-      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary rounded cursor-not-allowed opacity-50"><AtSign size={13} /></button>
-      <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary rounded cursor-not-allowed opacity-50"><Ellipsis size={13} /></button>
-      <span className="text-[10px] text-text-placeholder ml-auto">Markdown supported</span>
-    </div>
-  );
 
   if (status === "minimized") {
     return (
@@ -591,7 +574,10 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
             )}
 
             {/* Format toolbar */}
-            {formatToolbar}
+            <FormatToolbar onFormat={applyFormat} onAttach={handleAttach} showMarkdownLabel>
+              <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary rounded cursor-not-allowed opacity-50"><AtSign size={13} /></button>
+              <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary rounded cursor-not-allowed opacity-50"><Ellipsis size={13} /></button>
+            </FormatToolbar>
 
             {/* Schedule send popover */}
             {showSchedule && (
