@@ -10,15 +10,20 @@ import { createKeyStore } from "@post/nostr-core";
 export default function WelcomePage() {
   const router = useRouter();
   const identity = useIdentityStore((s) => s.identity);
-  const nip07Available = useIdentityStore((s) => s.nip07Available);
   const createOrImport = useIdentityStore((s) => s.createOrImport);
   const [checked, setChecked] = useState(false);
   const [creating, setCreating] = useState(false);
-  const inTauri = isTauri();
+  const [nip07Available, setNip07Available] = useState(false);
+  const [inTauri, setInTauri] = useState(false);
+
+  useEffect(() => {
+    setNip07Available(typeof window !== "undefined" && !!window.nostr);
+    setInTauri(isTauri());
+  }, []);
 
   useEffect(() => {
     if (checked) return;
-    const keyStore = inTauri ? createTauriKeyStore() : createKeyStore();
+    const keyStore = isTauri() ? createTauriKeyStore() : createKeyStore();
     const existing = keyStore.load();
     if (existing) {
       useIdentityStore.getState().setIdentity(existing);
