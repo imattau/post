@@ -48,6 +48,7 @@ interface DrivePreviewProps {
   onOpenFile: () => void;
   onSetShareFile: (file: DriveFile) => void;
   onToggleOffline: (id: string) => void;
+  onDeletePermanently?: (file: DriveFile) => void;
 }
 
 export default function DrivePreview({
@@ -64,6 +65,7 @@ export default function DrivePreview({
   onOpenFile,
   onSetShareFile,
   onToggleOffline,
+  onDeletePermanently,
 }: DrivePreviewProps) {
   return (
     <aside className="flex min-h-0 flex-col overflow-y-auto bg-dock px-6 pt-[22px] pb-5">
@@ -85,6 +87,12 @@ export default function DrivePreview({
                 className={!file.trashed ? "text-danger" : ""}>
                 {file.trashed ? "Restore" : "Trash"}
               </MenuItem>
+              {file.trashed && onDeletePermanently && (
+                <MenuItem onClick={() => { onDeletePermanently(file); }}
+                  className="text-danger">
+                  Delete permanently
+                </MenuItem>
+              )}
             </MenuPopup>
           </MenuRoot>
         </div>

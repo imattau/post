@@ -151,6 +151,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     toggleStar,
     toggleTrash,
     toggleOffline,
+    deletePermanently,
     createFolder,
     enqueueUploads,
     clearUploads,
@@ -260,6 +261,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const handleShare = useCallback((file: DriveFile) => setShareFile(file), []);
   const handleStar = useCallback(async (file: DriveFile) => { await toggleStar(file.id); }, [toggleStar]);
   const handleTrash = useCallback(async (file: DriveFile) => { await toggleTrash(file.id); }, [toggleTrash]);
+  const handleDeletePermanently = useCallback(async (file: DriveFile) => { await deletePermanently(file.id); }, [deletePermanently]);
   const handleRename = useCallback(async (file: DriveFile) => {
     setRenameFileId(file.id);
     setRenameValue(file.name);
@@ -279,9 +281,13 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   }, [renameFileId, renameValue]);
 
   const handleBatchTrash = useCallback(async () => {
-    for (const id of selectedFileIds) await toggleTrash(id);
+    if (screen === "trash") {
+      for (const id of selectedFileIds) await deletePermanently(id);
+    } else {
+      for (const id of selectedFileIds) await toggleTrash(id);
+    }
     clearFileSelection();
-  }, [selectedFileIds, toggleTrash, clearFileSelection]);
+  }, [selectedFileIds, toggleTrash, deletePermanently, screen, clearFileSelection]);
 
   const handleBatchStar = useCallback(async () => {
     for (const id of selectedFileIds) await toggleStar(id);
@@ -413,6 +419,12 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                       className={!file.trashed ? "text-danger" : ""}>
                       {file.trashed ? "Restore" : "Trash"}
                     </MenuItem>
+                    {file.trashed && (
+                      <MenuItem onClick={() => { handleDeletePermanently(file); }}
+                        className="text-danger">
+                        Delete permanently
+                      </MenuItem>
+                    )}
                   </MenuPopup>
                 </MenuRoot>
               </div>
@@ -450,6 +462,12 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                       className={!file.trashed ? "text-danger" : ""}>
                       {file.trashed ? "Restore" : "Trash"}
                     </MenuItem>
+                    {file.trashed && (
+                      <MenuItem onClick={() => { handleDeletePermanently(file); }}
+                        className="text-danger">
+                        Delete permanently
+                      </MenuItem>
+                    )}
                   </MenuPopup>
                 </MenuRoot>
               </div>
@@ -685,6 +703,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             onOpenFile={handleOpenFile}
             onSetShareFile={setShareFile}
             onToggleOffline={toggleOffline}
+            onDeletePermanently={handleDeletePermanently}
           />
         ) : (
           <aside className="flex min-h-0 flex-col overflow-y-auto bg-dock px-6 pt-[22px] pb-5">

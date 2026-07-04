@@ -1,5 +1,5 @@
 import { decode } from "nostr-tools/nip19";
-import type { Identity, EncryptedBlobMetadata } from "./types";
+import type { Identity, EncryptedBlobMetadata, DriveFile, DriveFolder } from "./types";
 
 const DRIVE_INFO = new TextEncoder().encode("post-drive-v1");
 const AES_GCM = { name: "AES-GCM", length: 256 } as const;
@@ -94,4 +94,47 @@ export async function decryptDriveBlob(payload: DriveEncryptedPayload, identity:
 
 export function isDriveEncryptionAvailable(identity: Identity | null): boolean {
   return !!identity?.nsec;
+}
+
+export function createFileMetadataEvent(file: DriveFile): {
+  kind: 1063;
+  tags: string[][];
+  content: string;
+  created_at: number;
+} {
+  const tags: string[][] = [
+    ["url", file.blobUrl ?? ""],
+    ["m", file.mimeType],
+    ["x", file.sha256 ?? ""],
+    ["size", String(file.sizeBytes)],
+  ];
+  if (file.folderId) tags.push(["folder", file.folderId]);
+  if (file.encrypted) tags.push(["encrypted", "true"]);
+  tags.push(["client", "Post"]);
+
+  return {
+    kind: 1063,
+    tags,
+    content: file.name,
+    created_at: Math.floor(file.updatedAt / 1000),
+  };
+}
+
+export function createFolderEvent(folder: DriveFolder): {
+  kind: 30063;
+  tags: string[][];
+  content: string;
+  created_at: number;
+} {
+  return {
+    kind: 30063,
+    tags: [
+      ["d", folder.id],
+      ["title", folder.name],
+      ...(folder.parentId ? [["parent", folder.parentId]] : []),
+      ["client", "Post"],
+    ],
+    content: folder.name,
+    created_at: Math.floor(folder.updatedAt / 1000),
+  };
 }

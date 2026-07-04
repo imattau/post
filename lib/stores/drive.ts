@@ -1,7 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import { encryptDriveBlob, uploadBlob } from "@post/nostr-core";
+import { encryptDriveBlob, uploadBlob, deleteBlob } from "@post/nostr-core";
+import type { BlossomServer } from "@post/nostr-core";
 import { decode } from "nostr-tools/nip19";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useBlossomStore } from "@/lib/stores/blossom";
@@ -58,6 +59,7 @@ interface DriveState {
   cancelUpload: (id: string) => void;
   retryUpload: (id: string) => Promise<void>;
   updateSharedWith: (id: string, sharedWith: string[]) => Promise<void>;
+  deletePermanently: (id: string) => Promise<void>;
   importAttachment: (attachment: { fileName: string; mimeType: string; sizeBytes: number; sha256: string; url: string; encrypted: boolean }, sourceMessageId?: string) => Promise<string>;
 }
 
@@ -195,7 +197,7 @@ function matchesScreen(file: DriveFile, screen: DriveScreen): boolean {
     case "starred":
       return !file.trashed && file.starred;
     case "shared":
-      return !file.trashed && file.sharedWith.length >= 3;
+      return !file.trashed && file.sharedWith.length > 0;
     case "offline":
       return !file.trashed && file.offlineAvailable;
     case "from-post":
@@ -368,6 +370,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     const { db } = await import("@/lib/db/schema");
     await db.driveFolders.put(folder);
     set({ folders: [...get().folders, folder] });
+    void publishFolderEvent(folder);
     return folder.id;
   },
 
@@ -443,6 +446,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
           uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, progress: 100, status: "complete", fileId: driveFile.id } : job)),
           selectedFileId: driveFile.id,
         }));
+        void publishFileMetadataEvent(driveFile, secretKey);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           set((state) => ({
@@ -501,6 +505,39 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
   },
 
+  async deletePermanently(id) {
+    const { db } = await import("@/lib/db/schema");
+    const file = get().files.find((item) => item.id === id);
+    if (!file) return;
+
+    const identity = useIdentityStore.getState().identity;
+    const serverUrl = useBlossomStore.getState().serverUrl;
+    if (file.sha256 && serverUrl && identity?.nsec) {
+      try {
+        const decoded = decode(identity.nsec);
+        if (decoded.type === "nsec") {
+          const server: BlossomServer = { url: serverUrl };
+          await deleteBlob(server, file.sha256, decoded.data);
+        }
+      } catch {
+        // Blossom deletion is best-effort; proceed with local removal
+      }
+    }
+
+    await db.driveFiles.delete(id);
+    const state = get();
+    set({
+      files: state.files.filter((item) => item.id !== id),
+      folders: state.folders.map((folder) =>
+        file.folderId && folder.id === file.folderId
+          ? { ...folder, fileCount: Math.max(0, folder.fileCount - 1), updatedAt: Date.now() }
+          : folder
+      ),
+      ...(state.selectedFileId === id ? { selectedFileId: state.files.find((f) => f.id !== id)?.id ?? null } : {}),
+      selectedFileIds: state.selectedFileIds.filter((fid) => fid !== id),
+    });
+  },
+
   async importAttachment(attachment, sourceMessageId) {
     const identity = useIdentityStore.getState().identity;
     const now = Date.now();
@@ -539,6 +576,47 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     return file.id;
   },
 }));
+
+async function publishFileMetadataEvent(file: DriveFile, sk: Uint8Array): Promise<void> {
+  try {
+    const { createFileMetadataEvent } = await import("@post/nostr-core");
+    const { finalizeEvent } = await import("nostr-tools/pure");
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+
+    const pool = useRelaysStore.getState().pool;
+    if (!pool) return;
+
+    const eventTemplate = createFileMetadataEvent(file);
+    const signedEvent = finalizeEvent(eventTemplate, sk);
+    await pool.publish(signedEvent);
+  } catch {
+    // Publishing file metadata to relays is best-effort
+  }
+}
+
+async function publishFolderEvent(folder: DriveFolder): Promise<void> {
+  try {
+    const { createFolderEvent } = await import("@post/nostr-core");
+    const { finalizeEvent } = await import("nostr-tools/pure");
+    const { useIdentityStore } = await import("@/lib/stores/identity");
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+
+    const identity = useIdentityStore.getState().identity;
+    const pool = useRelaysStore.getState().pool;
+    if (!identity?.nsec || !pool) return;
+
+    const { decode } = await import("nostr-tools/nip19");
+    const decoded = decode(identity.nsec);
+    if (decoded.type !== "nsec") return;
+    const sk = decoded.data;
+
+    const eventTemplate = createFolderEvent(folder);
+    const signedEvent = finalizeEvent(eventTemplate, sk);
+    await pool.publish(signedEvent);
+  } catch {
+    // Publishing folder event to relays is best-effort
+  }
+}
 
 export function getVisibleDriveFiles(state = useDriveStore.getState(), screen: DriveScreen = "my-files"): DriveFile[] {
   const query = state.query.trim().toLowerCase();

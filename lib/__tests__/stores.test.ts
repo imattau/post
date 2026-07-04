@@ -369,7 +369,7 @@ describe("drive store", () => {
 
     const recentCutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
     expect(getVisibleDriveFiles(state, "recent").every((file) => file.updatedAt >= recentCutoff)).toBe(true);
-    expect(getVisibleDriveFiles(state, "shared").every((file) => file.sharedWith.length >= 3)).toBe(true);
+    expect(getVisibleDriveFiles(state, "shared").every((file) => file.sharedWith.length > 0)).toBe(true);
     expect(getVisibleDriveFiles(state, "offline").every((file) => file.offlineAvailable)).toBe(true);
     expect(getVisibleDriveFiles(state, "from-post").every((file) => file.source === "post" || file.source === "attachment")).toBe(true);
     expect(getVisibleDriveFiles(state, "trash").every((file) => file.trashed)).toBe(true);
