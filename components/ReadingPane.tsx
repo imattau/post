@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback } from "react";
 import type { MockMessage } from "@/lib/mock/threads";
 import type { Message, Profile } from "@post/nostr-core";
 import { useDriveStore } from "@/lib/stores/drive";
@@ -78,6 +77,7 @@ export default function ReadingPane({
           <SubjectPills
             labels={message.labels}
             encrypted={message.encrypted}
+            isGiftWrapped={message.isGiftWrapped}
             relayCount={message.relayCount}
           />
         </div>

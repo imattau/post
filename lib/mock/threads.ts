@@ -27,13 +27,25 @@ export interface MockMessage {
   createdAt: number;
   read: boolean;
   starred: boolean;
+  archived?: boolean;
+  spam?: boolean;
   labels: string[];
   attachments: MockAttachment[];
   encrypted: boolean;
+  isGiftWrapped?: boolean;
   relayCount: number;
   threadLength: number;
   deliveryStatus?: "pending" | "sent" | "delivered" | "failed";
   replyTo?: string | null;
+  kind?: number;
+  pubkey?: string;
+  recipientPubkey?: string;
+  raw?: string;
+  tags?: string[][];
+  snoozedUntil?: number | null;
+  mailbox?: string;
+  labelIds?: string[];
+  relayUrls?: string[];
 }
 
 const now = Date.now();

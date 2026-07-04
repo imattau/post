@@ -6,7 +6,7 @@ import { useIdentityStore } from "@/lib/stores/identity";
 import { useMemo, useEffect, useState } from "react";
 import type { MockMessage, MockContact } from "@/lib/mock/threads";
 import type { AttachmentRef, Draft } from "@/lib/types";
-import type { Profile } from "@post/nostr-core";
+import type { Message, Profile } from "@post/nostr-core";
 
 function draftToMessage(draft: Draft): MockMessage {
   const recipientNames = draft.to.map((r) => r.name).join(", ") || "No recipient";
@@ -110,22 +110,7 @@ export function useMailboxMessages(mailbox: string): {
 }
 
 export function realToMock(
-  real: {
-    id: string;
-    pubkey: string;
-    recipientPubkey?: string;
-    subject: string;
-    preview: string;
-    content: string;
-    createdAt: number;
-    read: boolean;
-    starred: boolean;
-    labelIds?: string[];
-    attachments?: AttachmentRef[];
-    isEncrypted?: boolean;
-    relayUrls?: string[];
-    deliveryStatus?: string;
-  },
+  real: Message,
   labels: Record<string, { name: string }> = {},
   profiles: Record<string, Profile> = {},
   myPubkey: string | null = null
@@ -158,12 +143,24 @@ export function realToMock(
     createdAt: real.createdAt,
     read: real.read,
     starred: real.starred,
+    archived: real.archived,
+    spam: real.spam,
     labels: (real.labelIds ?? []).map((id) => labels[id]?.name ?? id),
     attachments: real.attachments ?? [],
     encrypted: real.isEncrypted ?? true,
+    isGiftWrapped: real.isGiftWrapped,
     relayCount: real.relayUrls?.length ?? 3,
     threadLength: 1,
-    deliveryStatus: (real as any).deliveryStatus as MockMessage["deliveryStatus"],
-    replyTo: (real as any).replyTo as string | null | undefined,
+    deliveryStatus: real.deliveryStatus,
+    replyTo: real.replyTo,
+    kind: real.kind,
+    pubkey: real.pubkey,
+    recipientPubkey: real.recipientPubkey,
+    raw: real.raw,
+    tags: real.tags,
+    snoozedUntil: real.snoozedUntil,
+    mailbox: real.mailbox,
+    labelIds: real.labelIds,
+    relayUrls: real.relayUrls,
   };
 }

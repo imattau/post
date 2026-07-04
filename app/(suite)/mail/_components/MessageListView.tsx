@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useState, useMemo, useRef } from "react";
 import { useVirtualizer, measureElement } from "@tanstack/react-virtual";
-import { Search, Ellipsis, Inbox, SearchX } from "lucide-react";
+import { Search, Inbox, SearchX } from "lucide-react";
 import type { MockMessage } from "@/lib/mock/threads";
 import MessageRow from "@/components/MessageRow";
 import EmptyState from "@/components/EmptyState";
@@ -165,13 +165,7 @@ export default function MessageListView({
             {chip}
           </button>
         ))}
-        <button
-          disabled
-          className="text-text-tertiary ml-1 cursor-not-allowed opacity-50"
-          aria-label="No more filters available"
-        >
-          <Ellipsis size={18} />
-        </button>
+
       </div>
 
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-2 relative" role="list" aria-label="Message list">

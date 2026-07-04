@@ -5,7 +5,7 @@ import { useComposeStore } from "@/lib/stores/compose";
 import { useBlossomStore } from "@/lib/stores/blossom";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useContactsStore } from "@/lib/stores/contacts";
-import { AtSign, Ellipsis, Minus, X, ChevronDown, LoaderCircle, FileImage, File } from "lucide-react";
+import { AtSign, Ellipsis, Minus, X, ChevronDown, LoaderCircle, File } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import { toast } from "sonner";

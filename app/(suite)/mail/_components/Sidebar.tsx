@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Inbox, Star, Clock, ArrowUpRight, FileEdit, Archive, ShieldAlert, SquarePen, Tag, Plus } from "lucide-react";
+import { Inbox, Star, Clock, ArrowUpRight, FileEdit, Archive, ShieldAlert, SquarePen, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { toast } from "sonner";
 

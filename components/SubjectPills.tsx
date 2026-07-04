@@ -1,17 +1,12 @@
-const LABEL_COLORS: Record<string, string> = {
-  Work: "var(--color-info)",
-  Friends: "var(--color-ok)",
-  Projects: "var(--color-warn)",
-  Receipts: "var(--color-danger)",
-};
-
 export default function SubjectPills({
   labels,
   encrypted,
+  isGiftWrapped,
   relayCount,
 }: {
   labels: string[];
   encrypted: boolean;
+  isGiftWrapped?: boolean;
   relayCount: number;
 }) {
   return (
@@ -24,9 +19,14 @@ export default function SubjectPills({
           {label}
         </span>
       ))}
-      {encrypted && (
+      {encrypted && !isGiftWrapped && (
         <span className="h-[28px] px-3 rounded-pill bg-sidebar border border-border text-ok text-[12px] font-medium leading-[28px]">
           Encrypted
+        </span>
+      )}
+      {isGiftWrapped && (
+        <span className="h-[28px] px-3 rounded-pill bg-sidebar border border-border text-brand-light text-[12px] font-medium leading-[28px]">
+          Private
         </span>
       )}
       <span className="h-[28px] px-3 rounded-pill bg-sidebar border border-border text-text-secondary text-[12px] font-medium leading-[28px]">

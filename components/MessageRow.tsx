@@ -3,13 +3,6 @@ import { Check, CheckCheck, X, Reply } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import Avatar from "./Avatar";
 
-const LABEL_COLORS: Record<string, string> = {
-  Work: "var(--color-info)",
-  Friends: "var(--color-ok)",
-  Projects: "var(--color-warn)",
-  Receipts: "var(--color-danger)",
-};
-
 export default function MessageRow({
   message,
   selected,
