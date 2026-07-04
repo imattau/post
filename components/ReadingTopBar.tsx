@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLabelsStore } from "@/lib/stores/labels";
+import { Menu } from "@base-ui/react/menu";
 
 export default function ReadingTopBar({
   onBack,
@@ -76,56 +77,51 @@ export default function ReadingTopBar({
       >
         ☆
       </button>
-      <div className="relative">
-        <button
-          onClick={() => setMenuOpen((open) => !open)}
+      <Menu.Root open={menuOpen} onOpenChange={(open) => setMenuOpen(open)}>
+        <Menu.Trigger
           aria-label="More message actions"
           className="text-[19px] font-semibold text-text-secondary cursor-pointer hover:text-text-near-white transition-colors duration-150"
         >
           ⋮
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-8 z-20 w-44 overflow-hidden rounded-[10px] border border-border bg-pill-subtle shadow-lg">
-            <button
-              onClick={() => { onToggleSpam(); setMenuOpen(false); }}
-              className="block w-full px-3 py-2 text-left text-[12px] text-text-primary hover:bg-surface-active"
-            >
-              {spam ? "Not spam" : "Mark spam"}
-            </button>
-            <button
-              onClick={() => { onCopyEventId(); setMenuOpen(false); }}
-              className="block w-full px-3 py-2 text-left text-[12px] text-text-primary hover:bg-surface-active"
-            >
-              Copy event id
-            </button>
-            <div className="border-t border-border my-1" />
-            <div className="px-3 py-1 text-[10px] font-semibold text-text-tertiary tracking-wider">LABELS</div>
-            {allIds.length === 0 && (
-              <div className="px-3 py-1.5 text-[11px] text-text-tertiary">No labels yet</div>
-            )}
-            {allIds.map((labelId) => {
-              const label = byId[labelId];
-              if (!label) return null;
-              const assigned = label.messageIds.includes(messageId);
-              return (
-                <button
-                  key={labelId}
-                  onClick={() => {
-                    if (assigned) removeLabel(messageId, labelId);
-                    else assignLabel(messageId, labelId);
-                    setMenuOpen(false);
-                  }}
-                  className="block w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-surface-active flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
-                  <span className="flex-1">{label.name}</span>
-                  {assigned && <span className="text-brand-light">✓</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Positioner className="z-20" side="bottom" align="end">
+            <Menu.Popup className="w-44 overflow-hidden rounded-[10px] border border-border bg-pill-subtle shadow-lg">
+              <Menu.Item onClick={() => { onToggleSpam(); setMenuOpen(false); }} className="block w-full px-3 py-2 text-left text-[12px] text-text-primary hover:bg-surface-active data-[highlighted]:bg-surface-active cursor-pointer">
+                {spam ? "Not spam" : "Mark spam"}
+              </Menu.Item>
+              <Menu.Item onClick={() => { onCopyEventId(); setMenuOpen(false); }} className="block w-full px-3 py-2 text-left text-[12px] text-text-primary hover:bg-surface-active data-[highlighted]:bg-surface-active cursor-pointer">
+                Copy event id
+              </Menu.Item>
+              <Menu.Separator className="border-t border-border my-1" />
+              <div className="px-3 py-1 text-[10px] font-semibold text-text-tertiary tracking-wider">LABELS</div>
+              {allIds.length === 0 && (
+                <div className="px-3 py-1.5 text-[11px] text-text-tertiary">No labels yet</div>
+              )}
+              {allIds.map((labelId) => {
+                const label = byId[labelId];
+                if (!label) return null;
+                const assigned = label.messageIds.includes(messageId);
+                return (
+                  <Menu.Item
+                    key={labelId}
+                    onClick={() => {
+                      if (assigned) removeLabel(messageId, labelId);
+                      else assignLabel(messageId, labelId);
+                      setMenuOpen(false);
+                    }}
+                    className="block w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-surface-active data-[highlighted]:bg-surface-active flex items-center gap-2 cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
+                    <span className="flex-1">{label.name}</span>
+                    {assigned && <span className="text-brand-light">✓</span>}
+                  </Menu.Item>
+                );
+              })}
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
     </div>
   );
 }

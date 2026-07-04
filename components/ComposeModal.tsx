@@ -1,10 +1,14 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo, useLayoutEffect } from "react";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useBlossomStore } from "@/lib/stores/blossom";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useContactsStore } from "@/lib/stores/contacts";
+import { Dialog } from "@base-ui/react/dialog";
+import { Menu } from "@base-ui/react/menu";
+import { toast } from "sonner";
+import { formatSize, wrapTextareaSelection } from "@/lib/utils";
 import MessageBody from "./MessageBody";
 import UploadProgress from "./UploadProgress";
 
@@ -17,11 +21,16 @@ interface UploadItem {
   error: string | null;
 }
 
+interface ComposeFormFields {
+  subject: string;
+  body: string;
+}
+
 export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingSelectionRef = useRef<number | null>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
-  const [showSendMenu, setShowSendMenu] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -82,15 +91,9 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   }, [status, open]);
 
   useEffect(() => {
-    if (bodyRef.current && bodyRef.current.innerText !== draft.body) {
-      bodyRef.current.innerText = draft.body;
-    }
-  }, [draft.id, draft.body]);
-
-  useEffect(() => {
     if (status === "sent") {
-      const timer = setTimeout(onClose, 1500);
-      return () => clearTimeout(timer);
+      toast.success("Message sent");
+      onClose();
     }
   }, [status, onClose]);
 
@@ -258,22 +261,29 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     if (e.target) e.target.value = "";
   }, [addAttachment, updateAttachment, uploadFile]);
 
-  const insertFormat = useCallback((prefix: string, suffix: string) => {
-    if (!bodyRef.current) return;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    const text = range.toString();
-    range.deleteContents();
-    range.insertNode(document.createTextNode(prefix + text + suffix));
-    updateBody(bodyRef.current.innerText);
-  }, [updateBody]);
+  const applyFormat = useCallback((prefix: string, suffix = "", fallback = "") => {
+    if (!textareaRef.current) return;
+    const start = textareaRef.current.selectionStart ?? draft.body.length;
+    const selection = draft.body.slice(start, textareaRef.current.selectionEnd ?? draft.body.length);
+    const content = selection || fallback;
+    const next = wrapTextareaSelection(textareaRef.current, prefix, suffix, draft.body, fallback);
+    const nextCaret = start + prefix.length + content.length + suffix.length;
 
-  const handleBodyInput = useCallback(() => {
-    if (bodyRef.current) {
-      updateBody(bodyRef.current.innerText);
-    }
-  }, [updateBody]);
+    pendingSelectionRef.current = nextCaret;
+    updateBody(next);
+  }, [draft.body, updateBody]);
+
+  useLayoutEffect(() => {
+    if (pendingSelectionRef.current == null) return;
+    const position = pendingSelectionRef.current;
+    pendingSelectionRef.current = null;
+    textareaRef.current?.focus();
+    textareaRef.current?.setSelectionRange(position, position);
+  }, [draft.body]);
+
+  const handleToolbarMouseDown = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+  }, []);
 
   const handleSchedule = useCallback(async () => {
     if (!scheduleDate || !scheduleTime) return;
@@ -286,22 +296,17 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
 
   const formatToolbar = (
     <div className="flex items-center gap-0.5 px-5 py-1.5 border-t border-modal-stroke">
-      <button onMouseDown={(e) => { e.preventDefault(); insertFormat("**", "**"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-semibold rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">B</button>
-      <button onMouseDown={(e) => { e.preventDefault(); insertFormat("_", "_"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium italic rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">I</button>
-      <button onMouseDown={(e) => { e.preventDefault(); insertFormat("__", "__"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium underline rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">U</button>
-      <button onMouseDown={(e) => { e.preventDefault(); insertFormat("[", "](url)"); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">⌁</button>
+      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("**", "**")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-semibold rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">B</button>
+      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("_", "_")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium italic rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">I</button>
+      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("__", "__")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] font-medium underline rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">U</button>
+      <button onMouseDown={handleToolbarMouseDown} onClick={() => applyFormat("[", "](url)", "text")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">⌁</button>
       <button onClick={handleAttach} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">▣</button>
-      <button onMouseDown={(e) => { e.preventDefault(); insertFormat("☺", ""); }} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">☺</button>
+      <button onClick={() => applyFormat("☺")} className="w-7 h-7 flex items-center justify-center text-text-modal-2 text-[13px] rounded hover:bg-pill-subtle cursor-pointer transition-colors duration-150">☺</button>
       <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary text-[13px] rounded cursor-not-allowed opacity-50">@</button>
       <button disabled className="w-7 h-7 flex items-center justify-center text-text-tertiary text-[13px] rounded cursor-not-allowed opacity-50">⋯</button>
       <span className="text-[10px] text-text-placeholder ml-auto">Markdown supported</span>
     </div>
   );
-
-  function formatSize(bytes: number): string {
-    if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} KB`;
-    return `${(bytes / 1_000_000).toFixed(1)} MB`;
-  }
 
   if (status === "minimized") {
     return (
@@ -320,28 +325,14 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     );
   }
 
-  if (status === "sent") {
-    return (
-      <>
-        <div className="fixed inset-0 z-40" style={{ backgroundColor: "rgba(5,7,11,0.44)" }} />
-        <div className="fixed z-50" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
-          <div className="rounded-[20px] bg-modal-card border border-modal-stroke px-10 py-8 text-center shadow-lg">
-            <p className="text-ok text-[16px] font-semibold">Message sent</p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   const isSending = status === "sending";
 
   return (
     <>
-      <div className="fixed inset-0 z-40 transition-opacity duration-200" style={{ backgroundColor: "rgba(5,7,11,0.44)" }} onClick={handleClose} />
-      <div
-        className="fixed z-50 animate-[composeOpen_250ms_ease-out]"
-        style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 730, height: 784 }}
-      >
+    <Dialog.Root open modal onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <Dialog.Backdrop className="fixed inset-0 z-40 transition-opacity duration-200" style={{ backgroundColor: "rgba(5,7,11,0.44)" }} />
+      <Dialog.Portal>
+      <Dialog.Popup className="fixed z-50 animate-[composeOpen_250ms_ease-out]" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 730, height: 784 }}>
         <div className="w-full h-full rounded-[24px]" style={{ boxShadow: "0 20px 40px 0 rgba(0,0,0,0.5)" }}>
           <div className="w-full h-full rounded-[20px] bg-modal-card border border-modal-stroke flex flex-col overflow-hidden">
             {/* Header */}
@@ -503,13 +494,13 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 <MessageBody body={draft.body || "Nothing to preview yet."} />
               </div>
             ) : (
-              <div
-                ref={bodyRef}
-                contentEditable={!isSending}
-                onInput={handleBodyInput}
-                className="flex-1 p-5 text-[14px] text-text-modal outline-none overflow-y-auto whitespace-pre-wrap empty:before:content-[attr(data-placeholder)]"
-                data-placeholder="Write your message…"
-                suppressContentEditableWarning
+              <textarea
+                ref={textareaRef}
+                value={draft.body}
+                onChange={(e) => updateBody(e.target.value)}
+                placeholder="Write your message…"
+                disabled={isSending}
+                className="flex-1 p-5 text-[14px] text-text-modal outline-none overflow-y-auto resize-none bg-transparent placeholder-text-placeholder"
               />
             )}
 
@@ -625,23 +616,26 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                     "Send"
                   )}
                 </button>
-                <button
-                  onClick={() => setShowSendMenu(!showSendMenu)}
-                  disabled={isSending}
-                  className="h-10 w-[34px] rounded-r-[12px] bg-brand text-white flex items-center justify-center cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 border-l border-white/20 disabled:opacity-40"
-                >
-                  <span className="text-[12px]">⌄</span>
-                </button>
-                {showSendMenu && (
-                  <div className="absolute bottom-full left-0 mb-1 w-44 rounded-pill bg-pill-subtle border border-border shadow-lg overflow-hidden z-10">
-                    <button onClick={() => { send(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-primary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Send</button>
-                    <button onClick={() => { setShowPreview((show) => !show); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">
-                      {showPreview ? "Edit" : "Preview"}
-                    </button>
-                    <button onClick={() => { useComposeStore.getState().autosave(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Save Draft</button>
-                    <button onClick={() => { requestDiscard(); setShowSendMenu(false); }} className="w-full px-4 py-2.5 text-[12px] text-danger text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer">Discard</button>
-                  </div>
-                )}
+                <Menu.Root>
+                  <Menu.Trigger
+                    disabled={isSending}
+                    className="h-10 w-[34px] rounded-r-[12px] bg-brand text-white flex items-center justify-center cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-150 border-l border-white/20 disabled:opacity-40"
+                  >
+                    <span className="text-[12px]">⌄</span>
+                  </Menu.Trigger>
+                  <Menu.Portal>
+                    <Menu.Positioner className="absolute bottom-full left-0 mb-1 z-10" side="top" align="start">
+                      <Menu.Popup className="w-44 rounded-pill bg-pill-subtle border border-border shadow-lg overflow-hidden">
+                        <Menu.Item onClick={send} className="w-full px-4 py-2.5 text-[12px] text-text-primary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer data-[highlighted]:bg-surface-active">Send</Menu.Item>
+                        <Menu.Item onClick={() => setShowPreview((show) => !show)} className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer data-[highlighted]:bg-surface-active">
+                          {showPreview ? "Edit" : "Preview"}
+                        </Menu.Item>
+                        <Menu.Item onClick={() => useComposeStore.getState().autosave()} className="w-full px-4 py-2.5 text-[12px] text-text-secondary text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer data-[highlighted]:bg-surface-active">Save Draft</Menu.Item>
+                        <Menu.Item onClick={requestDiscard} className="w-full px-4 py-2.5 text-[12px] text-danger text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer data-[highlighted]:bg-surface-active">Discard</Menu.Item>
+                      </Menu.Popup>
+                    </Menu.Positioner>
+                  </Menu.Portal>
+                </Menu.Root>
               </div>
               <button
                 onClick={() => setShowSchedule(true)}
@@ -665,7 +659,9 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         </div>
-      </div>
+        </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {showUploadOverlay && uploads.length > 0 && (
         <UploadProgress
@@ -683,18 +679,18 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
           onHide={() => setShowUploadOverlay(false)}
         />
       )}
-      {showDiscardConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(5,7,11,0.44)" }}>
+
+      <Dialog.Root open={showDiscardConfirm} onOpenChange={(open) => { if (!open) setShowDiscardConfirm(false); }}>
+        <Dialog.Backdrop className="fixed inset-0 z-50" style={{ backgroundColor: "rgba(5,7,11,0.44)" }} />
+        <Dialog.Portal>
+        <Dialog.Popup className="fixed z-50" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
           <div className="w-[320px] rounded-[14px] border border-border bg-modal-card p-5 shadow-lg">
             <p className="text-[14px] font-semibold text-text-modal">Discard draft?</p>
             <p className="mt-2 text-[12px] text-text-modal-2">You will lose any unsaved changes.</p>
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setShowDiscardConfirm(false)}
-                className="h-8 px-4 rounded-[10px] border border-border bg-modal-2 text-[12px] font-medium text-text-modal-2 cursor-pointer hover:brightness-110"
-              >
+              <Dialog.Close className="h-8 px-4 rounded-[10px] border border-border bg-modal-2 text-[12px] font-medium text-text-modal-2 cursor-pointer hover:brightness-110">
                 Cancel
-              </button>
+              </Dialog.Close>
               <button
                 onClick={handleDiscard}
                 className="h-8 px-4 rounded-[10px] bg-danger text-white text-[12px] font-semibold cursor-pointer hover:brightness-110"
@@ -703,8 +699,10 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <input ref={fileInputRef} type="file" multiple onChange={handleFiles} className="hidden" />
     </>
   );

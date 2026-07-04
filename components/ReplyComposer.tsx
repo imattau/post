@@ -2,6 +2,7 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useComposeStore } from "@/lib/stores/compose";
+import { wrapTextareaSelection } from "@/lib/utils";
 
 export default function ReplyComposer({
   recipientName,
@@ -33,14 +34,12 @@ export default function ReplyComposer({
   }, [body]);
 
   const applyFormat = useCallback((prefix: string, suffix = "", fallback = "") => {
-    const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? body.length;
-    const end = textarea?.selectionEnd ?? body.length;
-    const selection = body.slice(start, end);
+    if (!textareaRef.current) return;
+    const start = textareaRef.current.selectionStart ?? body.length;
+    const selection = body.slice(start, textareaRef.current.selectionEnd ?? body.length);
     const content = selection || fallback;
-    const insertion = `${prefix}${content}${suffix}`;
-    const next = `${body.slice(0, start)}${insertion}${body.slice(end)}`;
-    const nextCaret = start + insertion.length;
+    const next = wrapTextareaSelection(textareaRef.current, prefix, suffix, body, fallback);
+    const nextCaret = start + prefix.length + content.length + suffix.length;
 
     pendingSelectionRef.current = nextCaret;
     setBody(next);

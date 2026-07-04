@@ -1,11 +1,8 @@
 "use client";
 
 import { useState } from "react";
-
-function formatSize(bytes: number): string {
-  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} KB`;
-  return `${(bytes / 1_000_000).toFixed(1)} MB`;
-}
+import { Dialog } from "@base-ui/react/dialog";
+import { formatSize } from "@/lib/utils";
 
 export default function AttachmentCard({
   fileName,
@@ -84,23 +81,24 @@ export default function AttachmentCard({
           )}
         </div>
       </div>
-      {previewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setPreviewOpen(false)}>
-          <div className="max-w-[720px] rounded-[12px] border border-border bg-modal-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <p className="truncate text-[13px] font-semibold text-text-modal">{fileName}</p>
-              <button onClick={() => setPreviewOpen(false)} className="text-[18px] text-text-modal-2 hover:text-text-modal">×</button>
-            </div>
-            {url ? (
-              <img src={url} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
-            ) : (
-              <div className="flex h-48 w-80 items-center justify-center rounded-[8px] bg-pill-subtle">
-                <p className="text-[12px] text-text-tertiary">Preview unavailable for this attachment.</p>
-              </div>
-            )}
+      <Dialog.Root open={previewOpen} onOpenChange={(open) => setPreviewOpen(open)}>
+        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/60" />
+        <Dialog.Portal>
+        <Dialog.Popup className="fixed z-50 max-w-[720px] rounded-[12px] border border-border bg-modal-card p-4 shadow-lg" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <p className="truncate text-[13px] font-semibold text-text-modal">{fileName}</p>
+            <Dialog.Close className="text-[18px] text-text-modal-2 hover:text-text-modal cursor-pointer">×</Dialog.Close>
           </div>
-        </div>
-      )}
+          {url ? (
+            <img src={url} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
+          ) : (
+            <div className="flex h-48 w-80 items-center justify-center rounded-[8px] bg-pill-subtle">
+              <p className="text-[12px] text-text-tertiary">Preview unavailable for this attachment.</p>
+            </div>
+          )}
+        </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

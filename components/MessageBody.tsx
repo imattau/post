@@ -1,53 +1,56 @@
-function renderLine(line: string, i: number) {
-  const trimmed = line.trim();
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
-  if (trimmed.startsWith("• ") || trimmed.startsWith("- ")) {
-    return (
-      <div key={i} className="flex gap-2 text-[13px] leading-6 text-text-near-white">
-        <span className="w-[6px] h-[6px] rounded-full bg-brand-light mt-[9px] flex-shrink-0" />
-        <span>{trimmed.slice(2)}</span>
-      </div>
-    );
-  }
-
-  if (trimmed.startsWith("**") && trimmed.endsWith("**")) {
-    return (
-      <p key={i} className="font-semibold text-[14px] text-text-primary mt-4 mb-1">
-        {trimmed.slice(2, -2)}
-      </p>
-    );
-  }
-
-  if (trimmed.startsWith("1. ")) {
-    return (
-      <div key={i} className="flex gap-2 text-[13px] leading-6 text-text-near-white">
-        <span className="text-text-secondary font-medium w-4 flex-shrink-0">
-          {trimmed.split(". ")[0]}.
-        </span>
-        <span>{trimmed.slice(trimmed.indexOf(". ") + 2)}</span>
-      </div>
-    );
-  }
-
-  if (trimmed === "") {
-    return <div key={i} className="h-2" />;
-  }
-
-  const bold = trimmed.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>;
-    }
-    return part;
-  });
-
-  return (
-    <p key={i} className="text-[14px] leading-6 text-text-near-white">
-      {bold}
+const components: Components = {
+  p: ({ children }) => (
+    <p className="text-[14px] leading-6 text-text-near-white [&_code]:text-[13px] [&_code]:bg-pill-subtle [&_code]:px-1 [&_code]:rounded">
+      {children}
     </p>
-  );
-}
+  ),
+  strong: ({ children }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  ul: ({ children }) => (
+    <ul className="flex flex-col gap-1 list-none pl-0">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="flex flex-col gap-1 list-none pl-0">{children}</ol>
+  ),
+  li: ({ children, ...props }) => (
+    <li {...props} className="flex gap-2 text-[13px] leading-6 text-text-near-white [&>p]:m-0">
+      <span className="w-[6px] h-[6px] rounded-full bg-brand-light mt-[9px] flex-shrink-0" />
+      <span className="flex-1">{children}</span>
+    </li>
+  ),
+  h1: ({ children }) => (
+    <p className="font-semibold text-[14px] text-text-primary mt-4 mb-1">{children}</p>
+  ),
+  h2: ({ children }) => (
+    <p className="font-semibold text-[14px] text-text-primary mt-4 mb-1">{children}</p>
+  ),
+  h3: ({ children }) => (
+    <p className="font-semibold text-[14px] text-text-primary mt-4 mb-1">{children}</p>
+  ),
+  a: ({ children, href }) => (
+    <a href={href} className="text-brand-light underline" target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+  pre: ({ children }) => (
+    <pre className="bg-pill-subtle rounded-[8px] p-3 overflow-x-auto text-[13px] leading-5 my-2">{children}</pre>
+  ),
+  code: ({ children }) => (
+    <code className="text-[13px] bg-pill-subtle px-1 rounded">{children}</code>
+  ),
+};
 
 export default function MessageBody({ body }: { body: string }) {
-  const lines = body.split("\n");
-  return <div className="max-w-[570px]">{lines.map(renderLine)}</div>;
+  if (!body) return null;
+  return (
+    <div className="max-w-[570px]">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {body}
+      </ReactMarkdown>
+    </div>
+  );
 }

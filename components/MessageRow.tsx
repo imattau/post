@@ -1,14 +1,6 @@
 import type { MockMessage } from "@/lib/mock/threads";
+import { formatRelativeTime } from "@/lib/utils";
 import Avatar from "./Avatar";
-
-function formatTime(ts: number): string {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return "now";
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3600_000)}h`;
-  const d = new Date(ts);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 const LABEL_COLORS: Record<string, string> = {
   Work: "var(--color-info)",
@@ -65,7 +57,7 @@ export default function MessageRow({
           </span>
           {!message.read && <div className="w-[7px] h-[7px] rounded-full bg-brand-light flex-shrink-0" />}
           <span className={`ml-auto text-[11px] flex-shrink-0 ${!message.read ? "font-semibold text-white" : "text-text-tertiary"}`}>
-            {formatTime(message.createdAt)}
+            {formatRelativeTime(message.createdAt)}
           </span>
         </div>
         <p

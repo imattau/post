@@ -1,14 +1,5 @@
+import { formatDate } from "@/lib/utils";
 import Avatar from "./Avatar";
-
-function formatMessageDate(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 export default function SenderBlock({
   name,
@@ -34,7 +25,7 @@ export default function SenderBlock({
         <p className="mt-1 text-[11px] text-text-tertiary">to {recipientName}</p>
       </div>
       <div className="flex-shrink-0 text-right">
-        <p className="text-[11px] text-text-tertiary">{formatMessageDate(createdAt)}</p>
+        <p className="text-[11px] text-text-tertiary">{formatDate(createdAt)}</p>
         {verified && <p className="mt-1 text-[10px] font-medium text-ok">✓ verified</p>}
       </div>
     </div>

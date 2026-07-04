@@ -1,15 +1,7 @@
 "use client";
 
 import type { Message } from "@post/nostr-core";
-
-function formatTime(ts: number): string {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return "now";
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3600_000)}h`;
-  const d = new Date(ts);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+import { formatRelativeTime } from "@/lib/utils";
 
 export default function ThreadView({
   messages,
@@ -45,7 +37,7 @@ export default function ThreadView({
                   {msg.pubkey.slice(0, 12)}…
                 </span>
                 <span className="ml-auto text-[10px] text-text-tertiary flex-shrink-0">
-                  {formatTime(msg.createdAt)}
+                  {formatRelativeTime(msg.createdAt)}
                 </span>
               </div>
               {msg.subject && (

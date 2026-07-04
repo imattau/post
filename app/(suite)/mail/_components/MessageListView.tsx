@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useRef } from "react";
+import { useVirtualizer, measureElement } from "@tanstack/react-virtual";
 import type { MockMessage } from "@/lib/mock/threads";
 import MessageRow from "@/components/MessageRow";
 import EmptyState from "@/components/EmptyState";
@@ -85,6 +86,8 @@ export default function MessageListView({
   const filteredIds = useMemo(() => messages.map((m) => m.id), [messages]);
   useKeyboardNav(filteredIds, effectiveSelectedId, handleSelect, [filteredIds, effectiveSelectedId]);
 
+  const listRef = useRef<HTMLDivElement>(null);
+
   const filtered = useMemo(() => {
     let result = messages;
 
@@ -103,6 +106,14 @@ export default function MessageListView({
     }
     return result;
   }, [messages, activeFilter, searchQuery]);
+
+  const virtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 112,
+    measureElement,
+    overscan: 5,
+  });
 
   return (
     <div className="flex flex-col h-full min-h-0" role="region" aria-label={title} suppressHydrationWarning>
@@ -162,27 +173,41 @@ export default function MessageListView({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-2 relative" role="list" aria-label="Message list">
+      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-2 relative" role="list" aria-label="Message list">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : filtered.length > 0 ? (
+          <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
+            {virtualizer.getVirtualItems().map((virtualItem) => (
+              <div
+                key={virtualItem.key}
+                ref={virtualizer.measureElement}
+                data-index={virtualItem.index}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+              >
+                <MessageRow
+                  message={filtered[virtualItem.index]}
+                  selected={effectiveSelectedId === filtered[virtualItem.index].id}
+                  onClick={() => handleSelect(filtered[virtualItem.index].id)}
+                  batchMode={batchMode}
+                  batchSelected={batchSelection.has(filtered[virtualItem.index].id)}
+                  onBatchToggle={() => handleBatchToggle(filtered[virtualItem.index].id)}
+                />
+              </div>
+            ))}
+          </div>
         ) : messages.length === 0 ? (
           <EmptyState icon="▣" title="No messages yet" description="Start by composing a new message." />
-        ) : filtered.length === 0 && searchQuery ? (
+        ) : searchQuery ? (
           <EmptyState icon="⌕" title="No results" description="No messages match your search." />
-        ) : filtered.length === 0 ? (
-          <EmptyState title={`No ${title.toLowerCase()} messages`} />
         ) : (
-          filtered.map((msg) => (
-            <MessageRow
-              key={msg.id}
-              message={msg}
-              selected={effectiveSelectedId === msg.id}
-              onClick={() => handleSelect(msg.id)}
-              batchMode={batchMode}
-              batchSelected={batchSelection.has(msg.id)}
-              onBatchToggle={() => handleBatchToggle(msg.id)}
-            />
-          ))
+          <EmptyState title={`No ${title.toLowerCase()} messages`} />
         )}
         {batchSelection.size > 0 && (
           <div className="sticky bottom-0 left-0 right-0 flex items-center gap-2 px-4 py-3 bg-dock border-t border-border">

@@ -84,9 +84,9 @@ describe("ReadingTopBar", () => {
     renderTopBar({ onToggleSpam, onCopyEventId });
 
     await userEvent.click(screen.getByText("⋮"));
-    await userEvent.click(screen.getByText("Mark spam"));
+    await userEvent.click(await screen.findByText("Mark spam"));
     await userEvent.click(screen.getByText("⋮"));
-    await userEvent.click(screen.getByText("Copy event id"));
+    await userEvent.click(await screen.findByText("Copy event id"));
 
     expect(onToggleSpam).toHaveBeenCalledOnce();
     expect(onCopyEventId).toHaveBeenCalledOnce();

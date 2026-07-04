@@ -1,5 +1,7 @@
 "use client";
 
+import { formatSize } from "@/lib/utils";
+
 export interface UploadFile {
   id: string;
   name: string;
@@ -8,12 +10,6 @@ export interface UploadFile {
   status: "pending" | "uploading" | "complete" | "failed" | "cancelled";
   letter: string;
   color: string;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1000) return `${bytes} B`;
-  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} KB`;
-  return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
 const STATUS_COLORS: Record<string, { bar: string; text: string }> = {
