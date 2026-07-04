@@ -110,6 +110,18 @@ function FileThumb({ file }: { file: DriveFile }) {
   );
 }
 
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase()
+      ? <mark key={i} className="bg-brand/20 text-text-near-white rounded-[2px] px-[1px]">{part}</mark>
+      : part
+  );
+}
+
 export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const state = useDriveStore();
   const {
@@ -156,6 +168,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const [renameFileId, setRenameFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [shareFile, setShareFile] = useState<DriveFile | null>(null);
+  const [searchInput, setSearchInput] = useState(query);
   const searchParams = useSearchParams();
   const blobParam = searchParams.get("blob");
   const meta = SCREEN_META[screen];
@@ -173,6 +186,11 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
       if (match) selectFile(match.id);
     }
   }, [blobParam, files, selectFile]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, setQuery]);
 
   const selectedFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
   const totalBytes = files.reduce((sum, f) => sum + f.sizeBytes, 0);
@@ -362,8 +380,8 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
               <div className="flex min-w-0 items-center gap-4">
                 <FileThumb file={file} />
                 <div className="min-w-0">
-                  <p className="truncate text-[12px] font-semibold text-text-near-white">{file.name}</p>
-                  <p className="mt-[4px] text-[10px] text-text-tertiary">{labelForKind(file.fileKind)}</p>
+                  <p className="truncate text-[12px] font-semibold text-text-near-white">{highlightText(file.name, query)}</p>
+                  <p className="mt-[4px] text-[10px] text-text-tertiary">{highlightText(labelForKind(file.fileKind), query)}</p>
                 </div>
               </div>
               <span className="text-right text-[11px] text-text-secondary">{formatSize(file.sizeBytes)}</span>
@@ -397,9 +415,9 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
                 {contextMenu}
               </div>
             </div>
-            <p className="mt-4 truncate text-[13px] font-semibold text-text-near-white">{file.name}</p>
+            <p className="mt-4 truncate text-[13px] font-semibold text-text-near-white">{highlightText(file.name, query)}</p>
             <p className="mt-1 text-[10px] text-text-tertiary">
-              {labelForKind(file.fileKind)} · {formatSize(file.sizeBytes)}
+              {highlightText(labelForKind(file.fileKind), query)} · {formatSize(file.sizeBytes)}
             </p>
           </button>
         )}
@@ -461,7 +479,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
           <div className="mt-5 flex items-center gap-3" suppressHydrationWarning>
             <div className="flex h-[42px] flex-1 items-center gap-3 rounded-pill border border-border bg-sidebar px-3">
               <span className="text-[15px] text-text-secondary">⌕</span>
-              <input value={query} onChange={(e) => setQuery(e.target.value)}
+              <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search files, folders or people"
                 className="h-full flex-1 bg-transparent text-[12px] text-text-primary outline-none placeholder:text-text-placeholder" />
             </div>
