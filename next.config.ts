@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "export",
   webpack: (config) => {
     config.resolve = config.resolve ?? {};
     config.resolve.fallback = {

@@ -1,9 +1,11 @@
-export default async function ComingSoonPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ app?: string }>;
-}) {
-  const { app } = await searchParams;
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+
+function ComingSoonContent() {
+  const searchParams = useSearchParams();
+  const app = searchParams.get("app");
   return (
     <div className="h-dvh flex items-center justify-center bg-canvas">
       <div className="text-center">
@@ -19,5 +21,13 @@ export default async function ComingSoonPage({
         </a>
       </div>
     </div>
+  );
+}
+
+export default function ComingSoonPage() {
+  return (
+    <Suspense>
+      <ComingSoonContent />
+    </Suspense>
   );
 }
