@@ -1,6 +1,6 @@
-# Post — Private messaging for Nostr
+# Post — Enterprise suite for Nostr
 
-Post is a **privacy-focused, email-styled direct messaging client** for the [Nostr](https://nostr.com) protocol. It combines the familiar UX of a desktop email client with Nostr's end-to-end encrypted messaging (NIP-17 + NIP-44), and ships as a native desktop application powered by Tauri.
+Post is an **enterprise productivity suite for the Nostr protocol**. It combines an email-styled direct messaging client, a calendar, contact management, and a file drive into a single native desktop application — all secured by Nostr's end-to-end encryption (NIP-17 + NIP-44) and wrapped in a familiar desktop email experience powered by Tauri.
 
 > **Status:** v0.1.0 — Active development.
 
@@ -8,19 +8,19 @@ Post is a **privacy-focused, email-styled direct messaging client** for the [Nos
 
 ## Screenshots
 
-| Welcome / identity choice | Inbox view | Settings & relays |
+| Mail — Inbox | Calendar | Contacts |
 |:---:|:---:|:---:|
-| ![Welcome](public/screenshots/login-welcome.png) | ![Inbox](public/screenshots/mail-inbox.png) | ![Settings](public/screenshots/settings.png) |
+| ![Inbox](public/screenshots/mail-inbox.png) | ![Calendar](public/screenshots/calendar.png) | ![Contacts](public/screenshots/contacts.png) |
 
-| Passkey sign-in | NSEC key import |
-|:---:|:---:|
-| ![Passkey](public/screenshots/login-passkey.png) | ![Key import](public/screenshots/login-nsec.png) |
+| Welcome / onboarding | Settings & relays | Passkey sign-in |
+|:---:|:---:|:---:|
+| ![Welcome](public/screenshots/login-welcome.png) | ![Settings](public/screenshots/settings.png) | ![Passkey](public/screenshots/login-passkey.png) |
 
 ---
 
-## Features
+## Apps
 
-### Core messaging
+### Mail — Private messaging
 - **Email-styled inbox** — read/unread, sender, subject, preview, timestamps
 - **End-to-end encryption** — NIP-17 DMs with NIP-44 encryption
 - **Threaded conversations** — reply chains via NIP-10 tags
@@ -34,6 +34,23 @@ Post is a **privacy-focused, email-styled direct messaging client** for the [Nos
 - **Full-text search** — messages, people, and npubs via minisearch
 - **Keyboard navigation** — arrows, escape, shortcuts throughout
 
+### Calendar
+- **Event management** — create, edit, delete calendar events
+- **Multiple views** — week, agenda, day views
+- **Invitations** — send and receive event invites
+- **Shared calendars**
+
+### Contacts
+- **Contact management** — add, edit, delete contacts
+- **Nostr profile resolution** — kind 0 events, NIP-05 verification
+- **npub-based identities** with human-readable display
+
+### Drive (Blossom)
+- **Media server protocol** — upload/download/delete via NIP-98 HTTP auth
+- **Encrypted blobs** — AES-GCM with file-key wrapping
+- **Upload progress** — rows, progress bars, status states
+- **Organized views** — recent, starred, shared, trash
+
 ### Identity & authentication
 - **Multiple sign-in methods** — Passkey, NIP-07 (browser extension), NIP-46 (remote signer), raw nsec import
 - **Profile resolution** — kind 0 events + NIP-05 verification
@@ -44,11 +61,6 @@ Post is a **privacy-focused, email-styled direct messaging client** for the [Nos
 - **5 default seed relays**
 - **Network status** — connected count, health percentage, sync age
 - **Per-message relay overrides**
-
-### Attachments (Blossom)
-- **Blossom media server** — upload/download/delete via NIP-98 HTTP auth
-- **Encrypted blobs** — AES-GCM with file-key wrapping
-- **Upload progress** — rows, progress bars, status states
 
 ### Desktop native (Tauri)
 - **Native window** — system tray (Show Post, Compose, Quit)
@@ -107,7 +119,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 post/
 ├── app/                        # Next.js App Router
 │   ├── (suite)/mail/           # Mail app (inbox, compose, reading)
+│   ├── (suite)/calendar/       # Calendar (week, agenda, events, invitations)
 │   ├── (suite)/contacts/       # Contacts manager
+│   ├── (suite)/drive/          # Blossom file drive
 │   ├── (suite)/settings/       # Settings
 │   ├── login/                  # Authentication flow
 │   └── coming-soon/            # Placeholder apps
@@ -118,7 +132,7 @@ post/
 │   ├── db/schema.ts            # Dexie IndexedDB schema
 │   └── mock/                   # Mock data for dev
 ├── packages/
-│   ├── nostr-core/             # Nostr protocol (NIP-17/44, keys, relays)
+│   ├── nostr-core/             # Nostr protocol (NIP-17/44, keys, relays, blossom)
 │   ├── suite-shell/            # Reusable suite shell
 │   └── ui/                     # Shared UI primitives
 ├── src-tauri/                  # Tauri desktop wrapper (Rust)
@@ -147,7 +161,7 @@ The `packages/nostr-core` package encapsulates all Nostr protocol logic:
 
 ### State management — Zustand + Dexie
 
-Application state is managed through Zustand stores that sync with Dexie IndexedDB for persistence. Key stores include `identity`, `messages`, `mailboxes`, `relays`, `contacts`, `labels`, `compose`, and `settings`.
+Application state is managed through Zustand stores that sync with Dexie IndexedDB for persistence. Key stores include `identity`, `messages`, `mailboxes`, `relays`, `contacts`, `labels`, `compose`, `calendar`, `drive`, and `settings`.
 
 ### Desktop shell — Tauri
 
@@ -171,7 +185,7 @@ Builds the native desktop app for your current platform. Supported targets: **de
 
 ## Suite ecosystem
 
-Post is the first app in the **Nostr Suite** ecosystem — a planned collection of interconnected Nostr apps including Drive, Calendar, Contacts, Notes, and Tasks, all sharing a common shell (IconDock, app switcher, identity/relay context).
+Post is the flagship app of the **Nostr Suite** ecosystem — an interconnected collection of Nostr productivity apps including Mail, Calendar, Drive, and Contacts, all sharing a common shell (IconDock, app switcher, identity/relay context). Future apps include Notes and Tasks.
 
 ---
 
