@@ -6,6 +6,7 @@ import { useSearchSimple } from "@/lib/useSearch";
 import { resolveNip05 } from "@post/nostr-core";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
+import { useBlossomStore } from "@/lib/stores/blossom";
 import { useSettingsStore, SETTING_DEFAULTS, type SettingKey } from "@/lib/stores/settings";
 import { db } from "@/lib/db/schema";
 import IdentityDialog from "@/components/IdentityDialog";
@@ -642,6 +643,11 @@ function RulesContent() {
 /* ───── Drive ───── */
 
 function DriveStorageContent() {
+  const serverUrl = useBlossomStore((s) => s.serverUrl);
+  const serverUrls = useBlossomStore((s) => s.serverUrls);
+  const setServerUrl = useBlossomStore((s) => s.setServerUrl);
+  const useNostrList = useSettingsStore((s) => s.values["use-nostr-blossom-list"]);
+
   return (
     <>
       <h2 className="text-[24px] font-semibold text-text-primary">Storage</h2>
@@ -656,6 +662,40 @@ function DriveStorageContent() {
         </div>
         <p className="mt-3 text-[10px] text-text-tertiary">Blossom 12.2 GB · Local cache 4.8 GB · Vault 1.4 GB</p>
       </div>
+
+      <SectionHeader title="Blossom servers" />
+      <hr className="border-border mb-2" />
+      <ToggleRow settingKey="use-nostr-blossom-list" label="Use Nostr blossom list" description="Use your kind 10063 blossom server list from your Nostr profile." />
+      <hr className="border-border" />
+      {typeof useNostrList === "boolean" && useNostrList && serverUrls.length > 0 ? (
+        <div className="py-3">
+          <p className="text-[11px] text-text-tertiary mb-2">Servers from Nostr profile:</p>
+          {serverUrls.map((url) => (
+            <div key={url} className="flex items-center gap-2 py-1.5">
+              <div className={`w-2 h-2 rounded-full ${url === serverUrl ? "bg-ok" : "bg-text-tertiary"}`} />
+              <span className="text-[13px] text-text-primary">{url}</span>
+              {url === serverUrl && <span className="text-[10px] text-text-tertiary">(active)</span>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between py-3">
+            <div className="flex-1 pr-4">
+              <p className="text-[14px] font-medium text-text-primary">Server URL</p>
+              <p className="text-[11px] text-text-tertiary mt-0.5">The blossom server used for file uploads.</p>
+            </div>
+            <input
+              type="text"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              placeholder="https://blossom.example.com"
+              className="w-[220px] h-9 px-3 text-[13px] bg-pill-subtle border border-border rounded-pill text-text-primary placeholder-text-placeholder outline-none"
+            />
+          </div>
+          <hr className="border-border" />
+        </>
+      )}
     </>
   );
 }
@@ -954,6 +994,9 @@ function RelaysContent() {
         </div>
         <span className="h-[26px] px-3 rounded-pill border border-border text-text-secondary text-[11px] font-medium leading-[26px]">3 relays</span>
       </div>
+
+      <ToggleRow settingKey="use-nostr-relay-list" label="Use Nostr relay list" description="Use your NIP-65 relay list from your Nostr profile alongside manual relays." />
+      <hr className="border-border" />
 
       <SectionHeader title="Connected Relays" />
       <div className="space-y-1 max-w-lg">

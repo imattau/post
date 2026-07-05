@@ -5,7 +5,7 @@ import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { startSync, loadCachedMessages } from "@/lib/sync";
-import { loadBlossomConfig } from "@/lib/stores/blossom";
+import { loadBlossomConfig, useBlossomStore } from "@/lib/stores/blossom";
 import { useContactsStore } from "@/lib/stores/contacts";
 import { useSettingsStore } from "@/lib/stores/settings";
 
@@ -54,10 +54,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     booted.current = true;
 
     (async () => {
-      loadBlossomConfig();
       useSettingsStore.getState().load();
 
       const settings = useSettingsStore.getState().values;
+
+      loadBlossomConfig();
+
       const downloadMetadata = settings["download-profile-metadata"] ?? true;
 
       if (downloadMetadata) {
@@ -68,6 +70,17 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       await loadCachedMessages();
       await useMailboxStore.getState().refreshUnreadCounts();
       await connect();
+
+      if (settings["use-nostr-relay-list"]) {
+        await useRelaysStore.getState().loadRelayListFromNostr(identity.pubkey);
+        useRelaysStore.getState().disconnect();
+        await connect();
+      }
+
+      if (settings["use-nostr-blossom-list"]) {
+        await useBlossomStore.getState().loadBlossomListFromNostr(identity.pubkey);
+      }
+
       startSync();
     })();
   }, [identity]);

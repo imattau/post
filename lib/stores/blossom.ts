@@ -5,16 +5,19 @@ import { useSettingsStore } from "@/lib/stores/settings";
 
 interface BlossomState {
   serverUrl: string;
+  serverUrls: string[];
   setServerUrl: (url: string) => void;
   uploadFile: (
     file: File,
     sk: Uint8Array,
     onProgress?: (pct: number) => void
   ) => Promise<AttachmentRef>;
+  loadBlossomListFromNostr: (pubkey: string) => Promise<void>;
 }
 
 export const useBlossomStore = create<BlossomState>((set, get) => ({
   serverUrl: "",
+  serverUrls: [],
 
   setServerUrl: (url: string) => {
     set({ serverUrl: url });
@@ -25,6 +28,21 @@ export const useBlossomStore = create<BlossomState>((set, get) => ({
     const { serverUrl } = get();
     if (!serverUrl) throw new Error("Upload not configured");
     return uploadBlob({ url: serverUrl }, file, sk, onProgress);
+  },
+
+  loadBlossomListFromNostr: async (pubkey: string) => {
+    const { useRelaysStore } = await import("@/lib/stores/relays");
+    const pool = useRelaysStore.getState().pool;
+    if (!pool) return;
+
+    const enabled = useSettingsStore.getState().values["use-nostr-blossom-list"];
+    if (!enabled) return;
+
+    const { fetchBlossomList } = await import("@post/nostr-core");
+    const servers = await fetchBlossomList(pool, pubkey);
+    if (servers.length === 0) return;
+
+    set({ serverUrls: servers, serverUrl: servers[0] });
   },
 }));
 

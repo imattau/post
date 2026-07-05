@@ -8,5 +8,6 @@ export type { SendOptions, SendResult } from "./messages";
 export { fetchProfile, resolveNip05, searchProfiles, batchFetchProfiles } from "./profiles";
 export { uploadBlob, downloadBlob, deleteBlob } from "./blossom";
 export type { BlossomServer } from "./blossom";
+export { fetchRelayList, fetchBlossomList } from "./relay-list";
 export { encryptDriveBlob, decryptDriveBlob, isDriveEncryptionAvailable, encryptContentForOwner, decryptContentForOwner, createFileMetadataEvent, createFolderEvent, parseFileMetadataEvent, parseFolderEvent } from "./drive";
 export { encryptAttachment, decryptAttachment, wrapFileKey, unwrapFileKey } from "./attachments";

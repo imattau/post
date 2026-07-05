@@ -13,6 +13,7 @@ interface RelaysState {
   addRelay: (config: RelayConfig) => void;
   removeRelay: (url: string) => void;
   loadRelayConfigs: () => Promise<void>;
+  loadRelayListFromNostr: (pubkey: string) => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => void;
   updateStatuses: () => Promise<void>;
@@ -40,6 +41,31 @@ export const useRelaysStore = create<RelaysState>((set, get) => ({
     const { db } = await import("@/lib/db/schema");
     const saved = await db.relayConfigs.toArray();
     if (saved.length > 0) set({ relays: saved });
+  },
+
+  loadRelayListFromNostr: async (pubkey: string) => {
+    const { pool, relays } = get();
+    if (!pool) return;
+
+    const { useSettingsStore } = await import("@/lib/stores/settings");
+    const enabled = useSettingsStore.getState().values["use-nostr-relay-list"];
+    if (!enabled) return;
+
+    const { fetchRelayList } = await import("@post/nostr-core");
+    const nostrRelays = await fetchRelayList(pool, pubkey);
+    if (nostrRelays.length === 0) return;
+
+    const merged = [...relays];
+    for (const nr of nostrRelays) {
+      if (!merged.some((r) => r.url === nr.url)) {
+        merged.push(nr);
+      }
+    }
+
+    set({ relays: merged });
+    const { db } = await import("@/lib/db/schema");
+    await db.relayConfigs.clear();
+    await db.relayConfigs.bulkAdd(merged);
   },
 
   connect: async () => {

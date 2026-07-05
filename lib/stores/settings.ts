@@ -61,6 +61,8 @@ export const SETTING_DEFAULTS = {
   "automatic-relay-selection": true,
   "download-profile-metadata": true,
   "prefer-recipient-relays": true,
+  "use-nostr-relay-list": false,
+  "use-nostr-blossom-list": false,
   // Advanced
   "developer-mode": false,
   "debug-logging": false,
