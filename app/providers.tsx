@@ -9,6 +9,37 @@ import { loadBlossomConfig } from "@/lib/stores/blossom";
 import { useContactsStore } from "@/lib/stores/contacts";
 import { useSettingsStore } from "@/lib/stores/settings";
 
+function applyTheme(theme: string) {
+  const resolved = theme === "system"
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : theme;
+  document.documentElement.setAttribute("data-theme", resolved);
+}
+
+function applyDensity(density: string) {
+  document.documentElement.setAttribute("data-density", density);
+}
+
+function ThemeApplier() {
+  const theme = useSettingsStore((s) => s.values["theme"]);
+  const density = useSettingsStore((s) => s.values["density"]);
+
+  useEffect(() => {
+    applyTheme(theme ?? "dark");
+    applyDensity(density ?? "comfortable");
+  }, [theme, density]);
+
+  useEffect(() => {
+    if (theme !== "system") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => applyTheme("system");
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [theme]);
+
+  return null;
+}
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   const identity = useIdentityStore((s) => s.identity);
   const connect = useRelaysStore((s) => s.connect);
@@ -25,15 +56,26 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     (async () => {
       loadBlossomConfig();
       useSettingsStore.getState().load();
-      await useContactsStore.getState().loadContacts();
+
+      const settings = useSettingsStore.getState().values;
+      const downloadMetadata = settings["download-profile-metadata"] ?? true;
+
+      if (downloadMetadata) {
+        await useContactsStore.getState().loadContacts();
+        useIdentityStore.getState().refreshProfile();
+      }
       await useRelaysStore.getState().loadRelayConfigs();
       await loadCachedMessages();
       await useMailboxStore.getState().refreshUnreadCounts();
       await connect();
-      useIdentityStore.getState().refreshProfile();
       startSync();
     })();
   }, [identity]);
 
-  return <>{children}</>;
+  return (
+    <>
+      <ThemeApplier />
+      {children}
+    </>
+  );
 }

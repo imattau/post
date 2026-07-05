@@ -94,11 +94,11 @@ export async function sendMessage(
   opts: SendOptions
 ): Promise<SendResult> {
   const identity = keys.load();
-  if (!identity || !identity.nsec) throw new Error("No private key available");
+  if (!identity || !identity.nsec) throw new Error("Cannot send message");
 
   const { decode } = await import("nostr-tools/nip19");
   const nsecDecoded = decode(identity.nsec);
-  if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+  if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
   const sk = nsecDecoded.data;
 
   let event: NostrEvent;
@@ -159,11 +159,11 @@ export async function decryptEvent(
   keys: KeyStore
 ): Promise<string> {
   const identity = keys.load();
-  if (!identity || !identity.nsec) throw new Error("No private key available");
+  if (!identity || !identity.nsec) throw new Error("Cannot decrypt message");
 
   const { decode } = await import("nostr-tools/nip19");
   const nsecDecoded = decode(identity.nsec);
-  if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+  if (nsecDecoded.type !== "nsec") throw new Error("Cannot decrypt message");
   const sk = nsecDecoded.data;
 
   const conversationKey = nip44.v2.utils.getConversationKey(sk, event.pubkey);
@@ -271,11 +271,11 @@ export async function decryptIncoming(
   keys: KeyStore
 ): Promise<AsyncGenerator<Message>> {
   const identity = keys.load();
-  if (!identity || !identity.nsec) throw new Error("No identity or private key");
+  if (!identity || !identity.nsec) throw new Error("Cannot decrypt message");
 
   const { decode } = await import("nostr-tools/nip19");
   const nsecDecoded = decode(identity.nsec);
-  if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+  if (nsecDecoded.type !== "nsec") throw new Error("Cannot decrypt message");
   const sk = nsecDecoded.data;
 
   return new IncomingStream(pool, sk, identity.pubkey);

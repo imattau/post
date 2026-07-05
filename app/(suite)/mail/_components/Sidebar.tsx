@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Inbox, Star, Clock, ArrowUpRight, FileEdit, Archive, ShieldAlert, SquarePen, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useShallow } from "zustand/shallow";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { toast } from "sonner";
 
@@ -22,8 +23,8 @@ export default function Sidebar({
   syncedAgo: number;
 }) {
   const pathname = usePathname();
-  const labelIds = useLabelsStore((s) => s.allIds);
-  const labels = useLabelsStore((s) => s.byId);
+  const labelIds = useLabelsStore(useShallow((s) => s.allIds));
+  const labels = useLabelsStore(useShallow((s) => s.byId));
 
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [newLabelName, setNewLabelName] = useState("");

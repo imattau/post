@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowLeft, Star, EllipsisVertical, BadgeCheck, Check } from "lucide-react";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { Menu } from "@base-ui/react/menu";
@@ -38,11 +38,14 @@ export default function ReadingTopBar({
   const assignLabel = useLabelsStore((s) => s.assignLabel);
   const removeLabel = useLabelsStore((s) => s.removeLabel);
 
-  const actions = [
-    { label: "Archive", onClick: onArchive },
-    { label: "Snooze", onClick: onSnooze },
-    { label: "Delete", onClick: onDelete },
-  ];
+  const actions = useMemo(
+    () => [
+      { label: "Archive", onClick: onArchive },
+      { label: "Snooze", onClick: onSnooze },
+      { label: "Delete", onClick: onDelete },
+    ],
+    [onArchive, onSnooze, onDelete]
+  );
 
   return (
     <div className="flex h-[73px] items-center gap-3 border-b border-border px-6">

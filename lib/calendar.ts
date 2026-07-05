@@ -11,11 +11,11 @@ import {
 } from "date-fns";
 import type { CalendarEvent } from "@/lib/types";
 
-export function buildMonthGrid(month: Date): Date[][] {
+export function buildMonthGrid(month: Date, weekStartsOn: number = 1): Date[][] {
   const first = startOfMonth(month);
   const last = endOfMonth(month);
-  const gridStart = startOfWeek(first, { weekStartsOn: 1 });
-  const gridEnd = endOfWeek(addDays(last, 6), { weekStartsOn: 1 });
+  const gridStart = startOfWeek(first, { weekStartsOn: weekStartsOn as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+  const gridEnd = endOfWeek(addDays(last, 6), { weekStartsOn: weekStartsOn as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
   const weeks: Date[][] = [];
   let cursor = gridStart;
   while (cursor <= gridEnd) {
@@ -76,6 +76,12 @@ export function getWeekEventSpan(
 
 export function startOfWeekMonday(date: Date): Date {
   return startOfWeek(date, { weekStartsOn: 1 });
+}
+
+export function weekStartFromSetting(setting: string | undefined): number {
+  if (setting === "sunday") return 0;
+  if (setting === "saturday") return 6;
+  return 1;
 }
 
 export { addDays, isSameDay, isSameMonth };

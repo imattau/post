@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { formatDistanceToNow, format } from "date-fns"
+import type { Draft } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -37,4 +38,19 @@ export function wrapTextareaSelection(
   const insertion = `${prefix}${content}${suffix}`
   const next = `${body.slice(0, start)}${insertion}${body.slice(end)}`
   return next
+}
+
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ""
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary)
+}
+
+export function draftHasContent(draft: Draft): boolean {
+  return draft.to.length > 0 || !!draft.subject || !!draft.body
+}
+
+export function autosizeTextarea(el: HTMLTextAreaElement): void {
+  el.style.height = "auto"
+  el.style.height = `${el.scrollHeight}px`
 }

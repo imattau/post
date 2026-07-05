@@ -428,21 +428,27 @@ export const useDriveStore = create<DriveState>((set, get) => ({
       }));
 
       try {
-        const encrypted = await encryptDriveBlob(file, identity);
+        const { useSettingsStore } = await import("@/lib/stores/settings");
+        const encryptSetting = useSettingsStore.getState().getValue("encrypt-private-uploads", true);
+        const encrypted = encryptSetting ? await encryptDriveBlob(file, identity) : null;
         if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
         set((state) => ({
           uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, progress: 45 } : job)),
         }));
-        const wrappedFile = new File([encrypted.ciphertext], file.name, { type: "application/octet-stream" });
+        const wrappedFile = encrypted
+          ? new File([encrypted.ciphertext], file.name, { type: "application/octet-stream" })
+          : file;
         const ref = await uploadBlob({ url: serverUrl }, wrappedFile, secretKey, (progress) => {
           set((state) => ({
             uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, progress: Math.max(progress, 45) } : job)),
           }));
         }, controller.signal);
-        const driveFile = buildFileFromUpload(file, encrypted.ciphertext, ref.url, ref.sha256, targetFolderId);
+        const blobContent = encrypted ? encrypted.ciphertext : new Blob([]);
+        const driveFile = buildFileFromUpload(file, blobContent, ref.url, ref.sha256, targetFolderId);
+        const fileRecord = { ...driveFile, encrypted: encryptSetting, encryption: encrypted?.metadata ?? null, encryptedBlob: blobContent };
         const { db } = await import("@/lib/db/schema");
-        await db.driveFiles.put({ ...driveFile, encryption: encrypted.metadata, blobUrl: ref.url, sha256: ref.sha256, encryptedBlob: encrypted.ciphertext });
+        await db.driveFiles.put(fileRecord);
         set((state) => ({
           files: [driveFile, ...state.files],
           folders: state.folders.map((folder) =>
@@ -460,10 +466,10 @@ export const useDriveStore = create<DriveState>((set, get) => ({
             ),
           }));
         } else {
-          const message = err instanceof Error ? err.message : "Upload failed";
+          console.error("Upload failed:", err);
           set((state) => ({
-            uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, status: "failed", error: message } : job)),
-            error: message,
+            uploadJobs: state.uploadJobs.map((job) => (job.id === jobId ? { ...job, status: "failed", error: "Upload failed" } : job)),
+            error: "Upload failed",
           }));
         }
       } finally {

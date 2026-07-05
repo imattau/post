@@ -5,8 +5,9 @@ import { useEffect, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { buildMonthGrid, formatTimeRange, getEventSpanDays, isSameDay, isSameMonth, monthLabel } from "@/lib/calendar";
+import { buildMonthGrid, formatTimeRange, getEventSpanDays, isSameDay, isSameMonth, monthLabel, weekStartFromSetting } from "@/lib/calendar";
 import { useCalendarStore } from "@/lib/stores/calendar";
+import { useSettingsStore } from "@/lib/stores/settings";
 import CalendarViewControls from "./CalendarViewControls";
 import CalendarEventPill from "./CalendarEventPill";
 import CalendarMiniGrid from "./CalendarMiniGrid";
@@ -17,26 +18,26 @@ function formatRelativeTime(updatedAt: number): string {
 }
 
 export default function CalendarWorkspace() {
-  const {
-    calendars,
-    events,
-    sync,
-    activeMonth,
-    selectedDate,
-    selectedEventId,
-    viewMode,
-    loading,
-    load,
-    selectDate,
-    selectEvent,
-    setMonth,
-    goToToday,
-    previousMonth,
-    nextMonth,
-    toggleCalendar,
-    updateEvent,
-    deleteEvent,
-  } = useCalendarStore();
+  const calendars = useCalendarStore((s) => s.calendars);
+  const events = useCalendarStore((s) => s.events);
+  const sync = useCalendarStore((s) => s.sync);
+  const activeMonth = useCalendarStore((s) => s.activeMonth);
+  const selectedDate = useCalendarStore((s) => s.selectedDate);
+  const selectedEventId = useCalendarStore((s) => s.selectedEventId);
+  const viewMode = useCalendarStore((s) => s.viewMode);
+  const loading = useCalendarStore((s) => s.loading);
+  const load = useCalendarStore((s) => s.load);
+  const selectDate = useCalendarStore((s) => s.selectDate);
+  const selectEvent = useCalendarStore((s) => s.selectEvent);
+  const setMonth = useCalendarStore((s) => s.setMonth);
+  const goToToday = useCalendarStore((s) => s.goToToday);
+  const previousMonth = useCalendarStore((s) => s.previousMonth);
+  const nextMonth = useCalendarStore((s) => s.nextMonth);
+  const toggleCalendar = useCalendarStore((s) => s.toggleCalendar);
+  const updateEvent = useCalendarStore((s) => s.updateEvent);
+  const deleteEvent = useCalendarStore((s) => s.deleteEvent);
+  const weekStartSetting = useSettingsStore((s) => s.values["week-start-day"]);
+  const showWeekends = (useSettingsStore((s) => s.values["show-weekends"]) ?? true) as boolean;
 
   useEffect(() => {
     void load();
@@ -47,7 +48,8 @@ export default function CalendarWorkspace() {
     () => events.filter((event) => calendarById.get(event.calendarId)?.enabled !== false).sort((a, b) => a.startAt - b.startAt),
     [events, calendarById]
   );
-  const weeks = useMemo(() => buildMonthGrid(activeMonth), [activeMonth]);
+  const weekStartsOn = weekStartFromSetting(weekStartSetting);
+  const weeks = useMemo(() => buildMonthGrid(activeMonth, weekStartsOn), [activeMonth, weekStartsOn]);
   const selectedEvent = useMemo(
     () => visibleEvents.find((event) => event.id === selectedEventId) ?? visibleEvents[0] ?? null,
     [selectedEventId, visibleEvents]
@@ -152,8 +154,8 @@ export default function CalendarWorkspace() {
 
           <div className="mt-5 overflow-hidden rounded-[16px] border border-border shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
             <div className="grid grid-cols-7 border-b border-border bg-[#121721] text-[11px] text-text-tertiary">
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <div key={day} className="px-3 py-2 text-left">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, i) => (
+                <div key={day} className={`px-3 py-2 text-left ${!showWeekends && i >= 5 ? "hidden" : ""}`}>
                   {day}
                 </div>
               ))}
@@ -175,6 +177,7 @@ export default function CalendarWorkspace() {
                       const selected = isSameDay(day, selectedDate);
                       const dayInMonth = isSameMonth(day, activeMonth);
                       const hasToday = isSameDay(day, today);
+                      const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                       const startOfDay = new Date(day);
                       startOfDay.setHours(0, 0, 0, 0);
                       const endOfDay = new Date(day);

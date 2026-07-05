@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Draft, RecipientEntry, AttachmentUpload, SendResult } from "@/lib/types";
+import { useSettingsStore } from "@/lib/stores/settings";
 
 export type ComposeStatus = "closed" | "composing" | "minimized" | "sending" | "scheduled" | "sent" | "failed";
 
@@ -67,7 +68,13 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
 
   open: (draft?: Partial<Draft>) => {
     const next = { ...emptyDraft(), ...draft, updatedAt: Date.now() };
-    set({ status: "composing", draft: next, relayOverrides: next.relayOverrides, error: null });
+    set({
+      status: "composing",
+      draft: next,
+      relayOverrides: next.relayOverrides,
+      error: null,
+      encrypted: useSettingsStore.getState().getValue("encrypt-direct-posts", true),
+    });
   },
 
   async openSavedDraft(id: string) {
@@ -79,8 +86,8 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
 
   close: async () => {
     const { draft } = get();
-    const hasContent = draft.to.length > 0 || draft.subject || draft.body;
-    if (hasContent) {
+    const { draftHasContent } = await import("@/lib/utils");
+    if (draftHasContent(draft) && useSettingsStore.getState().getValue("autosave-drafts", true)) {
       await get().autosave();
     }
     set({ status: "closed", draft: emptyDraft(), uploads: [], error: null });
@@ -88,10 +95,13 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
 
   minimize: async () => {
     const { draft } = get();
-    if (draft.to.length === 0 && !draft.subject && !draft.body) {
+    const { draftHasContent } = await import("@/lib/utils");
+    if (!draftHasContent(draft)) {
       return;
     }
-    await get().autosave();
+    if (useSettingsStore.getState().getValue("autosave-drafts", true)) {
+      await get().autosave();
+    }
     set({ status: "minimized" });
   },
 
@@ -162,17 +172,17 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
       const { draft, encrypted, giftWrap, relayOverrides, uploads } = get();
       const keyStore = createKeyStore();
       const identity = keyStore.load();
-      if (!identity?.nsec) throw new Error("No private key");
+      if (!identity?.nsec) throw new Error("Cannot send message");
 
-      if (draft.to.length === 0) throw new Error("No recipient");
+      if (draft.to.length === 0) throw new Error("Cannot send message");
 
       const { decode } = await import("nostr-tools/nip19");
       const nsecDecoded = decode(identity.nsec);
-      if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+      if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
 
       const { useRelaysStore } = await import("@/lib/stores/relays");
       const pool = useRelaysStore.getState().pool;
-      if (!pool) throw new Error("Relay pool not connected");
+      if (!pool) throw new Error("Cannot send message");
 
       const attachments = uploads
         .filter((u): u is AttachmentUpload & { result: NonNullable<AttachmentUpload["result"]> } => u.status === "uploaded" && u.result !== null)
@@ -223,8 +233,8 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
       set({ status: "sent", draft: emptyDraft(), uploads: [] });
       return result;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Send failed";
-      set({ status: "failed", error: message });
+      console.error("Send failed:", err);
+      set({ status: "failed", error: "Send failed" });
       return { eventId: "", published: new Map(), delivered: 0 };
     }
   },
@@ -279,17 +289,17 @@ export const useComposeStore = create<ComposeState>((set, get) => ({
       const { sendMessage, createKeyStore } = await import("@post/nostr-core");
       const keyStore = createKeyStore();
       const identity = keyStore.load();
-      if (!identity?.nsec) throw new Error("No private key");
+      if (!identity?.nsec) throw new Error("Cannot send message");
 
-      if (to.length === 0) throw new Error("No recipient");
+      if (to.length === 0) throw new Error("Cannot send message");
 
       const { decode } = await import("nostr-tools/nip19");
       const nsecDecoded = decode(identity.nsec);
-      if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
+      if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
 
       const { useRelaysStore } = await import("@/lib/stores/relays");
       const pool = useRelaysStore.getState().pool;
-      if (!pool) throw new Error("Relay pool not connected");
+      if (!pool) throw new Error("Cannot send message");
 
       const result = await sendMessage(pool, keyStore, {
         to: to[0].pubkey,

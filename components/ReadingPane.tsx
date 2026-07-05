@@ -1,9 +1,8 @@
 "use client";
 
+import { useCallback, useMemo } from "react";
 import type { MockMessage } from "@/lib/mock/threads";
 import type { Message, Profile } from "@post/nostr-core";
-import { useDriveStore } from "@/lib/stores/drive";
-import { useProfilesStore } from "@/lib/stores/profiles";
 import ReadingTopBar from "./ReadingTopBar";
 import SubjectPills from "./SubjectPills";
 import SenderBlock from "./SenderBlock";
@@ -11,6 +10,7 @@ import MessageBody from "./MessageBody";
 import AttachmentCard from "./AttachmentCard";
 import ReplyComposer from "./ReplyComposer";
 import ThreadView from "./ThreadView";
+import { useSettingsStore } from "@/lib/stores/settings";
 
 export default function ReadingPane({
   message,
@@ -41,9 +41,13 @@ export default function ReadingPane({
   threadMessages?: Message[];
   onThreadSelect?: (id: string) => void;
 }) {
-  const driveFiles = useDriveStore((s) => s.files);
-  const importAttachment = useDriveStore((s) => s.importAttachment);
-  const profiles = useProfilesStore((s) => s.byPubkey);
+  const stableOnThreadSelect = useCallback(
+    (id: string) => onThreadSelect?.(id),
+    [onThreadSelect]
+  );
+
+  const showImagesInline = (useSettingsStore((s) => s.values["show-images-inline"]) ?? true) as boolean;
+
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
       <ReadingTopBar
@@ -64,8 +68,7 @@ export default function ReadingPane({
       <div className="flex-1 min-h-0 overflow-y-auto px-10 pt-[30px]">
         <ThreadView
           messages={threadMessages ?? []}
-          onSelect={onThreadSelect ?? (() => {})}
-          profiles={profiles}
+          onSelect={stableOnThreadSelect}
         />
         <div>
           <h1 className="max-w-[560px] text-[26px] font-semibold leading-tight text-text-near-white">
@@ -97,26 +100,33 @@ export default function ReadingPane({
           <MessageBody body={message.body} />
         </div>
 
-        {message.attachments.length > 0 && (
+        {message.attachments.length > 0 && showImagesInline && (
           <div className="flex flex-wrap gap-3 pt-8 pb-3">
-            {message.attachments.map((att) => {
-              const inDrive = driveFiles.some((f) => f.sha256 === att.sha256);
-              return (
-                <AttachmentCard
-                  key={att.id}
-                  fileName={att.fileName}
-                  sizeBytes={att.sizeBytes}
-                  encrypted={att.encrypted}
-                  sha256={att.sha256}
-                  mimeType={att.mimeType}
-                  url={att.url}
-                  fileKey={att.fileKey}
-                  fileIv={att.fileIv}
-                  storedInDrive={inDrive}
-                  onSaveToDrive={inDrive ? undefined : () => importAttachment({ fileName: att.fileName, mimeType: att.mimeType, sizeBytes: att.sizeBytes, sha256: att.sha256, url: att.url, encrypted: att.encrypted }, message.id)}
-                />
-              );
-            })}
+            {message.attachments.map((att) => (
+              <AttachmentCard
+                key={att.id}
+                fileName={att.fileName}
+                sizeBytes={att.sizeBytes}
+                encrypted={att.encrypted}
+                sha256={att.sha256}
+                mimeType={att.mimeType}
+                url={att.url}
+                fileKey={att.fileKey}
+                fileIv={att.fileIv}
+                messageId={message.id}
+              />
+            ))}
+          </div>
+        )}
+        {message.attachments.length > 0 && !showImagesInline && (
+          <div className="pt-8 pb-3 space-y-1">
+            {message.attachments.map((att) => (
+              <div key={att.id} className="flex items-center gap-2 text-[12px] text-text-secondary">
+                <span>📎</span>
+                <span>{att.fileName}</span>
+                <span className="text-text-tertiary">({(att.sizeBytes / 1024).toFixed(0)} KB)</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -126,6 +136,7 @@ export default function ReadingPane({
         recipientNpub={message.sender.npub}
         messageId={message.id}
         subject={message.subject}
+        messageBody={message.body}
       />
     </div>
   );

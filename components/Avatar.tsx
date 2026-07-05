@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 const AVATAR_COLORS = [
   "var(--color-avatar-1)",
   "var(--color-avatar-2)",
@@ -8,6 +10,8 @@ const AVATAR_COLORS = [
   "var(--color-avatar-7)",
 ];
 
+const FONT_SIZES: Record<number, number> = { 36: 10, 40: 11, 46: 14 };
+
 function hashInitials(initials: string): number {
   let hash = 0;
   for (let i = 0; i < initials.length; i++) {
@@ -16,7 +20,7 @@ function hashInitials(initials: string): number {
   return Math.abs(hash);
 }
 
-export default function Avatar({
+const Avatar = memo(function Avatar({
   initials,
   size = 40,
   className = "",
@@ -26,8 +30,7 @@ export default function Avatar({
   className?: string;
 }) {
   const colorIndex = hashInitials(initials) % AVATAR_COLORS.length;
-  const fontSizes: Record<number, number> = { 36: 10, 40: 11, 46: 14 };
-  const fontSize = fontSizes[size] ?? Math.round(size * 0.28);
+  const fontSize = FONT_SIZES[size] ?? Math.round(size * 0.28);
 
   return (
     <div
@@ -46,4 +49,6 @@ export default function Avatar({
       </span>
     </div>
   );
-}
+});
+
+export default Avatar;

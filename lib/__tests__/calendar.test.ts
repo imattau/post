@@ -165,7 +165,7 @@ describe("calendar store", () => {
     vi.mocked(db.calendarCalendars.count).mockRejectedValueOnce(new Error("DB error"));
     const { useCalendarStore } = await import("@/lib/stores/calendar");
     await useCalendarStore.getState().load();
-    expect(useCalendarStore.getState().error).toBe("DB error");
+    expect(useCalendarStore.getState().error).toBe("Failed to load calendar data");
     expect(useCalendarStore.getState().loading).toBe(false);
   });
 

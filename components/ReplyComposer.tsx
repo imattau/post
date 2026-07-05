@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, useEffect } from "react";
 import { Maximize2 } from "lucide-react";
 import { useComposeStore } from "@/lib/stores/compose";
-import { wrapTextareaSelection } from "@/lib/utils";
+import { useSettingsStore } from "@/lib/stores/settings";
+import { wrapTextareaSelection, autosizeTextarea } from "@/lib/utils";
 import FormatToolbar from "./FormatToolbar";
 
 export default function ReplyComposer({
@@ -12,12 +13,14 @@ export default function ReplyComposer({
   recipientNpub,
   messageId,
   subject,
+  messageBody,
 }: {
   recipientName: string;
   recipientPubkey: string;
   recipientNpub: string;
   messageId: string;
   subject: string;
+  messageBody?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,6 +38,12 @@ export default function ReplyComposer({
     textareaRef.current?.setSelectionRange(position, position);
   }, [body]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      autosizeTextarea(textareaRef.current);
+    }
+  }, [body]);
+
   const applyFormat = useCallback((prefix: string, suffix = "", fallback = "") => {
     if (!textareaRef.current) return;
     const start = textareaRef.current.selectionStart ?? body.length;
@@ -47,25 +56,33 @@ export default function ReplyComposer({
     setBody(next);
   }, [body]);
 
-  const replyDraft = useCallback(() => ({
-    to: [{
-      pubkey: recipientPubkey,
-      npub: recipientNpub,
-      name: recipientName,
-      avatarUrl: "",
-      isGroup: false,
-    }],
-    subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
-    body: body.trim(),
-    replyTo: messageId,
-  }), [body, messageId, recipientName, recipientNpub, recipientPubkey, subject]);
+  const replyDraft = useCallback(() => {
+    const quoteOriginal = (useSettingsStore.getState().values["quote-original-post"] ?? false) as boolean;
+    const trimmed = body.trim();
+    const finalBody = quoteOriginal && messageBody
+      ? `> ${messageBody.replace(/\n/g, "\n> ")}\n\n${trimmed}`
+      : trimmed;
+    return {
+      to: [{
+        pubkey: recipientPubkey,
+        npub: recipientNpub,
+        name: recipientName,
+        avatarUrl: "",
+        isGroup: false,
+      }],
+      subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+      body: finalBody,
+      replyTo: messageId,
+    };
+  }, [body, messageId, messageBody, recipientName, recipientNpub, recipientPubkey, subject]);
 
   const handleExpand = useCallback(() => {
     open(replyDraft());
   }, [open, replyDraft]);
 
   const sendReply = useCallback(async () => {
-    if (!body.trim() || sending) return;
+    const trimmed = body.trim();
+    if (!trimmed || sending) return;
     setSending(true);
     try {
       const draft = replyDraft();
@@ -76,7 +93,17 @@ export default function ReplyComposer({
     } finally {
       setSending(false);
     }
-  }, [body.trim(), sending, replyDraft]);
+  }, [body, sending, replyDraft]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      void sendReply();
+    }
+    if (e.key === "Escape" && !body.trim()) {
+      (e.target as HTMLTextAreaElement).blur();
+    }
+  }, [body, sendReply]);
 
   const handleAttach = useCallback(() => {
     fileInputRef.current?.click();
@@ -95,14 +122,16 @@ export default function ReplyComposer({
   return (
     <div className="mx-10 mb-11 mt-2 w-[560px] max-w-[calc(100%-80px)]">
       <p className="mb-[17px] text-[14px] font-medium text-text-near-white">{recipientName}</p>
-      <div className="h-[130px] rounded-pill border border-border bg-sidebar flex flex-col">
+      <div className="rounded-pill border border-border bg-sidebar flex flex-col">
         <textarea
           ref={textareaRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onKeyDown={handleKeyDown}
           aria-label={`Reply to ${recipientName}`}
           placeholder={`Reply to ${recipientName}…`}
-          className="h-[66px] min-h-0 flex-none resize-none bg-transparent px-5 pt-[18px] pb-2 text-[13px] text-text-primary placeholder-text-placeholder outline-none"
+          rows={2}
+          className="min-h-[66px] resize-none bg-transparent px-5 pt-[18px] pb-2 text-[13px] text-text-primary placeholder-text-placeholder outline-none overflow-hidden"
           disabled={sending}
         />
         <div className="mx-5 h-px bg-border" />

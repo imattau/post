@@ -98,14 +98,16 @@ describe("ReplyComposer", () => {
     expect(document.activeElement).toBe(textarea);
   });
 
-  it("quick-inserts emoji at the cursor", async () => {
+  it("quick-inserts emoji at the cursor via picker", async () => {
     render(<ReplyComposer {...props} />);
     const textarea = screen.getByLabelText("Reply to Alice") as HTMLTextAreaElement;
 
     await userEvent.type(textarea, "Hi ");
     await userEvent.click(screen.getByRole("button", { name: "Insert emoji" }));
+    const emoji = screen.getByRole("button", { name: "😀" });
+    await userEvent.click(emoji);
 
-    expect(textarea).toHaveValue("Hi ☺");
+    expect(textarea).toHaveValue("Hi 😀");
   });
 
   it("sends a reply directly", async () => {

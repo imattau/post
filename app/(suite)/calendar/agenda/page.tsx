@@ -15,7 +15,14 @@ function groupKey(date: Date): string {
 const PAGE_SIZE = 12;
 
 export default function CalendarAgendaPage() {
-  const { activeMonth, events, calendars, loading, error, load, previousMonth, nextMonth, goToToday } = useCalendarStore();
+  const events = useCalendarStore((s) => s.events);
+  const calendars = useCalendarStore((s) => s.calendars);
+  const loading = useCalendarStore((s) => s.loading);
+  const error = useCalendarStore((s) => s.error);
+  const load = useCalendarStore((s) => s.load);
+  const previousMonth = useCalendarStore((s) => s.previousMonth);
+  const nextMonth = useCalendarStore((s) => s.nextMonth);
+  const goToToday = useCalendarStore((s) => s.goToToday);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
 
   useEffect(() => {

@@ -9,7 +9,13 @@ import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarInvitationsPage() {
-  const { events, calendars, activeMonth, loading, error, load, updateEvent } = useCalendarStore();
+  const events = useCalendarStore((s) => s.events);
+  const calendars = useCalendarStore((s) => s.calendars);
+  const activeMonth = useCalendarStore((s) => s.activeMonth);
+  const loading = useCalendarStore((s) => s.loading);
+  const error = useCalendarStore((s) => s.error);
+  const load = useCalendarStore((s) => s.load);
+  const updateEvent = useCalendarStore((s) => s.updateEvent);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {

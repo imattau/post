@@ -80,7 +80,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         selectedEventId: get().selectedEventId ?? events[0]?.id ?? null,
       });
     } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : "Failed to load calendar data" });
+      console.error("Failed to load calendar data:", err);
+      set({ loading: false, error: "Failed to load calendar data" });
     }
   },
 
@@ -139,7 +140,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         await db.calendarCalendars.put(updated);
       }
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to toggle calendar" });
+      console.error("Failed to toggle calendar:", err);
+      set({ error: "Failed to toggle calendar" });
     }
   },
 
@@ -156,7 +158,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       await db.calendarEvents.put(created);
       return created;
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to create event" });
+      console.error("Failed to create event:", err);
+      set({ error: "Failed to create event" });
       throw err;
     }
   },
@@ -171,7 +174,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const { db } = await import("@/lib/db/schema");
       await db.calendarEvents.put(updated);
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to update event" });
+      console.error("Failed to update event:", err);
+      set({ error: "Failed to update event" });
     }
   },
 
@@ -183,7 +187,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const { db } = await import("@/lib/db/schema");
       await db.calendarEvents.delete(eventId);
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to delete event" });
+      console.error("Failed to delete event:", err);
+      set({ error: "Failed to delete event" });
     }
   },
 
@@ -202,7 +207,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       });
       return copy;
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to duplicate event" });
+      console.error("Failed to duplicate event:", err);
+      set({ error: "Failed to duplicate event" });
       return null;
     }
   },

@@ -28,7 +28,11 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function CalendarNewEventPage() {
   const router = useRouter();
-  const { calendars, createEvent, activeMonth, selectedDate, load } = useCalendarStore();
+  const calendars = useCalendarStore((s) => s.calendars);
+  const createEvent = useCalendarStore((s) => s.createEvent);
+  const activeMonth = useCalendarStore((s) => s.activeMonth);
+  const selectedDate = useCalendarStore((s) => s.selectedDate);
+  const load = useCalendarStore((s) => s.load);
   const [guest, _setGuest] = useState("Alice Nguyen");
 
   const defaultDate = useMemo(() => {

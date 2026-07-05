@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { BadgeCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Avatar from "./Avatar";
 
-export default function SenderBlock({
+const SenderBlock = memo(function SenderBlock({
   name,
   npub,
   avatarInitials,
@@ -31,4 +32,6 @@ export default function SenderBlock({
       </div>
     </div>
   );
-}
+});
+
+export default SenderBlock;

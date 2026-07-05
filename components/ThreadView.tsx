@@ -1,7 +1,9 @@
 "use client";
 
+import { memo } from "react";
 import type { Message, Profile } from "@post/nostr-core";
-import { formatRelativeTime } from "@/lib/utils";
+import { useProfilesStore } from "@/lib/stores/profiles";
+import RelativeTime from "./RelativeTime";
 
 function senderName(pubkey: string, profiles: Record<string, Profile>): string {
   const profile = profiles[pubkey];
@@ -17,15 +19,15 @@ function senderInitials(pubkey: string, profiles: Record<string, Profile>): stri
   return pubkey.slice(0, 2).toUpperCase();
 }
 
-export default function ThreadView({
+const ThreadView = memo(function ThreadView({
   messages,
   onSelect,
-  profiles = {},
 }: {
   messages: Message[];
   onSelect: (id: string) => void;
-  profiles?: Record<string, Profile>;
 }) {
+  const profiles = useProfilesStore((s) => s.byPubkey);
+
   if (messages.length === 0) return null;
 
   return (
@@ -53,7 +55,7 @@ export default function ThreadView({
                   {senderName(msg.pubkey, profiles)}
                 </span>
                 <span className="ml-auto text-[10px] text-text-tertiary flex-shrink-0">
-                  {formatRelativeTime(msg.createdAt)}
+                  <RelativeTime ts={msg.createdAt} />
                 </span>
               </div>
               {msg.subject && (
@@ -70,4 +72,6 @@ export default function ThreadView({
       </div>
     </div>
   );
-}
+});
+
+export default ThreadView;

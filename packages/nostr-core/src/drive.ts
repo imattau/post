@@ -26,9 +26,9 @@ function fromBase64(value: string): Uint8Array {
 }
 
 function requireSecretKey(identity: Identity): Uint8Array {
-  if (!identity.nsec) throw new Error("Drive encryption requires a local private key");
+  if (!identity.nsec) throw new Error("Cannot encrypt drive file");
   const decoded = decode(identity.nsec);
-  if (decoded.type !== "nsec") throw new Error("Invalid nsec");
+  if (decoded.type !== "nsec") throw new Error("Cannot encrypt drive file");
   return decoded.data;
 }
 

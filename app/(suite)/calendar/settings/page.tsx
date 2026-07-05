@@ -8,7 +8,13 @@ import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarSettingsPage() {
-  const { calendars, sync, activeMonth, loading, error, load, toggleCalendar } = useCalendarStore();
+  const calendars = useCalendarStore((s) => s.calendars);
+  const sync = useCalendarStore((s) => s.sync);
+  const activeMonth = useCalendarStore((s) => s.activeMonth);
+  const loading = useCalendarStore((s) => s.loading);
+  const error = useCalendarStore((s) => s.error);
+  const load = useCalendarStore((s) => s.load);
+  const toggleCalendar = useCalendarStore((s) => s.toggleCalendar);
 
   useEffect(() => {
     void load();

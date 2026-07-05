@@ -30,6 +30,12 @@ Object.defineProperty(window, "localStorage", {
   writable: true,
 });
 
+// Mock Tauri modules
+vi.mock("@/lib/tauri", () => ({
+  isTauri: () => false,
+  createTauriKeyStore: () => null,
+}));
+
 // Mock crypto.randomUUID
 if (!globalThis.crypto?.randomUUID) {
   Object.defineProperty(globalThis, "crypto", {

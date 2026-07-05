@@ -13,7 +13,13 @@ import GuestsRow from "../../_components/GuestsRow";
 
 export default function CalendarEventDetailsPage() {
   const params = useParams<{ eventId: string }>();
-  const { events, calendars, activeMonth, load, selectEvent, updateEvent, deleteEvent } = useCalendarStore();
+  const events = useCalendarStore((s) => s.events);
+  const calendars = useCalendarStore((s) => s.calendars);
+  const activeMonth = useCalendarStore((s) => s.activeMonth);
+  const load = useCalendarStore((s) => s.load);
+  const selectEvent = useCalendarStore((s) => s.selectEvent);
+  const updateEvent = useCalendarStore((s) => s.updateEvent);
+  const deleteEvent = useCalendarStore((s) => s.deleteEvent);
 
   useEffect(() => {
     void load();

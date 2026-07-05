@@ -310,22 +310,24 @@ describe("compose store", () => {
 });
 
 describe("blossom store", () => {
-  it("setServerUrl persists to localStorage", async () => {
+  it("setServerUrl persists to settings store", async () => {
     const { useBlossomStore } = await import("@/lib/stores/blossom");
+    const { useSettingsStore } = await import("@/lib/stores/settings");
     useBlossomStore.getState().setServerUrl("https://blossom.example.com");
     expect(useBlossomStore.getState().serverUrl).toBe("https://blossom.example.com");
-    expect(localStorage.setItem).toHaveBeenCalledWith("blossom-server-url", "https://blossom.example.com");
+    expect(useSettingsStore.getState().values["blossom-server-url"]).toBe("https://blossom.example.com");
   });
 
   it("uploadFile throws when no server configured", async () => {
     const { useBlossomStore } = await import("@/lib/stores/blossom");
     useBlossomStore.getState().setServerUrl("");
-    await expect(useBlossomStore.getState().uploadFile(new File([], "test.txt"), new Uint8Array(32))).rejects.toThrow("No Blossom server");
+    await expect(useBlossomStore.getState().uploadFile(new File([], "test.txt"), new Uint8Array(32))).rejects.toThrow("Upload not configured");
   });
 
-  it("loadBlossomConfig restores from localStorage", async () => {
+  it("loadBlossomConfig restores from settings store", async () => {
     const { loadBlossomConfig, useBlossomStore } = await import("@/lib/stores/blossom");
-    (localStorage.getItem as any).mockReturnValueOnce("https://restored.example.com");
+    const { useSettingsStore } = await import("@/lib/stores/settings");
+    useSettingsStore.getState().setValue("blossom-server-url", "https://restored.example.com");
     loadBlossomConfig();
     expect(useBlossomStore.getState().serverUrl).toBe("https://restored.example.com");
   });

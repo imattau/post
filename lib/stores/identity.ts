@@ -102,7 +102,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   },
 
   async connectNip07(): Promise<Identity> {
-    if (!window.nostr) throw new Error("NIP-07 extension not available");
+    if (!window.nostr) throw new Error("Signer not available");
 
     const pubkey = await window.nostr.getPublicKey();
     const npub = npubEncode(pubkey);
@@ -278,11 +278,11 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
 
   async publishProfile(profileData: { displayName: string; username: string; about: string; picture?: string }) {
     const { identity, usingNip07, passkeySigner } = get();
-    if (!identity) throw new Error("No identity");
+    if (!identity) throw new Error("Cannot publish profile");
 
     const { useRelaysStore } = await import("@/lib/stores/relays");
     const pool = useRelaysStore.getState().pool;
-    if (!pool) throw new Error("Relay pool not connected");
+    if (!pool) throw new Error("Cannot publish profile");
 
     let signedEvent: any;
 
@@ -336,7 +336,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       };
       signedEvent = finalizeEvent(eventTemplate, sk);
     } else {
-      throw new Error("No signer available");
+      throw new Error("Cannot publish profile");
     }
 
     await pool.publish(signedEvent);

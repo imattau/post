@@ -42,7 +42,6 @@ export interface MockMessage {
   kind?: number;
   pubkey?: string;
   recipientPubkey?: string;
-  raw?: string;
   tags?: string[][];
   snoozedUntil?: number | null;
   mailbox?: string;

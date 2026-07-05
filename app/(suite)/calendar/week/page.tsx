@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { useCalendarStore } from "@/lib/stores/calendar";
-import { addDays, formatMonthDay, formatTimeRange, isSameDay, monthLabel, startOfWeekMonday } from "@/lib/calendar";
+import { startOfWeek } from "date-fns";
+import { addDays, formatMonthDay, formatTimeRange, isSameDay, monthLabel, weekStartFromSetting } from "@/lib/calendar";
+import { useSettingsStore } from "@/lib/stores/settings";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
 import CalendarViewControls from "../_components/CalendarViewControls";
 import CalendarEventPill from "../_components/CalendarEventPill";
@@ -11,13 +13,28 @@ import CalendarEventPill from "../_components/CalendarEventPill";
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function CalendarWeekPage() {
-  const { activeMonth, selectedDate, events, calendars, loading, error, load, selectDate, selectEvent, previousWeek, nextWeek, goToToday } = useCalendarStore();
+  const activeMonth = useCalendarStore((s) => s.activeMonth);
+  const selectedDate = useCalendarStore((s) => s.selectedDate);
+  const events = useCalendarStore((s) => s.events);
+  const calendars = useCalendarStore((s) => s.calendars);
+  const loading = useCalendarStore((s) => s.loading);
+  const error = useCalendarStore((s) => s.error);
+  const load = useCalendarStore((s) => s.load);
+  const selectDate = useCalendarStore((s) => s.selectDate);
+  const selectEvent = useCalendarStore((s) => s.selectEvent);
+  const previousWeek = useCalendarStore((s) => s.previousWeek);
+  const nextWeek = useCalendarStore((s) => s.nextWeek);
+  const goToToday = useCalendarStore((s) => s.goToToday);
+
+  const weekStartSetting = useSettingsStore((s) => s.values["week-start-day"]);
+  const showWeekends = (useSettingsStore((s) => s.values["show-weekends"]) ?? true) as boolean;
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const weekStart = useMemo(() => startOfWeekMonday(selectedDate), [selectedDate]);
+  const weekStartsOn = weekStartFromSetting(weekStartSetting);
+  const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: weekStartsOn as 0 | 1 | 2 | 3 | 4 | 5 | 6 }), [selectedDate, weekStartsOn]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)), [weekStart]);
   const calendarById = useMemo(() => new Map(calendars.map((calendar) => [calendar.id, calendar])), [calendars]);
   const weekEvents = useMemo(
@@ -56,12 +73,15 @@ export default function CalendarWeekPage() {
       )}
       <div className="mt-5 overflow-hidden rounded-[16px] border border-border shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
         <div className="grid grid-cols-7 border-b border-border bg-[#121721] text-[11px] text-text-tertiary">
-          {days.map((day) => (
-            <div key={day.toISOString()} className="px-3 py-2">
+          {days.map((day) => {
+            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+            return (
+            <div key={day.toISOString()} className={`px-3 py-2 ${!showWeekends && isWeekend ? "hidden" : ""}`}>
               <div className="font-medium text-text-secondary">{WEEKDAY_LABELS[(day.getDay() + 6) % 7]}</div>
               <div className="mt-1 text-text-near-white">{formatMonthDay(day)}</div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         <div className="grid grid-cols-7 divide-x divide-border">
@@ -69,6 +89,7 @@ export default function CalendarWeekPage() {
             const dayEvents = weekEvents.filter((event) => isSameDay(new Date(event.startAt), day));
             const selected = isSameDay(day, selectedDate);
             const isToday = isSameDay(day, today);
+            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
             return (
               <div
                 key={day.toISOString()}
@@ -81,7 +102,7 @@ export default function CalendarWeekPage() {
                 }}
                 role="button"
                 tabIndex={0}
-                className={`min-h-[720px] bg-canvas p-3 ${isToday ? "bg-[#0F1420]" : ""} ${selected ? "ring-1 ring-brand/40" : ""}`}
+                className={`min-h-[720px] bg-canvas p-3 ${isToday ? "bg-[#0F1420]" : ""} ${selected ? "ring-1 ring-brand/40" : ""} ${!showWeekends && isWeekend ? "hidden" : ""}`}
               >
                 <div
                   className={`flex h-8 items-center justify-center rounded-full text-[11px] ${

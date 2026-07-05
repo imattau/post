@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' wss://*.nostr.* wss://relay.*; img-src 'self' blob: data: https:; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self' wss:; img-src 'self' blob: data: https:; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
@@ -40,9 +40,7 @@
   "plugins": {
     "updater": {
       "pubkey": "",
-      "endpoints": [
-        "https://releases.nostr.app/{{target}}/{{arch}}/{{current_version}}"
-      ]
+      "endpoints": []
     },
     "stronghold": {}
   }

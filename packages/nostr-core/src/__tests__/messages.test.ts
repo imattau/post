@@ -40,7 +40,7 @@ describe("sendMessage", () => {
   it("throws when keys.load returns null", async () => {
     const keys = makeKeys(generateSecretKey());
     (keys.load as any).mockReturnValueOnce(null);
-    await expect(sendMessage(mockPool, keys, { to: "b".repeat(64), content: "Hello" })).rejects.toThrow("No private key");
+    await expect(sendMessage(mockPool, keys, { to: "b".repeat(64), content: "Hello" })).rejects.toThrow("Cannot send message");
   });
 
   it("round-trips NIP-44 encryption between sender and receiver", async () => {

@@ -8,7 +8,11 @@ import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarSharedPage() {
-  const { calendars, activeMonth, loading, error, load } = useCalendarStore();
+  const calendars = useCalendarStore((s) => s.calendars);
+  const activeMonth = useCalendarStore((s) => s.activeMonth);
+  const loading = useCalendarStore((s) => s.loading);
+  const error = useCalendarStore((s) => s.error);
+  const load = useCalendarStore((s) => s.load);
 
   useEffect(() => {
     void load();

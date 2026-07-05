@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { memo, useState, useEffect } from "react";
 import { FileImage, File, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { formatSize } from "@/lib/utils";
+import { useDriveStore } from "@/lib/stores/drive";
 
-export default function AttachmentCard({
+function isImage(mimeType: string) {
+  return mimeType.startsWith("image/");
+}
+
+const AttachmentCard = memo(function AttachmentCard({
   fileName,
   sizeBytes,
   encrypted,
@@ -16,6 +21,7 @@ export default function AttachmentCard({
   fileKey,
   fileIv,
   onSaveToDrive,
+  messageId,
 }: {
   fileName: string;
   sizeBytes: number;
@@ -27,11 +33,20 @@ export default function AttachmentCard({
   fileKey?: string;
   fileIv?: string;
   onSaveToDrive?: () => void;
+  messageId?: string;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
+
+  const driveFiles = useDriveStore((s) => s.files);
+  const importAttachment = useDriveStore((s) => s.importAttachment);
+
+  const inDrive = storedInDrive ?? driveFiles.some((f) => f.sha256 === sha256);
+  const effectiveOnSaveToDrive = onSaveToDrive ?? (messageId && !inDrive
+    ? () => importAttachment({ fileName, mimeType, sizeBytes, sha256, url: url ?? "", encrypted }, messageId)
+    : undefined);
 
   useEffect(() => {
     return () => {
@@ -39,15 +54,11 @@ export default function AttachmentCard({
     };
   }, [decryptedUrl]);
 
-  function isImage() {
-    return mimeType.startsWith("image/");
-  }
-
   async function handleSave() {
-    if (!onSaveToDrive) return;
+    if (!effectiveOnSaveToDrive) return;
     setSaving(true);
     try {
-      await onSaveToDrive();
+      await effectiveOnSaveToDrive();
     } finally {
       setSaving(false);
     }
@@ -91,7 +102,7 @@ export default function AttachmentCard({
   return (
     <div className="flex items-center gap-3 h-[88px] px-3 border border-border rounded-[12px] bg-sidebar w-[274px]">
       <div className="w-12 h-14 rounded-[8px] bg-pill-subtle flex items-center justify-center flex-shrink-0">
-        {isImage() ? (
+        {isImage(mimeType) ? (
           <FileImage size={18} className="text-text-tertiary" />
         ) : (
           <File size={18} className="text-text-tertiary" />
@@ -103,7 +114,7 @@ export default function AttachmentCard({
           {formatSize(sizeBytes)} · Blossom{encrypted ? " / encrypted" : ""}
         </p>
         <div className="flex gap-3 mt-1">
-          {isImage() && (
+          {isImage(mimeType) && (
             <button
               onClick={() => void handlePreview()}
               className="text-[10px] font-medium text-brand-light cursor-pointer hover:brightness-110"
@@ -111,7 +122,7 @@ export default function AttachmentCard({
               {decrypting ? "Decrypting..." : "Preview"}
             </button>
           )}
-          {storedInDrive ? (
+          {inDrive ? (
             <a
               href={`/drive?blob=${sha256}`}
               className="text-[10px] font-medium text-brand-light hover:brightness-110 no-underline"
@@ -138,9 +149,9 @@ export default function AttachmentCard({
             <Dialog.Close className="text-text-modal-2 hover:text-text-modal cursor-pointer"><X size={18} /></Dialog.Close>
           </div>
           {decryptedUrl ? (
-            <img src={decryptedUrl} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
+            <img loading="lazy" src={decryptedUrl} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
           ) : url && !encrypted ? (
-            <img src={url} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
+            <img loading="lazy" src={url} alt={fileName} className="max-h-[70vh] max-w-full rounded-[8px] object-contain" />
           ) : (
             <div className="flex h-48 w-80 items-center justify-center rounded-[8px] bg-pill-subtle">
               <p className="text-[12px] text-text-tertiary">
@@ -153,4 +164,6 @@ export default function AttachmentCard({
       </Dialog.Root>
     </div>
   );
-}
+});
+
+export default AttachmentCard;

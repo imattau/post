@@ -1,4 +1,6 @@
-export default function SubjectPills({
+import { memo } from "react";
+
+const SubjectPills = memo(function SubjectPills({
   labels,
   encrypted,
   isGiftWrapped,
@@ -34,4 +36,6 @@ export default function SubjectPills({
       </span>
     </div>
   );
-}
+});
+
+export default SubjectPills;

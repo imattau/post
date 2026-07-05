@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { uploadBlob } from "@post/nostr-core";
 import type { AttachmentRef } from "@post/nostr-core";
+import { useSettingsStore } from "@/lib/stores/settings";
 
 interface BlossomState {
   serverUrl: string;
@@ -17,21 +18,17 @@ export const useBlossomStore = create<BlossomState>((set, get) => ({
 
   setServerUrl: (url: string) => {
     set({ serverUrl: url });
-    try {
-      localStorage.setItem("blossom-server-url", url);
-    } catch { /* ignore */ }
+    useSettingsStore.getState().setValue("blossom-server-url", url);
   },
 
   async uploadFile(file, sk, onProgress) {
     const { serverUrl } = get();
-    if (!serverUrl) throw new Error("No Blossom server configured");
+    if (!serverUrl) throw new Error("Upload not configured");
     return uploadBlob({ url: serverUrl }, file, sk, onProgress);
   },
 }));
 
 export function loadBlossomConfig() {
-  try {
-    const saved = localStorage.getItem("blossom-server-url");
-    if (saved) useBlossomStore.getState().setServerUrl(saved);
-  } catch { /* ignore */ }
+  const url = useSettingsStore.getState().values["blossom-server-url"];
+  if (url) useBlossomStore.getState().setServerUrl(url as string);
 }

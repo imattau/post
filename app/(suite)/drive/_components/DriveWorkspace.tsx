@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
@@ -127,46 +127,43 @@ function highlightText(text: string, query: string): React.ReactNode {
 }
 
 export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
-  const state = useDriveStore();
-  const {
-    files,
-    folders,
-    selectedFileId,
-    selectedFolderId,
-    query,
-    filter,
-    sort,
-    viewMode,
-    uploadJobs,
-    loading,
-    error,
-    load,
-    selectFile,
-    selectFolder,
-    selectedFileIds,
-    toggleFileSelection,
-    selectAllFiles,
-    clearFileSelection,
-    setQuery,
-    setFilter,
-    setSort,
-    setViewMode,
-    toggleStar,
-    toggleTrash,
-    toggleOffline,
-    deletePermanently,
-    createFolder,
-    renameFolder,
-    toggleFolderStar,
-    toggleFolderTrash,
-    enqueueUploads,
-    clearUploads,
-    cancelUpload,
-    retryUpload,
-    loadMore,
-    hasMore,
-    updateSharedWith,
-  } = state;
+  const files = useDriveStore((s) => s.files);
+  const folders = useDriveStore((s) => s.folders);
+  const selectedFileId = useDriveStore((s) => s.selectedFileId);
+  const selectedFolderId = useDriveStore((s) => s.selectedFolderId);
+  const query = useDriveStore((s) => s.query);
+  const filter = useDriveStore((s) => s.filter);
+  const sort = useDriveStore((s) => s.sort);
+  const viewMode = useDriveStore((s) => s.viewMode);
+  const uploadJobs = useDriveStore((s) => s.uploadJobs);
+  const loading = useDriveStore((s) => s.loading);
+  const error = useDriveStore((s) => s.error);
+  const load = useDriveStore((s) => s.load);
+  const selectFile = useDriveStore((s) => s.selectFile);
+  const selectFolder = useDriveStore((s) => s.selectFolder);
+  const selectedFileIds = useDriveStore((s) => s.selectedFileIds);
+  const toggleFileSelection = useDriveStore((s) => s.toggleFileSelection);
+  const selectAllFiles = useDriveStore((s) => s.selectAllFiles);
+  const clearFileSelection = useDriveStore((s) => s.clearFileSelection);
+  const setQuery = useDriveStore((s) => s.setQuery);
+  const setFilter = useDriveStore((s) => s.setFilter);
+  const setSort = useDriveStore((s) => s.setSort);
+  const setViewMode = useDriveStore((s) => s.setViewMode);
+  const toggleStar = useDriveStore((s) => s.toggleStar);
+  const toggleTrash = useDriveStore((s) => s.toggleTrash);
+  const toggleOffline = useDriveStore((s) => s.toggleOffline);
+  const deletePermanently = useDriveStore((s) => s.deletePermanently);
+  const createFolder = useDriveStore((s) => s.createFolder);
+  const renameFolder = useDriveStore((s) => s.renameFolder);
+  const toggleFolderStar = useDriveStore((s) => s.toggleFolderStar);
+  const toggleFolderTrash = useDriveStore((s) => s.toggleFolderTrash);
+  const enqueueUploads = useDriveStore((s) => s.enqueueUploads);
+  const clearUploads = useDriveStore((s) => s.clearUploads);
+  const cancelUpload = useDriveStore((s) => s.cancelUpload);
+  const retryUpload = useDriveStore((s) => s.retryUpload);
+  const loadMore = useDriveStore((s) => s.loadMore);
+  const hasMore = useDriveStore((s) => s.hasMore);
+  const updateSharedWith = useDriveStore((s) => s.updateSharedWith);
   const identity = useIdentityStore((s) => s.identity);
   const blossomUrl = useBlossomStore((s) => s.serverUrl);
   const setBlossomUrl = useBlossomStore((s) => s.setServerUrl);
@@ -236,15 +233,15 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  const selectedFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
-  const paginatedFiles = getPaginatedFiles(state, screen);
-  const totalBytes = files.reduce((sum, f) => sum + f.sizeBytes, 0);
-  const totalEncrypted = files.filter((f) => f.encrypted).length;
-  const totalOffline = files.filter((f) => f.offlineAvailable).length;
+  const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId) ?? null, [folders, selectedFolderId]);
+  const totalBytes = useMemo(() => files.reduce((sum, f) => sum + f.sizeBytes, 0), [files]);
+  const totalEncrypted = useMemo(() => files.filter((f) => f.encrypted).length, [files]);
+  const totalOffline = useMemo(() => files.filter((f) => f.offlineAvailable).length, [files]);
   const storageLimit = 30 * 1024 * 1024 * 1024;
-  const storagePercent = Math.min(100, Math.round((totalBytes / storageLimit) * 100));
-  const visibleFiles = getVisibleDriveFiles(state, screen);
-  const selectedFile = visibleFiles.find((file) => file.id === selectedFileId) ?? visibleFiles[0] ?? null;
+  const storagePercent = useMemo(() => Math.min(100, Math.round((totalBytes / storageLimit) * 100)), [totalBytes]);
+  const paginatedFiles = useMemo(() => getPaginatedFiles(undefined, screen), [files, folders, selectedFolderId, query, filter, sort, screen]);
+  const visibleFiles = useMemo(() => getVisibleDriveFiles(undefined, screen), [files, folders, selectedFolderId, screen, query, filter, sort]);
+  const selectedFile = useMemo(() => visibleFiles.find((file) => file.id === selectedFileId) ?? visibleFiles[0] ?? null, [visibleFiles, selectedFileId]);
 
   useEffect(() => {
     if (visibleFiles.length > 0 && !visibleFiles.some((file) => file.id === selectedFileId)) {

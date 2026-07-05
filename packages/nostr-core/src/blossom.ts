@@ -60,10 +60,10 @@ export async function uploadBlob(
             encrypted: true,
           });
         } catch {
-          reject(new Error("Invalid response from Blossom server"));
+          reject(new Error("Upload failed"));
         }
       } else {
-        reject(new Error(`Upload failed with status ${xhr.status}`));
+        reject(new Error("Upload failed"));
       }
     };
     xhr.onerror = () => reject(new Error("Upload failed"));
@@ -86,7 +86,7 @@ export async function downloadBlob(
   const response = await fetch(`${serverUrl}/${ref.sha256}`, {
     headers: { Authorization: authToken },
   });
-  if (!response.ok) throw new Error(`Download failed with status ${response.status}`);
+  if (!response.ok) throw new Error("Download failed");
   return response.arrayBuffer();
 }
 
@@ -106,5 +106,5 @@ export async function deleteBlob(
     method: "DELETE",
     headers: { Authorization: authToken },
   });
-  if (!response.ok) throw new Error(`Delete failed with status ${response.status}`);
+  if (!response.ok) throw new Error("Delete failed");
 }
