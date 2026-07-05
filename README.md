@@ -8,13 +8,13 @@ Post is an **enterprise productivity suite for the Nostr protocol**. It combines
 
 ## Screenshots
 
-| Mail — Inbox | Calendar | Contacts | Drive |
+| Mail — Inbox | Calendar — Month View | Contacts — Overview | Drive — Desktop |
 |:---:|:---:|:---:|:---:|
 | ![Inbox](public/screenshots/mail-inbox.png) | ![Calendar](public/screenshots/calendar.png) | ![Contacts](public/screenshots/contacts.png) | ![Drive](public/screenshots/drive.png) |
 
-| Welcome / onboarding | Settings & relays | Passkey sign-in |
-|:---:|:---:|:---:|
-| ![Welcome](public/screenshots/login-welcome.png) | ![Settings](public/screenshots/settings.png) | ![Passkey](public/screenshots/login-passkey.png) |
+| Welcome / onboarding | Settings | Passkey sign-in | Drive — Grid View |
+|:---:|:---:|:---:|:---:|
+| ![Welcome](public/screenshots/login-welcome.png) | ![Settings](public/screenshots/settings.png) | ![Passkey](public/screenshots/login-passkey.png) | ![Drive Grid](public/screenshots/drive-grid.png) |
 
 ---
 
