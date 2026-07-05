@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchSimple } from "@/lib/useSearch";
 import { resolveNip05 } from "@post/nostr-core";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
-import { useSettingsStore } from "@/lib/stores/settings";
+import { useSettingsStore, SETTING_DEFAULTS, type SettingKey } from "@/lib/stores/settings";
+import { db } from "@/lib/db/schema";
 import IdentityDialog from "@/components/IdentityDialog";
 
 type SubCategory = { id: string; label: string };
@@ -83,10 +85,11 @@ const CATEGORIES: Category[] = [
   },
 ];
 
-function ToggleRow({ settingKey, label, description, defaultOn }: { settingKey: string; label: string; description: string; defaultOn?: boolean }) {
+function ToggleRow({ settingKey, label, description, defaultOn }: { settingKey: SettingKey; label: string; description: string; defaultOn?: boolean }) {
   const value = useSettingsStore((s) => s.values[settingKey]);
   const setValue = useSettingsStore((s) => s.setValue);
-  const on = typeof value === "boolean" ? value : defaultOn ?? false;
+  const fallback = defaultOn ?? (SETTING_DEFAULTS[settingKey] as boolean | undefined) ?? false;
+  const on = typeof value === "boolean" ? value : fallback;
   return (
     <div className="flex items-center justify-between py-3">
       <div className="flex-1 pr-4">
@@ -113,10 +116,11 @@ function SectionHeader({ title }: { title: string }) {
   return <h3 className="text-[15px] font-semibold text-text-primary mt-8 mb-4">{title}</h3>;
 }
 
-function SelectRow({ settingKey, label, description, options, defaultValue }: { settingKey: string; label: string; description: string; options: { value: string; label: string }[]; defaultValue: string }) {
+function SelectRow({ settingKey, label, description, options, defaultValue }: { settingKey: SettingKey; label: string; description: string; options: { value: string; label: string }[]; defaultValue?: string }) {
   const value = useSettingsStore((s) => s.values[settingKey]);
   const setValue = useSettingsStore((s) => s.setValue);
-  const current = typeof value === "string" ? value : defaultValue;
+  const fallback = defaultValue ?? (SETTING_DEFAULTS[settingKey] as string | undefined) ?? "";
+  const current = typeof value === "string" ? value : fallback;
   return (
     <div className="flex items-center justify-between py-3">
       <div className="flex-1 pr-4">
@@ -162,20 +166,19 @@ function SubNav({ category, activeSub, onSelect }: { category: Category; activeS
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState("Account");
   const [activeSubCategory, setActiveSubCategory] = useState("Profile");
-  const [searchQuery, setSearchQuery] = useState("");
   const [identityOpen, setIdentityOpen] = useState(false);
   const router = useRouter();
   const identity = useIdentityStore((s) => s.identity);
 
   const category = CATEGORIES.find((c) => c.id === activeCategory) ?? CATEGORIES[0];
 
-  const filteredCategories = CATEGORIES.filter((cat) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      cat.label.toLowerCase().includes(q) ||
-      cat.subCategories.some((s) => s.label.toLowerCase().includes(q))
-    );
+  const { query: searchQuery, setQuery: setSearchQuery, results: filteredCategories } = useSearchSimple({
+    items: CATEGORIES.map((cat) => ({
+      ...cat,
+      _subLabels: cat.subCategories.map((s) => s.label).join(" "),
+    })),
+    fields: ["label", "_subLabels"],
+    debounceMs: 100,
   });
 
   const switchCategory = (catId: string) => {
@@ -294,6 +297,18 @@ function ProfileContent() {
   const handle = identity?.nip05 || "No NIP-05";
   const shortNpub = identity?.npub ? `npub1${identity.npub.slice(5, 9)}…${identity.npub.slice(-4)}` : "";
 
+  const exportSettings = async () => {
+    const relays = useRelaysStore.getState().relays;
+    const payload = JSON.stringify({ settings: useSettingsStore.getState().values, relays }, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "post-settings-export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <h2 className="text-[24px] font-semibold text-text-primary">Profile</h2>
@@ -342,7 +357,7 @@ function ProfileContent() {
           <p className="text-[14px] font-medium text-text-primary">Export suite settings</p>
           <p className="text-[11px] text-text-tertiary mt-0.5">Download preferences, relay lists and app configuration.</p>
         </div>
-        <button className="h-9 px-4 rounded-[10px] bg-pill-subtle border border-border text-text-secondary text-[11px] font-medium cursor-pointer hover:brightness-110 transition-all flex-shrink-0">
+        <button onClick={exportSettings} className="h-9 px-4 rounded-[10px] bg-pill-subtle border border-border text-text-secondary text-[11px] font-medium cursor-pointer hover:brightness-110 transition-all flex-shrink-0">
           Export
         </button>
       </div>
@@ -979,6 +994,17 @@ function RelaysContent() {
 /* ───── Advanced ───── */
 
 function AdvancedContent() {
+  const clearLocalData = async () => {
+    useSettingsStore.getState().reset();
+    try {
+      await db.delete();
+    } catch { /* ignore */ }
+    try {
+      localStorage.clear();
+    } catch { /* ignore */ }
+    window.location.reload();
+  };
+
   return (
     <>
       <h2 className="text-[24px] font-semibold text-text-primary">Advanced</h2>
@@ -992,7 +1018,7 @@ function AdvancedContent() {
           <p className="text-[14px] font-medium text-text-primary">Clear local data</p>
           <p className="text-[11px] text-text-tertiary mt-0.5">Remove all locally cached data and reset settings.</p>
         </div>
-        <button className="h-9 px-4 rounded-[10px] bg-danger/10 border border-danger/30 text-danger text-[11px] font-medium cursor-pointer hover:bg-danger/20 transition-all flex-shrink-0">
+        <button onClick={clearLocalData} className="h-9 px-4 rounded-[10px] bg-danger/10 border border-danger/30 text-danger text-[11px] font-medium cursor-pointer hover:bg-danger/20 transition-all flex-shrink-0">
           Clear data
         </button>
       </div>

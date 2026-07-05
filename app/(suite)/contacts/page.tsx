@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { type ContactStatus, type ContactView, useContactsStore } from "@/lib/stores/contacts";
+import { useSearchSimple } from "@/lib/useSearch";
 
 type ContactsTab = "Overview" | "Following" | "Muted" | "Blocked";
 
@@ -30,10 +31,14 @@ function StatusChip({ status }: { status: string }) {
 export default function ContactsPage() {
   const [activeTab, setActiveTab] = useState<ContactsTab>("Overview");
   const [selectedContact, setSelectedContact] = useState<ContactView | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const contacts = useContactsStore((s) => s.contacts);
   const loadContacts = useContactsStore((s) => s.loadContacts);
   const setStatus = useContactsStore((s) => s.setStatus);
+  const { query: searchQuery, setQuery: setSearchQuery, results: searched } = useSearchSimple({
+    items: contacts,
+    fields: ["name", "handle", "npub", "pubkey"],
+    debounceMs: 150,
+  });
 
   useEffect(() => {
     void loadContacts();
@@ -51,11 +56,10 @@ export default function ContactsPage() {
     setSelectedContact((current) => current?.id === contact.id ? { ...current, status } : current);
   };
 
-  const filtered = contacts.filter((c) => {
+  const filtered = searched.filter((c) => {
     if (activeTab === "Following" && c.status !== "Following") return false;
     if (activeTab === "Muted" && c.status !== "Muted") return false;
     if (activeTab === "Blocked" && c.status !== "Blocked") return false;
-    if (searchQuery && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 

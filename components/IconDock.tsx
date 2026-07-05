@@ -3,9 +3,11 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, CircleHelp, X } from "lucide-react";
+import { Search, CircleHelp, Settings, X } from "lucide-react";
+import { Command } from "cmdk";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useMessagesStore } from "@/lib/stores/messages";
+import { createMessageSearch } from "@/lib/search";
 import type { Message } from "@post/nostr-core";
 import AppSwitcher from "./AppSwitcher";
 import IdentityDialog from "./IdentityDialog";
@@ -63,6 +65,7 @@ export default function IconDock() {
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const search = useMemo(() => createMessageSearch(), []);
 
   useEffect(() => {
     if (!searchOpen) {
@@ -79,11 +82,14 @@ export default function IconDock() {
 
   const searchResults = useMemo(() => {
     if (!query.trim()) return [];
-    return messages.filter((message) => {
-      const q = query.trim().toLowerCase();
-      return message.subject.toLowerCase().includes(q) || message.content.toLowerCase().includes(q) || message.pubkey.toLowerCase().includes(q);
-    }).slice(0, 5);
-  }, [messages, query]);
+    return search.search(query, messages).slice(0, 5);
+  }, [messages, query, search]);
+
+  const handleSelect = useCallback((message: Message) => {
+    const mailbox = message.mailbox === "archive" ? "archive" : message.mailbox;
+    closeSearch();
+    router.push(`/mail/${mailbox}?c=${message.id}`);
+  }, [closeSearch, router]);
 
   return (
     <div className="w-[72px] h-dvh flex-shrink-0 bg-dock border-r border-border flex flex-col items-center pt-[18px]">
@@ -124,6 +130,11 @@ export default function IconDock() {
         <CircleHelp size={14} className="text-text-secondary" />
       </button>
 
+      {/* Settings */}
+      <Link href="/settings" aria-label="Settings" className="mt-[10px] w-10 h-10 rounded-tile-2 border border-border bg-transparent flex items-center justify-center flex-shrink-0 hover:brightness-125 transition-[brightness] duration-150 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-dock">
+        <Settings size={14} className="text-text-secondary" />
+      </Link>
+
       {/* Spacer */}
       <div className="flex-1" />
 
@@ -147,22 +158,31 @@ export default function IconDock() {
               <p className="text-[13px] font-semibold text-text-modal">Search messages</p>
               <button onClick={closeSearch} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
             </div>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoFocus
-              placeholder="Search subjects, content or pubkeys"
-              className="mt-3 h-9 w-full rounded-[10px] border border-border bg-sidebar px-3 text-[12px] text-text-primary outline-none placeholder-text-placeholder"
-            />
-            <div className="mt-3 space-y-1">
-              {query.trim() && searchResults.length === 0 && <p className="text-[12px] text-text-tertiary">No messages found.</p>}
-              {searchResults.map((message) => (
-                <a key={message.id} href={`/mail/${message.mailbox === "archive" ? "archive" : message.mailbox}?c=${message.id}`} className="block rounded-[8px] px-2 py-2 no-underline hover:bg-surface-active">
-                  <p className="truncate text-[12px] font-medium text-text-primary">{message.subject || "(no subject)"}</p>
-                  <p className="truncate text-[11px] text-text-tertiary">{message.preview || message.content}</p>
-                </a>
-              ))}
-            </div>
+            <Command shouldFilter={false} className="mt-3">
+              <Command.Input
+                value={query}
+                onValueChange={setQuery}
+                autoFocus
+                placeholder="Search subjects, content or pubkeys"
+                className="h-9 w-full rounded-[10px] border border-border bg-sidebar px-3 text-[12px] text-text-primary outline-none placeholder:text-text-placeholder"
+              />
+              <Command.List className="mt-3 space-y-1">
+                {query.trim() && searchResults.length === 0 && (
+                  <p className="text-[12px] text-text-tertiary">No messages found.</p>
+                )}
+                {searchResults.map((message) => (
+                  <Command.Item
+                    key={message.id}
+                    value={message.id}
+                    onSelect={() => handleSelect(message)}
+                    className="block rounded-[8px] px-2 py-2 no-underline hover:bg-surface-active data-[highlighted]:bg-surface-active cursor-pointer"
+                  >
+                    <p className="truncate text-[12px] font-medium text-text-primary">{message.subject || "(no subject)"}</p>
+                    <p className="truncate text-[11px] text-text-tertiary">{message.preview || message.content}</p>
+                  </Command.Item>
+                ))}
+              </Command.List>
+            </Command>
           </div>
         </div>
       )}

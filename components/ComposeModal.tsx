@@ -8,8 +8,10 @@ import { useContactsStore } from "@/lib/stores/contacts";
 import { Minus, X, ChevronDown, LoaderCircle, File, AtSign, Ellipsis } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
+import { Command, useCommandState } from "cmdk";
 import { toast } from "sonner";
 import { formatSize, wrapTextareaSelection, bytesToBase64, draftHasContent } from "@/lib/utils";
+import { createContactSearch } from "@/lib/search";
 import FormatToolbar from "./FormatToolbar";
 import MessageBody from "./MessageBody";
 import UploadProgress from "./UploadProgress";
@@ -73,43 +75,45 @@ const ComposeHeader = memo(function ComposeHeader({ onRequestClose }: { onReques
 const ContactSuggestions = memo(function ContactSuggestions({
   recipientText,
   onSelect,
+  highlightedRef,
 }: {
   recipientText: string;
   onSelect: (contact: ReturnType<typeof useContactsStore.getState>["contacts"][number]) => void;
+  highlightedRef: React.RefObject<boolean>;
 }) {
   const contacts = useContactsStore((s) => s.contacts);
+  const search = useMemo(() => createContactSearch(), []);
+  const selectedItemId = useCommandState((state) => state.selectedItemId);
+
+  highlightedRef.current = !!selectedItemId;
 
   const suggestions = useMemo(() => {
     if (!recipientText.trim()) return [];
-    const q = recipientText.toLowerCase();
-    return contacts.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.handle.toLowerCase().includes(q) ||
-        c.npub.toLowerCase().includes(q) ||
-        c.pubkey.toLowerCase().includes(q)
-    ).slice(0, 6);
-  }, [contacts, recipientText]);
+    return search.search(recipientText, contacts).slice(0, 6);
+  }, [contacts, recipientText, search]);
 
   if (suggestions.length === 0) return null;
 
   return (
-    <div className="absolute left-0 top-full mt-1 w-full z-20 rounded-[10px] border border-border bg-modal-card shadow-lg overflow-hidden">
-      {suggestions.map((contact) => (
-        <button
-          key={contact.id}
-          onMouseDown={(e) => { e.preventDefault(); onSelect(contact); }}
-          className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-surface-active transition-colors duration-150 cursor-pointer"
-        >
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0`} style={{ backgroundColor: contact.color }}>
-            <span className="text-white text-[10px] font-semibold">{contact.initials}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <span className="text-[12px] font-medium text-text-modal truncate block">{contact.name}</span>
-            <span className="text-[10px] text-text-tertiary truncate block">{contact.handle}</span>
-          </div>
-        </button>
-      ))}
+    <div className="absolute left-0 top-full mt-1 w-full z-20">
+      <Command.List className="rounded-[10px] border border-border bg-modal-card shadow-lg overflow-hidden p-0">
+        {suggestions.map((contact) => (
+          <Command.Item
+            key={contact.id}
+            value={contact.id}
+            onSelect={() => onSelect(contact)}
+            className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-surface-active data-[highlighted]:bg-surface-active transition-colors duration-150 cursor-pointer"
+          >
+            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: contact.color }}>
+              <span className="text-white text-[10px] font-semibold">{contact.initials}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[12px] font-medium text-text-modal truncate block">{contact.name}</span>
+              <span className="text-[10px] text-text-tertiary truncate block">{contact.handle}</span>
+            </div>
+          </Command.Item>
+        ))}
+      </Command.List>
     </div>
   );
 });
@@ -221,6 +225,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const [showPreview, setShowPreview] = useState(false);
   const [showContactSuggestions, setShowContactSuggestions] = useState(false);
   const suggestionsWrapperRef = useRef<HTMLDivElement>(null);
+  const cmdkHighlightedRef = useRef(false);
 
   const status = useComposeStore((s) => s.status);
   const to = useComposeStore((s) => s.draft.to);
@@ -601,7 +606,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
             {/* To field */}
             <div className="flex items-start gap-3 px-5 py-3 border-b border-modal-stroke">
               <span className="text-[12px] font-medium text-text-modal-2 pt-1">To</span>
-              <div className="flex-1 flex flex-wrap items-center gap-1.5 relative" ref={suggestionsRef}>
+              <Command shouldFilter={false} className="flex-1 flex flex-wrap items-center gap-1.5 relative" ref={suggestionsRef}>
                 {to.map((recipient) => (
                   <span
                     key={recipient.pubkey}
@@ -618,11 +623,10 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                   onBlur={handleRecipientBlur}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === ",") {
-                      e.preventDefault();
-                      void addRecipientFromText();
-                    }
-                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                      e.preventDefault();
+                      if (!cmdkHighlightedRef.current) {
+                        e.preventDefault();
+                        void addRecipientFromText();
+                      }
                     }
                     if (e.key === "Escape") setShowContactSuggestions(false);
                   }}
@@ -631,9 +635,9 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                   disabled={isSending}
                 />
                 {showContactSuggestions && (
-                  <ContactSuggestions recipientText={recipientText} onSelect={selectContact} />
+                  <ContactSuggestions recipientText={recipientText} onSelect={selectContact} highlightedRef={cmdkHighlightedRef} />
                 )}
-              </div>
+              </Command>
               <div className="flex gap-1">
                 <button onClick={() => setShowCc((show) => !show)} className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Cc</button>
                 <button onClick={() => setShowBcc((show) => !show)} className="text-[11px] font-medium text-brand-light cursor-pointer hover:brightness-110">Bcc</button>

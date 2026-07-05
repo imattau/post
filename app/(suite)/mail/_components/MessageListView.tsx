@@ -46,14 +46,7 @@ export default function MessageListView({
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("c");
   const effectiveSelectedId = selectedId ?? messages[0]?.id ?? null;
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("Primary");
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 200);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelection, setBatchSelection] = useState<Set<string>>(new Set());
 
@@ -98,6 +91,13 @@ export default function MessageListView({
 
   const listRef = useRef<HTMLDivElement>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   const filtered = useMemo(() => {
     let result = messages;
 
@@ -111,7 +111,8 @@ export default function MessageListView({
         (m) =>
           m.subject.toLowerCase().includes(q) ||
           m.preview.toLowerCase().includes(q) ||
-          m.sender.name.toLowerCase().includes(q)
+          m.sender.name.toLowerCase().includes(q) ||
+          (m.sender.npub && m.sender.npub.toLowerCase().includes(q))
       );
     }
     return result;
