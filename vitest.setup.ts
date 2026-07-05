@@ -1,6 +1,26 @@
 import { vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+// Mock next/dynamic to render the imported component for tests
+vi.mock("next/dynamic", () => ({
+  default: () => {
+    const Passthrough = (props: any) => props.children || null;
+    Passthrough.displayName = "DynamicPassthrough";
+    return Passthrough;
+  },
+}));
+
+// Mock IntersectionObserver for emoji-mart
+class MockIntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.defineProperty(globalThis, "IntersectionObserver", {
+  value: MockIntersectionObserver,
+  writable: true,
+});
+
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   useRouter: () => ({

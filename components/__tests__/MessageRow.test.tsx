@@ -64,6 +64,6 @@ describe("MessageRow", () => {
 
   it("renders time ago format", () => {
     render(<MessageRow message={unreadMessage} selected={false} onClick={vi.fn()} />);
-    expect(screen.getByText("15 minutes")).toBeInTheDocument();
+    expect(screen.getByText(/15 minutes?/)).toBeInTheDocument();
   });
 });

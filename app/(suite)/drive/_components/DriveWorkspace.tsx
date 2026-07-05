@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useDebounce } from "use-debounce";
+import { useDropzone } from "react-dropzone";
+import prettyBytes from "pretty-bytes";
+import { db } from "@/lib/db/schema";
 import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";
@@ -83,9 +87,7 @@ const SCREEN_META: Record<DriveScreen, { title: string; subtitle: string; emptyT
 };
 
 function formatSize(bytes: number): string {
-  if (bytes < 1000) return `${bytes} B`;
-  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(bytes >= 10_000 ? 0 : 1)} KB`;
-  return `${(bytes / 1_000_000).toFixed(bytes >= 10_000_000 ? 0 : 1)} MB`;
+  return prettyBytes(bytes);
 }
 
 function labelForKind(kind: DriveFile["fileKind"]): string {
@@ -171,7 +173,6 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
   const [blossomUrlInput, setBlossomUrlInput] = useState(blossomUrl);
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
@@ -205,20 +206,19 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     }
   }, [blobParam, screen, selectFile]);
 
+  const [debouncedSearchInput] = useDebounce(searchInput, 300);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setQuery(searchInput);
-      const params = new URLSearchParams(searchParams.toString());
-      if (searchInput.trim()) {
-        params.set("q", searchInput.trim());
-      } else {
-        params.delete("q");
-      }
-      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-      router.replace(newUrl, { scroll: false });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchInput, setQuery, searchParams, pathname, router]);
+    setQuery(debouncedSearchInput);
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearchInput.trim()) {
+      params.set("q", debouncedSearchInput.trim());
+    } else {
+      params.delete("q");
+    }
+    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [debouncedSearchInput, setQuery, searchParams, pathname, router]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -254,6 +254,14 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     if (picked.length === 0) return;
     await enqueueUploads(picked);
   }, [enqueueUploads]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: useCallback((acceptedFiles: File[]) => {
+      void handleFiles(acceptedFiles);
+    }, [handleFiles]),
+    noClick: true,
+    noKeyboard: true,
+  });
 
   const handleCreateFolder = useCallback(async () => {
     const name = newFolderName.trim();
@@ -311,7 +319,6 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
 
   const handleRenameSubmit = useCallback(async () => {
     if (!renameFileId || !renameValue.trim()) return;
-    const { db } = await import("@/lib/db/schema");
     const st = useDriveStore.getState();
     const file = st.files.find((f) => f.id === renameFileId);
     if (!file) return;
@@ -370,7 +377,6 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
 
   const onDrop = useCallback(async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    setDragActive(false);
     const picked = Array.from(event.dataTransfer.files ?? []);
     await handleFiles(picked);
   }, [handleFiles]);
@@ -698,9 +704,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
           </div>
 
           {meta.showUploadDropzone && (
-            <div onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-              onDragLeave={() => setDragActive(false)} onDrop={onDrop} onClick={handleChooseFiles}
-              className={`mt-6 flex h-[140px] cursor-pointer flex-col items-center justify-center rounded-pill border ${dragActive ? "border-brand bg-surface-active" : "border-border bg-sidebar"}`}>
+            <div {...getRootProps()} className={`mt-6 flex h-[140px] cursor-pointer flex-col items-center justify-center rounded-pill border ${isDragActive ? "border-brand bg-surface-active" : "border-border bg-sidebar"}`}>
               <div className="text-[26px] font-semibold text-brand-light">⇧</div>
               <p className="mt-3 text-[13px] font-semibold text-text-near-white">Drop files here to upload</p>
               <p className="mt-2 text-[10px] text-text-tertiary">Files are encrypted before upload when required</p>

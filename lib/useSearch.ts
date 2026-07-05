@@ -1,44 +1,36 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useDebounce } from "use-debounce";
 import type { SearchResult } from "minisearch";
 
-export function useSearch<T>({
+export function useSearch<T extends { id: string }>({
   items,
   searchFn,
   debounceMs = 200,
   minQueryLength = 1,
-  extractFields,
 }: {
   items: T[];
   searchFn: (query: string, items: T[]) => SearchResult[];
   debounceMs?: number;
   minQueryLength?: number;
-  extractFields?: (item: T) => Record<string, string>;
 }) {
   const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => {
-    debounceRef.current = setTimeout(() => setDebouncedQuery(query), debounceMs);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, debounceMs]);
+  const [debouncedQuery] = useDebounce(query, debounceMs);
 
   const results = useMemo(() => {
     if (!debouncedQuery.trim() || debouncedQuery.trim().length < minQueryLength) return items;
     const searchResults = searchFn(debouncedQuery, items);
     const resultMap = new Map(searchResults.map((r, i) => [r.id, i]));
     return items
-      .filter((item) => resultMap.has((item as any).id))
+      .filter((item) => resultMap.has(item.id))
       .sort((a, b) => {
-        const ia = resultMap.get((a as any).id) ?? Infinity;
-        const ib = resultMap.get((b as any).id) ?? Infinity;
+        const ia = resultMap.get(a.id) ?? Infinity;
+        const ib = resultMap.get(b.id) ?? Infinity;
         return ia - ib;
       });
   }, [debouncedQuery, items, searchFn, minQueryLength]);
 
   const clear = useCallback(() => {
     setQuery("");
-    setDebouncedQuery("");
   }, []);
 
   return {
@@ -63,13 +55,7 @@ export function useSearchSimple<T>({
   minQueryLength?: number;
 }) {
   const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => {
-    debounceRef.current = setTimeout(() => setDebouncedQuery(query), debounceMs);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, debounceMs]);
+  const [debouncedQuery] = useDebounce(query, debounceMs);
 
   const results = useMemo(() => {
     if (!debouncedQuery.trim() || debouncedQuery.trim().length < minQueryLength) return items;
@@ -84,7 +70,6 @@ export function useSearchSimple<T>({
 
   const clear = useCallback(() => {
     setQuery("");
-    setDebouncedQuery("");
   }, []);
 
   return {

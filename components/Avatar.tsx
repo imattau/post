@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { hashInitials } from "@/lib/utils";
 
 const AVATAR_COLORS = [
   "var(--color-avatar-1)",
@@ -11,14 +12,6 @@ const AVATAR_COLORS = [
 ];
 
 const FONT_SIZES: Record<number, number> = { 36: 10, 40: 11, 46: 14 };
-
-function hashInitials(initials: string): number {
-  let hash = 0;
-  for (let i = 0; i < initials.length; i++) {
-    hash = initials.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash);
-}
 
 const Avatar = memo(function Avatar({
   initials,

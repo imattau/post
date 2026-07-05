@@ -1,4 +1,5 @@
 import { nip44, nip17, finalizeEvent } from "nostr-tools";
+import { decode } from "nostr-tools/nip19";
 import type { NostrEvent } from "nostr-tools";
 import type { RelayPool } from "./relays";
 import type { KeyStore } from "./keys";
@@ -96,7 +97,6 @@ export async function sendMessage(
   const identity = keys.load();
   if (!identity || !identity.nsec) throw new Error("Cannot send message");
 
-  const { decode } = await import("nostr-tools/nip19");
   const nsecDecoded = decode(identity.nsec);
   if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
   const sk = nsecDecoded.data;
@@ -161,7 +161,6 @@ export async function decryptEvent(
   const identity = keys.load();
   if (!identity || !identity.nsec) throw new Error("Cannot decrypt message");
 
-  const { decode } = await import("nostr-tools/nip19");
   const nsecDecoded = decode(identity.nsec);
   if (nsecDecoded.type !== "nsec") throw new Error("Cannot decrypt message");
   const sk = nsecDecoded.data;
@@ -181,102 +180,54 @@ function extractPreview(content: string): string {
   return content.replace(/\n/g, " ").slice(0, 120);
 }
 
-class IncomingStream implements AsyncGenerator<Message> {
-  private resolveNext: ((msg: Message) => void) | null = null;
-  private queue: Message[] = [];
-  private closed = false;
-  private unsubscribe: () => void;
-
-  constructor(pool: RelayPool, sk: Uint8Array, pubkey: string) {
-
-    this.unsubscribe = pool.subscribe(
-      [{ kinds: [14], "#p": [pubkey] }],
-      (event: Event) => {
-        try {
-          const conversationKey = nip44.v2.utils.getConversationKey(sk, event.pubkey);
-          const plaintext = nip44.v2.decrypt(event.content, conversationKey);
-          const { body, subject, attachments } = parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey);
-          const msg: Message = {
-            id: event.id,
-            kind: event.kind,
-            pubkey: event.pubkey,
-            recipientPubkey: pubkey,
-            content: body,
-            raw: event.content,
-            createdAt: event.created_at,
-            tags: event.tags,
-            subject: subject ?? extractSubject(event),
-            preview: extractPreview(body),
-            read: false,
-            starred: false,
-            archived: false,
-            snoozedUntil: null,
-            spam: false,
-            mailbox: "inbox" as const,
-            labelIds: [],
-            replyTo: event.tags.find((t) => t[0] === "e")?.[1] ?? null,
-            relayUrls: [],
-            attachments,
-            isEncrypted: true,
-            isGiftWrapped: false,
-            deliveryStatus: "delivered" as const,
-          };
-          if (this.resolveNext) {
-            this.resolveNext(msg);
-            this.resolveNext = null;
-          } else {
-            this.queue.push(msg);
-          }
-        } catch {
-          // Decryption failed — skip
-        }
-      }
-    );
-  }
-
-  next(): Promise<IteratorResult<Message>> {
-    if (this.closed) return Promise.resolve({ done: true, value: undefined as unknown as Message });
-    if (this.queue.length > 0) {
-      return Promise.resolve({ done: false, value: this.queue.shift()! });
-    }
-    return new Promise((resolve) => {
-      this.resolveNext = (msg: Message) => resolve({ done: false, value: msg });
-    });
-  }
-
-  return(): Promise<IteratorResult<Message>> {
-    this.closed = true;
-    this.unsubscribe();
-    return Promise.resolve({ done: true, value: undefined as unknown as Message });
-  }
-
-  throw(err: unknown): Promise<IteratorResult<Message>> {
-    this.closed = true;
-    this.unsubscribe();
-    return Promise.reject(err);
-  }
-
-  [Symbol.asyncIterator]() {
-    return this;
-  }
-
-  async [Symbol.asyncDispose]() {
-    this.closed = true;
-    this.unsubscribe();
-  }
-}
-
-export async function decryptIncoming(
+export function decryptIncoming(
   pool: RelayPool,
-  keys: KeyStore
-): Promise<AsyncGenerator<Message>> {
+  keys: KeyStore,
+  onMessage: (msg: Message) => void
+): () => void {
   const identity = keys.load();
   if (!identity || !identity.nsec) throw new Error("Cannot decrypt message");
 
-  const { decode } = await import("nostr-tools/nip19");
   const nsecDecoded = decode(identity.nsec);
   if (nsecDecoded.type !== "nsec") throw new Error("Cannot decrypt message");
   const sk = nsecDecoded.data;
 
-  return new IncomingStream(pool, sk, identity.pubkey);
+  return pool.subscribe(
+    [{ kinds: [14], "#p": [identity.pubkey] }],
+    (event: Event) => {
+      try {
+        const conversationKey = nip44.v2.utils.getConversationKey(sk, event.pubkey);
+        const plaintext = nip44.v2.decrypt(event.content, conversationKey);
+        const { body, subject, attachments } = parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey);
+        const msg: Message = {
+          id: event.id,
+          kind: event.kind,
+          pubkey: event.pubkey,
+          recipientPubkey: identity.pubkey,
+          content: body,
+          raw: event.content,
+          createdAt: event.created_at,
+          tags: event.tags,
+          subject: subject ?? extractSubject(event),
+          preview: extractPreview(body),
+          read: false,
+          starred: false,
+          archived: false,
+          snoozedUntil: null,
+          spam: false,
+          mailbox: "inbox" as const,
+          labelIds: [],
+          replyTo: event.tags.find((t) => t[0] === "e")?.[1] ?? null,
+          relayUrls: [],
+          attachments,
+          isEncrypted: true,
+          isGiftWrapped: false,
+          deliveryStatus: "delivered" as const,
+        };
+        onMessage(msg);
+      } catch {
+        // Decryption failed — skip
+      }
+    }
+  );
 }

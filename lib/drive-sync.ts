@@ -1,13 +1,13 @@
 import type { RelayPool } from "@post/nostr-core";
+import { parseFileMetadataEvent, parseFolderEvent, decryptContentForOwner, subscribeAccumulate } from "@post/nostr-core";
 import type { DriveFile, DriveFolder } from "@/lib/types";
+import { db } from "@/lib/db/schema";
 
 export async function syncDriveFromRelays(
   pool: RelayPool,
   pubkey: string,
   sk?: Uint8Array
 ): Promise<{ files: DriveFile[]; folders: DriveFolder[] }> {
-  const { parseFileMetadataEvent, parseFolderEvent, decryptContentForOwner } = await import("@post/nostr-core");
-  const { db } = await import("@/lib/db/schema");
 
   const [fileEvents, folderEvents] = await Promise.all([
     queryEvents(pool, [{ kinds: [1063], authors: [pubkey], limit: 500 }]),
@@ -70,20 +70,18 @@ function queryEvents(
   pool: RelayPool,
   filters: { kinds: number[]; authors: string[]; limit: number }[]
 ): Promise<{ id: string; pubkey: string; content: string; tags: string[][]; created_at: number }[]> {
-  return new Promise((resolve) => {
-    const results: { id: string; pubkey: string; content: string; tags: string[][]; created_at: number }[] = [];
-    const unsub = pool.subscribe(filters, (event) => {
-      results.push({
+  return subscribeAccumulate(
+    pool,
+    filters,
+    (event, acc) => {
+      acc.push({
         id: event.id,
         pubkey: event.pubkey,
         content: event.content,
         tags: event.tags,
         created_at: event.created_at,
       });
-    });
-    setTimeout(() => {
-      resolve(results);
-      unsub();
-    }, 5000);
-  });
+    },
+    5000
+  );
 }

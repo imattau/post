@@ -54,8 +54,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     booted.current = true;
 
     (async () => {
-      useSettingsStore.getState().load();
-
       const settings = useSettingsStore.getState().values;
 
       loadBlossomConfig();

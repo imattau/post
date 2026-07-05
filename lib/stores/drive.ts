@@ -1,12 +1,20 @@
 "use client";
 
 import { create } from "zustand";
-import { encryptDriveBlob, uploadBlob, deleteBlob } from "@post/nostr-core";
+import { immer } from "zustand/middleware/immer";
+import { encryptDriveBlob, uploadBlob, deleteBlob, createFileMetadataEvent, encryptContentForOwner, createFolderEvent } from "@post/nostr-core";
 import type { BlossomServer } from "@post/nostr-core";
 import { decode } from "nostr-tools/nip19";
+import { finalizeEvent } from "nostr-tools/pure";
+import { db } from "@/lib/db/schema";
 import { useIdentityStore } from "@/lib/stores/identity";
+import { useRelaysStore } from "@/lib/stores/relays";
+import { useSettingsStore } from "@/lib/stores/settings";
 import { useBlossomStore } from "@/lib/stores/blossom";
+import { syncDriveFromRelays } from "@/lib/drive-sync";
 import { DRIVE_FILES, DRIVE_FOLDERS } from "@/lib/mock/drive";
+import { generateId } from "@/lib/utils";
+import { cloneFiles, cloneFolders, guessFileKind, guessFileKindFromMime, fileLetter, colorForKind, modifiedLabel, buildFileFromUpload, matchesFilter, sortFiles, matchesScreen } from "@/lib/drive-utils";
 import type {
   DriveFile,
   DriveFileKind,
@@ -66,153 +74,9 @@ interface DriveState {
   importAttachment: (attachment: { fileName: string; mimeType: string; sizeBytes: number; sha256: string; url: string; encrypted: boolean }, sourceMessageId?: string) => Promise<string>;
 }
 
-function cloneFiles(files: DriveFile[]): DriveFile[] {
-  return files.map((file) => ({ ...file, sharedWith: [...file.sharedWith], tags: [...file.tags] }));
-}
 
-function cloneFolders(folders: DriveFolder[]): DriveFolder[] {
-  return folders.map((folder) => ({ ...folder }));
-}
 
-function guessFileKind(file: File): DriveFileKind {
-  const name = file.name.toLowerCase();
-  const mime = file.type.toLowerCase();
-  return guessFileKindFromMime(mime, name);
-}
-
-function guessFileKindFromMime(mimeType: string, fileName: string): DriveFileKind {
-  const name = fileName.toLowerCase();
-  const mime = mimeType.toLowerCase();
-  if (name.endsWith(".fig")) return "figma";
-  if (mime.includes("pdf") || name.endsWith(".pdf")) return "pdf";
-  if (mime.startsWith("image/")) return "image";
-  if (mime.startsWith("video/")) return "video";
-  if (name.endsWith(".csv")) return "spreadsheet";
-  if (name.endsWith(".md")) return "markdown";
-  if (name.endsWith(".json")) return "json";
-  if (mime.includes("album")) return "album";
-  if (mime.includes("text/")) return "document";
-  return "other";
-}
-
-function fileLetter(kind: DriveFileKind, name: string): string {
-  if (kind === "figma") return "F";
-  if (kind === "pdf") return "P";
-  if (kind === "album") return "A";
-  if (kind === "spreadsheet") return "S";
-  if (kind === "video") return "V";
-  if (kind === "markdown") return "M";
-  if (kind === "json") return "J";
-  if (kind === "image") return "I";
-  return name.slice(0, 1).toUpperCase() || "?";
-}
-
-function colorForKind(kind: DriveFileKind): string {
-  switch (kind) {
-    case "figma":
-      return "var(--color-brand)";
-    case "pdf":
-      return "var(--color-danger)";
-    case "album":
-      return "var(--color-info)";
-    case "spreadsheet":
-      return "var(--color-ok)";
-    case "video":
-      return "var(--color-warn)";
-    case "markdown":
-      return "var(--color-teal)";
-    case "json":
-      return "var(--color-pill-subtle)";
-    case "image":
-      return "var(--color-info)";
-    case "document":
-      return "var(--color-ok)";
-    default:
-      return "var(--color-text-secondary)";
-  }
-}
-
-function modifiedLabel(date = new Date()): string {
-  return date.toLocaleString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function buildFileFromUpload(file: File, encryptedBlob: Blob, blobUrl: string, sha256: string, folderId: string | null): DriveFile {
-  const kind = guessFileKind(file);
-  const now = Date.now();
-  return {
-    id: crypto.randomUUID(),
-    name: file.name,
-    folderId,
-    fileKind: kind,
-    mimeType: file.type || "application/octet-stream",
-    sizeBytes: file.size,
-    createdAt: now,
-    updatedAt: now,
-    modifiedLabel: modifiedLabel(new Date(now)),
-    ownerName: "Matt Thomson",
-    ownerInitials: "MT",
-    source: "blossom",
-    starred: false,
-    trashed: false,
-    offlineAvailable: true,
-    encrypted: true,
-    storedInDrive: true,
-    sha256,
-    blobUrl,
-    preview: `${file.name} uploaded to Drive`,
-    sharedWith: [],
-    tags: ["Encrypted", "Blossom", "Offline"],
-    color: colorForKind(kind),
-    letter: fileLetter(kind, file.name),
-    encryption: null,
-    encryptedBlob,
-  };
-}
-
-function matchesFilter(file: DriveFile, filter: DriveFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "documents") return ["pdf", "markdown", "json", "spreadsheet", "document", "figma"].includes(file.fileKind);
-  if (filter === "images") return file.fileKind === "image" || file.fileKind === "album" || file.mimeType.startsWith("image/");
-  if (filter === "media") return file.fileKind === "video";
-  return true;
-}
-
-function sortFiles(files: DriveFile[], sort: DriveSort): DriveFile[] {
-  const cloned = [...files];
-  switch (sort) {
-    case "name":
-      return cloned.sort((a, b) => a.name.localeCompare(b.name));
-    case "size":
-      return cloned.sort((a, b) => b.sizeBytes - a.sizeBytes);
-    default:
-      return cloned.sort((a, b) => b.updatedAt - a.updatedAt);
-  }
-}
-
-function matchesScreen(file: DriveFile, screen: DriveScreen): boolean {
-  switch (screen) {
-    case "my-files":
-      return !file.trashed;
-    case "recent":
-      return !file.trashed && file.updatedAt >= Date.now() - 1000 * 60 * 60 * 24 * 7;
-    case "starred":
-      return !file.trashed && file.starred;
-    case "shared":
-      return !file.trashed && file.sharedWith.length > 0;
-    case "offline":
-      return !file.trashed && file.offlineAvailable;
-    case "from-post":
-      return !file.trashed && (file.source === "post" || file.source === "attachment");
-    case "trash":
-      return file.trashed;
-  }
-}
-
-export const useDriveStore = create<DriveState>((set, get) => ({
+export const useDriveStore = create<DriveState>()(immer((set, get) => ({
   files: [],
   folders: [],
   selectedFileId: null,
@@ -231,7 +95,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
 
   async load() {
     set({ loading: true, error: null });
-    const { db } = await import("@/lib/db/schema");
+
+
     const [folderCount, fileCount] = await Promise.all([db.driveFolders.count(), db.driveFiles.count()]);
     if (folderCount === 0) {
       await db.driveFolders.bulkPut(cloneFolders(DRIVE_FOLDERS));
@@ -258,7 +123,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async refresh() {
-    const { db } = await import("@/lib/db/schema");
+
+
     const [folders, files] = await Promise.all([db.driveFolders.toArray(), db.driveFiles.toArray()]);
     const countedFolders = folders.map((folder) => ({
       ...folder,
@@ -276,11 +142,11 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   toggleFileSelection(id) {
-    set((state) => ({
-      selectedFileIds: state.selectedFileIds.includes(id)
-        ? state.selectedFileIds.filter((fid) => fid !== id)
-        : [...state.selectedFileIds, id],
-    }));
+    set((state) => {
+      const idx = state.selectedFileIds.indexOf(id);
+      if (idx >= 0) state.selectedFileIds.splice(idx, 1);
+      else state.selectedFileIds.push(id);
+    });
   },
 
   selectAllFiles(screen: DriveScreen = "my-files") {
@@ -335,7 +201,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async toggleStar(id) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, starred: !file.starred, updatedAt: Date.now() };
@@ -344,7 +211,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async toggleTrash(id) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, trashed: !file.trashed, updatedAt: Date.now() };
@@ -353,7 +221,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async toggleOffline(id) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, offlineAvailable: !file.offlineAvailable, updatedAt: Date.now() };
@@ -363,7 +232,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
 
   async createFolder(name) {
     const folder: DriveFolder = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name,
       parentId: null,
       fileCount: 0,
@@ -372,7 +241,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
       starred: false,
       trashed: false,
     };
-    const { db } = await import("@/lib/db/schema");
+
+
     await db.driveFolders.put(folder);
     set({ folders: [...get().folders, folder] });
     void publishFolderEvent(folder);
@@ -384,7 +254,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     const serverUrl = useBlossomStore.getState().serverUrl;
     const targetFolderId = get().selectedFolderId ?? get().folders[0]?.id ?? null;
     const jobs = files.map((file) => ({
-      id: crypto.randomUUID(),
+      id: generateId(),
       fileName: file.name,
       sizeBytes: file.size,
       progress: 0,
@@ -417,7 +287,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     const secretKey = decoded.data;
 
     for (const [index, file] of files.entries()) {
-      const jobId = jobs[index]?.id ?? crypto.randomUUID();
+      const jobId = jobs[index]?.id ?? generateId();
       uploadOriginalFiles.set(jobId, file);
 
       const controller = new AbortController();
@@ -428,7 +298,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
       }));
 
       try {
-        const { useSettingsStore } = await import("@/lib/stores/settings");
+
+
         const encryptSetting = useSettingsStore.getState().getValue("encrypt-private-uploads", true);
         const encrypted = encryptSetting ? await encryptDriveBlob(file, identity) : null;
         if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -447,7 +318,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
         const blobContent = encrypted ? encrypted.ciphertext : new Blob([]);
         const driveFile = buildFileFromUpload(file, blobContent, ref.url, ref.sha256, targetFolderId);
         const fileRecord = { ...driveFile, encrypted: encryptSetting, encryption: encrypted?.metadata ?? null, encryptedBlob: blobContent };
-        const { db } = await import("@/lib/db/schema");
+    
+
         await db.driveFiles.put(fileRecord);
         set((state) => ({
           files: [driveFile, ...state.files],
@@ -511,7 +383,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async updateSharedWith(id, sharedWith) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, sharedWith, updatedAt: Date.now() };
@@ -520,7 +393,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async deletePermanently(id) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
 
@@ -553,7 +427,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async renameFolder(id, name) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const folder = get().folders.find((item) => item.id === id);
     if (!folder) return;
     const updated = { ...folder, name, updatedAt: Date.now() };
@@ -562,7 +437,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async toggleFolderStar(id) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const folder = get().folders.find((item) => item.id === id);
     if (!folder) return;
     const updated = { ...folder, starred: !folder.starred, updatedAt: Date.now() };
@@ -571,7 +447,8 @@ export const useDriveStore = create<DriveState>((set, get) => ({
   },
 
   async toggleFolderTrash(id) {
-    const { db } = await import("@/lib/db/schema");
+
+
     const folder = get().folders.find((item) => item.id === id);
     if (!folder) return;
     const updated = { ...folder, trashed: !folder.trashed, updatedAt: Date.now() };
@@ -585,7 +462,7 @@ export const useDriveStore = create<DriveState>((set, get) => ({
     const now = Date.now();
     const kind = guessFileKindFromMime(attachment.mimeType || "", attachment.fileName);
     const file: DriveFile = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: attachment.fileName,
       folderId: null,
       fileKind: kind,
@@ -612,18 +489,17 @@ export const useDriveStore = create<DriveState>((set, get) => ({
       encryption: null,
       encryptedBlob: null,
     };
-    const { db } = await import("@/lib/db/schema");
+
+
     await db.driveFiles.put(file);
     set((state) => ({ files: [file, ...state.files] }));
     return file.id;
   },
-}));
+})));
 
 async function publishFileMetadataEvent(file: DriveFile, sk: Uint8Array): Promise<void> {
   try {
-    const { createFileMetadataEvent, encryptContentForOwner } = await import("@post/nostr-core");
-    const { finalizeEvent } = await import("nostr-tools/pure");
-    const { useRelaysStore } = await import("@/lib/stores/relays");
+
 
     const pool = useRelaysStore.getState().pool;
     if (!pool) return;
@@ -644,16 +520,10 @@ async function publishFileMetadataEvent(file: DriveFile, sk: Uint8Array): Promis
 
 async function publishFolderEvent(folder: DriveFolder): Promise<void> {
   try {
-    const { createFolderEvent, encryptContentForOwner } = await import("@post/nostr-core");
-    const { finalizeEvent } = await import("nostr-tools/pure");
-    const { useIdentityStore } = await import("@/lib/stores/identity");
-    const { useRelaysStore } = await import("@/lib/stores/relays");
-
     const identity = useIdentityStore.getState().identity;
     const pool = useRelaysStore.getState().pool;
     if (!identity?.nsec || !pool) return;
 
-    const { decode } = await import("nostr-tools/nip19");
     const decoded = decode(identity.nsec);
     if (decoded.type !== "nsec") return;
     const sk = decoded.data;
@@ -676,17 +546,12 @@ async function publishFolderEvent(folder: DriveFolder): Promise<void> {
 
 async function syncFromRelays(): Promise<void> {
   try {
-    const { useRelaysStore } = await import("@/lib/stores/relays");
-    const { useIdentityStore } = await import("@/lib/stores/identity");
-    const { syncDriveFromRelays } = await import("@/lib/drive-sync");
-
     const pool = useRelaysStore.getState().pool;
     const identity = useIdentityStore.getState().identity;
     if (!pool || !identity?.pubkey) return;
 
     let sk: Uint8Array | undefined;
     if (identity?.nsec) {
-      const { decode } = await import("nostr-tools/nip19");
       const decoded = decode(identity.nsec);
       if (decoded.type === "nsec") sk = decoded.data;
     }

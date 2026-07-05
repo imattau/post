@@ -6,16 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MenuRoot, MenuTrigger, MenuPopup, MenuItem } from "@/components/ui/menu";
 import type { DriveFile, DriveScreen } from "@/lib/types";
 import type { Identity } from "@post/nostr-core";
-
-function formatSize(bytes: number): string {
-  if (bytes < 1000) return `${bytes} B`;
-  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(bytes >= 10_000 ? 0 : 1)} KB`;
-  return `${(bytes / 1_000_000).toFixed(bytes >= 10_000_000 ? 0 : 1)} MB`;
-}
-
-function isHexPubkey(value: string): boolean {
-  return /^[0-9a-f]{64}$/i.test(value);
-}
+import { formatSize, isHexPubkey } from "@/lib/utils";
 
 function displayInitials(value: string): string {
   return isHexPubkey(value) ? value.slice(0, 2).toUpperCase() : value;

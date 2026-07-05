@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import { useVirtualizer, measureElement } from "@tanstack/react-virtual";
+import { useDebounce } from "use-debounce";
 import { Search, Inbox, SearchX } from "lucide-react";
 import type { MockMessage } from "@/lib/mock/threads";
 import MessageRow from "@/components/MessageRow";
@@ -92,11 +93,7 @@ export default function MessageListView({
   const listRef = useRef<HTMLDivElement>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(searchQuery), 200);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+  const [debouncedQuery] = useDebounce(searchQuery, 200);
 
   const filtered = useMemo(() => {
     let result = messages;

@@ -1,6 +1,8 @@
 import { create } from "zustand";
-import { createRelayPool, DEFAULT_RELAYS } from "@post/nostr-core";
+import { createRelayPool, DEFAULT_RELAYS, fetchRelayList } from "@post/nostr-core";
 import type { RelayPool } from "@post/nostr-core";
+import { db } from "@/lib/db/schema";
+import { useSettingsStore } from "@/lib/stores/settings";
 import type { RelayConfig, RelayStatus } from "@/lib/types";
 
 interface RelaysState {
@@ -29,16 +31,15 @@ export const useRelaysStore = create<RelaysState>((set, get) => ({
 
   addRelay: (config: RelayConfig) => {
     set((state) => ({ relays: [...state.relays, config] }));
-    void import("@/lib/db/schema").then(({ db }) => db.relayConfigs.put(config));
+    void db.relayConfigs.put(config);
   },
 
   removeRelay: (url: string) => {
     set((state) => ({ relays: state.relays.filter((r) => r.url !== url) }));
-    void import("@/lib/db/schema").then(({ db }) => db.relayConfigs.delete(url));
+    void db.relayConfigs.delete(url);
   },
 
   loadRelayConfigs: async () => {
-    const { db } = await import("@/lib/db/schema");
     const saved = await db.relayConfigs.toArray();
     if (saved.length > 0) set({ relays: saved });
   },
@@ -47,11 +48,9 @@ export const useRelaysStore = create<RelaysState>((set, get) => ({
     const { pool, relays } = get();
     if (!pool) return;
 
-    const { useSettingsStore } = await import("@/lib/stores/settings");
     const enabled = useSettingsStore.getState().values["use-nostr-relay-list"];
     if (!enabled) return;
 
-    const { fetchRelayList } = await import("@post/nostr-core");
     const nostrRelays = await fetchRelayList(pool, pubkey);
     if (nostrRelays.length === 0) return;
 
@@ -63,7 +62,6 @@ export const useRelaysStore = create<RelaysState>((set, get) => ({
     }
 
     set({ relays: merged });
-    const { db } = await import("@/lib/db/schema");
     await db.relayConfigs.clear();
     await db.relayConfigs.bulkAdd(merged);
   },

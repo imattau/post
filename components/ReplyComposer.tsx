@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef, useState, useEffect } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Maximize2 } from "lucide-react";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useSettingsStore } from "@/lib/stores/settings";
-import { wrapTextareaSelection, autosizeTextarea } from "@/lib/utils";
+import { wrapTextareaSelection } from "@/lib/utils";
+import TextareaAutosize from "react-textarea-autosize";
 import FormatToolbar from "./FormatToolbar";
 
 export default function ReplyComposer({
@@ -36,12 +37,6 @@ export default function ReplyComposer({
     pendingSelectionRef.current = null;
     textareaRef.current?.focus();
     textareaRef.current?.setSelectionRange(position, position);
-  }, [body]);
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      autosizeTextarea(textareaRef.current);
-    }
   }, [body]);
 
   const applyFormat = useCallback((prefix: string, suffix = "", fallback = "") => {
@@ -123,14 +118,15 @@ export default function ReplyComposer({
     <div className="mx-10 mb-11 mt-2 w-[560px] max-w-[calc(100%-80px)]">
       <p className="mb-[17px] text-[14px] font-medium text-text-near-white">{recipientName}</p>
       <div className="rounded-pill border border-border bg-sidebar flex flex-col">
-        <textarea
+        <TextareaAutosize
           ref={textareaRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={handleKeyDown}
           aria-label={`Reply to ${recipientName}`}
           placeholder={`Reply to ${recipientName}…`}
-          rows={2}
+          minRows={2}
+          maxRows={12}
           className="min-h-[66px] resize-none bg-transparent px-5 pt-[18px] pb-2 text-[13px] text-text-primary placeholder-text-placeholder outline-none overflow-hidden"
           disabled={sending}
         />

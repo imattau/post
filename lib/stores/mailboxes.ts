@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { useMessagesStore } from "@/lib/stores/messages";
+import { useComposeStore } from "@/lib/stores/compose";
 
 export type MailboxTab = "inbox" | "starred" | "snoozed" | "sent" | "drafts" | "archive" | "spam";
 
@@ -28,7 +30,6 @@ export const useMailboxStore = create<MailboxState>((set) => ({
   },
 
   async refreshUnreadCounts() {
-    const { useMessagesStore } = await import("@/lib/stores/messages");
     const { byId, ids } = useMessagesStore.getState();
     const now = Date.now();
     const all = ids.map((id) => byId[id]).filter(Boolean);
@@ -38,7 +39,6 @@ export const useMailboxStore = create<MailboxState>((set) => ({
     const sent = all.filter((m) => m!.mailbox === "sent").length;
     const archive = all.filter((m) => m!.archived).length;
     const spam = all.filter((m) => m!.spam).length;
-    const { useComposeStore } = await import("@/lib/stores/compose");
     const drafts = await useComposeStore.getState().listDrafts();
     set({ unreadCounts: { inbox: inboxUnread, starred, snoozed, sent, drafts: drafts.length, archive, spam } });
   },

@@ -31,7 +31,7 @@ describe("UploadProgress", () => {
     render(<UploadProgress files={mockFiles} totalComplete={2} totalCount={3} onHide={vi.fn()} />);
     expect(screen.getByText(/284/)).toBeInTheDocument();
     expect(screen.getByText(/18\.4/)).toBeInTheDocument();
-    expect(screen.getByText(/84 KB/)).toBeInTheDocument();
+    expect(screen.getByText(/84 kB/)).toBeInTheDocument();
   });
 
   it("shows percentage for uploading files", () => {

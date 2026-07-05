@@ -3,7 +3,9 @@
 import { create } from "zustand";
 import { createKeyStore, generateKey, importFromNsec } from "@post/nostr-core";
 import { getPublicKey, finalizeEvent } from "nostr-tools/pure";
-import { npubEncode } from "nostr-tools/nip19";
+import { npubEncode, decode } from "nostr-tools/nip19";
+import { useRelaysStore } from "@/lib/stores/relays";
+import { useProfilesStore } from "@/lib/stores/profiles";
 import type { Identity } from "@/lib/types";
 import { isTauri, createTauriKeyStore } from "@/lib/tauri";
 
@@ -265,7 +267,6 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   async refreshProfile() {
     const { identity } = get();
     if (!identity?.pubkey) return;
-    const { useProfilesStore } = await import("@/lib/stores/profiles");
     const profile = await useProfilesStore.getState().fetchProfile(identity.pubkey);
     if (profile) {
       set((state) => {
@@ -280,7 +281,6 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
     const { identity, usingNip07, passkeySigner } = get();
     if (!identity) throw new Error("Cannot publish profile");
 
-    const { useRelaysStore } = await import("@/lib/stores/relays");
     const pool = useRelaysStore.getState().pool;
     if (!pool) throw new Error("Cannot publish profile");
 
@@ -319,7 +319,6 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       const sig = await passkeySigner.signEvent(event);
       signedEvent = { ...event, sig, id: "" };
     } else if (identity.nsec) {
-      const { decode } = await import("nostr-tools/nip19");
       const nsecDecoded = decode(identity.nsec);
       if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
       const sk = nsecDecoded.data;

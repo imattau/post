@@ -10,6 +10,10 @@ import { useBlossomStore } from "@/lib/stores/blossom";
 import { useSettingsStore, SETTING_DEFAULTS, type SettingKey } from "@/lib/stores/settings";
 import { db } from "@/lib/db/schema";
 import IdentityDialog from "@/components/IdentityDialog";
+import { ToggleRow } from "./_components/ToggleRow";
+import { SectionHeader } from "./_components/SectionHeader";
+import { SelectRow } from "./_components/SelectRow";
+import { SubNav } from "./_components/SubNav";
 
 type SubCategory = { id: string; label: string };
 type Category = { id: string; icon: string; label: string; subCategories: SubCategory[] };
@@ -86,83 +90,7 @@ const CATEGORIES: Category[] = [
   },
 ];
 
-function ToggleRow({ settingKey, label, description, defaultOn }: { settingKey: SettingKey; label: string; description: string; defaultOn?: boolean }) {
-  const value = useSettingsStore((s) => s.values[settingKey]);
-  const setValue = useSettingsStore((s) => s.setValue);
-  const fallback = defaultOn ?? (SETTING_DEFAULTS[settingKey] as boolean | undefined) ?? false;
-  const on = typeof value === "boolean" ? value : fallback;
-  return (
-    <div className="flex items-center justify-between py-3">
-      <div className="flex-1 pr-4">
-        <p className="text-[14px] font-medium text-text-primary">{label}</p>
-        <p className="text-[11px] text-text-tertiary mt-0.5">{description}</p>
-      </div>
-      <button
-        onClick={() => setValue(settingKey, !on)}
-        className={`relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0 cursor-pointer ${
-          on ? "bg-brand" : "bg-pill-subtle"
-        }`}
-      >
-        <div
-          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-            on ? "translate-x-[22px]" : "translate-x-0.5"
-          }`}
-        />
-      </button>
-    </div>
-  );
-}
 
-function SectionHeader({ title }: { title: string }) {
-  return <h3 className="text-[15px] font-semibold text-text-primary mt-8 mb-4">{title}</h3>;
-}
-
-function SelectRow({ settingKey, label, description, options, defaultValue }: { settingKey: SettingKey; label: string; description: string; options: { value: string; label: string }[]; defaultValue?: string }) {
-  const value = useSettingsStore((s) => s.values[settingKey]);
-  const setValue = useSettingsStore((s) => s.setValue);
-  const fallback = defaultValue ?? (SETTING_DEFAULTS[settingKey] as string | undefined) ?? "";
-  const current = typeof value === "string" ? value : fallback;
-  return (
-    <div className="flex items-center justify-between py-3">
-      <div className="flex-1 pr-4">
-        <p className="text-[14px] font-medium text-text-primary">{label}</p>
-        <p className="text-[11px] text-text-tertiary mt-0.5">{description}</p>
-      </div>
-      <select
-        value={current}
-        onChange={(e) => setValue(settingKey, e.target.value)}
-        className="h-9 px-3 rounded-[10px] bg-pill-subtle border border-border text-text-secondary text-[11px] font-medium text-center appearance-none cursor-pointer hover:brightness-110 transition-all flex-shrink-0"
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function SubNav({ category, activeSub, onSelect }: { category: Category; activeSub: string; onSelect: (id: string) => void }) {
-  return (
-    <div className="pt-[30px] px-4">
-      <h3 className="text-[18px] font-semibold text-text-near-white mb-6">{category.label}</h3>
-      <div className="flex flex-col gap-[2px]">
-        {category.subCategories.map((sub) => (
-          <button
-            key={sub.id}
-            onClick={() => onSelect(sub.id)}
-            className={`w-full h-[38px] px-3 rounded-[10px] text-left text-[12px] font-medium transition-all duration-150 cursor-pointer ${
-              activeSub === sub.id
-                ? "bg-surface-active text-white"
-                : "text-text-secondary hover:text-text-near-white"
-            }`}
-          >
-            {sub.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState("Account");

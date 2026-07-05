@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
+import { db } from "@/lib/db/schema";
 import type { Message, MailboxKind } from "@/lib/types";
 
 interface MessagesState {
@@ -22,7 +24,7 @@ interface MessagesState {
   startSnoozeWatcher: () => () => void;
 }
 
-export const useMessagesStore = create<MessagesState>((set, get) => ({
+export const useMessagesStore = create<MessagesState>()(immer((set, get) => ({
   byId: {},
   ids: [],
   selectedId: null,
@@ -30,7 +32,6 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
   error: null,
 
   async loadFromCache() {
-    const { db } = await import("@/lib/db/schema");
     const messages = await db.messages.orderBy("createdAt").reverse().toArray();
     const byId: Record<string, Message> = {};
     const ids: string[] = [];
@@ -38,7 +39,7 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       byId[m.id] = m;
       ids.push(m.id);
     }
-    set({ byId, ids, loading: false });
+    set((state) => { state.byId = byId; state.ids = ids; state.loading = false; });
   },
 
   selectMessage: (id: string | null) => {
@@ -50,9 +51,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const msg = byId[id];
     if (!msg || msg.read) return;
     const updated = { ...msg, read: true };
-    const { db } = await import("@/lib/db/schema");
     await db.messages.put(updated);
-    set({ byId: { ...byId, [id]: updated } });
+    set((state) => { state.byId[id] = updated; });
   },
 
   async markUnread(id: string) {
@@ -60,19 +60,16 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const msg = byId[id];
     if (!msg || !msg.read) return;
     const updated = { ...msg, read: false };
-    const { db } = await import("@/lib/db/schema");
     await db.messages.put(updated);
-    set({ byId: { ...byId, [id]: updated } });
+    set((state) => { state.byId[id] = updated; });
   },
 
   async toggleStar(id: string) {
-    const { byId } = get();
-    const msg = byId[id];
+    const msg = get().byId[id];
     if (!msg) return;
     const updated = { ...msg, starred: !msg.starred };
-    const { db } = await import("@/lib/db/schema");
     await db.messages.put(updated);
-    set({ byId: { ...byId, [id]: updated } });
+    set((state) => { state.byId[id] = updated; });
   },
 
   async toggleArchive(id: string) {
@@ -80,9 +77,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const msg = byId[id];
     if (!msg) return;
     const updated = { ...msg, archived: !msg.archived, mailbox: (msg.archived ? "inbox" : "archive") as MailboxKind };
-    const { db } = await import("@/lib/db/schema");
     await db.messages.put(updated);
-    set({ byId: { ...byId, [id]: updated } });
+    set((state) => { state.byId[id] = updated; });
   },
 
   async toggleSpam(id: string) {
@@ -90,9 +86,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const msg = byId[id];
     if (!msg) return;
     const updated = { ...msg, spam: !msg.spam, mailbox: (msg.spam ? "inbox" : "spam") as MailboxKind };
-    const { db } = await import("@/lib/db/schema");
     await db.messages.put(updated);
-    set({ byId: { ...byId, [id]: updated } });
+    set((state) => { state.byId[id] = updated; });
   },
 
   async snooze(id: string, until: number) {
@@ -100,59 +95,62 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const msg = byId[id];
     if (!msg) return;
     const updated = { ...msg, snoozedUntil: until, mailbox: "snoozed" as MailboxKind };
-    const { db } = await import("@/lib/db/schema");
     await db.messages.put(updated);
-    set({ byId: { ...byId, [id]: updated } });
+    set((state) => { state.byId[id] = updated; });
   },
 
   async deleteMessage(id: string) {
     const { byId, ids } = get();
-    const { [id]: _, ...rest } = byId;
-    const { db } = await import("@/lib/db/schema");
     await db.messages.delete(id);
-    set({ byId: rest, ids: ids.filter((i) => i !== id) });
+    set((state) => { delete state.byId[id]; state.ids = state.ids.filter((i) => i !== id); });
   },
 
   ingestFromRelay: (message: Message) => {
     const { byId, ids } = get();
     if (byId[message.id]) return;
-    set({
-      byId: { ...byId, [message.id]: message },
-      ids: [message.id, ...ids],
-    });
+    set((state) => { state.byId[message.id] = message; state.ids.unshift(message.id); });
   },
 
   async upsertMessage(message: Message) {
     const { byId, ids } = get();
-    const { db } = await import("@/lib/db/schema");
     await db.messages.put(message);
-    set({
-      byId: { ...byId, [message.id]: message },
-      ids: ids.includes(message.id) ? ids : [message.id, ...ids],
+    set((state) => {
+      state.byId[message.id] = message;
+      if (!state.ids.includes(message.id)) state.ids.unshift(message.id);
     });
   },
 
   startSnoozeWatcher: () => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const check = () => {
       const { byId } = get();
       const now = Date.now();
       const updates: Record<string, Message> = {};
+      let nextSnooze = Infinity;
+
       for (const msg of Object.values(byId)) {
-        if (msg.snoozedUntil !== null && msg.snoozedUntil <= now) {
-          updates[msg.id] = { ...msg, snoozedUntil: null, mailbox: "inbox" };
+        if (msg.snoozedUntil !== null) {
+          if (msg.snoozedUntil <= now) {
+            updates[msg.id] = { ...msg, snoozedUntil: null, mailbox: "inbox" };
+          } else {
+            nextSnooze = Math.min(nextSnooze, msg.snoozedUntil - now);
+          }
         }
       }
+
       if (Object.keys(updates).length > 0) {
-        set((state) => ({ byId: { ...state.byId, ...updates } }));
-        import("@/lib/db/schema").then(({ db }) => {
-          for (const msg of Object.values(updates)) {
-            db.messages.put(msg);
-          }
-        });
+        set((state) => { Object.assign(state.byId, updates); });
+        for (const msg of Object.values(updates)) {
+          db.messages.put(msg);
+        }
       }
+
+      const delay = Math.min(nextSnooze === Infinity ? 30000 : nextSnooze, 30000);
+      timeoutId = setTimeout(check, Math.max(delay, 1000));
     };
-    const interval = setInterval(check, 30000);
+
     check();
-    return () => clearInterval(interval);
+    return () => { if (timeoutId !== null) clearTimeout(timeoutId); };
   },
-}));
+})));

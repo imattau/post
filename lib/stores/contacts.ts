@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { db } from "@/lib/db/schema";
 import type { Contact } from "@/lib/types";
 
 export type ContactStatus = "Following" | "Muted" | "Blocked";
@@ -31,7 +32,6 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
   contacts: SEED_CONTACTS,
 
   async loadContacts() {
-    const { db } = await import("@/lib/db/schema");
     const stored = await db.contacts.toArray();
     if (stored.length === 0) {
       await db.contacts.bulkPut(SEED_CONTACTS);
@@ -58,7 +58,6 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
     set({ contacts });
     const contact = contacts.find((item) => item.id === id);
     if (contact) {
-      const { db } = await import("@/lib/db/schema");
       await db.contacts.put(contact);
     }
   },

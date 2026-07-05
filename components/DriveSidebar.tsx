@@ -7,13 +7,7 @@ import { Progress } from "@base-ui/react/progress";
 import { Folder, Clock, Star, Share2, CloudOff, Paperclip, Trash2, Plus, ChevronDown } from "lucide-react";
 import type { DriveScreen } from "@/lib/types";
 import type { Identity } from "@post/nostr-core";
-
-function identityInitials(identity: Identity | null): string {
-  if (!identity) return "?";
-  const name = identity.profile?.displayName ?? identity.profile?.name ?? "";
-  if (name.length >= 2) return name.slice(0, 2).toUpperCase();
-  return identity.pubkey.slice(0, 2).toUpperCase();
-}
+import { formatSize } from "@/lib/utils";
 
 interface DriveSidebarProps {
   screen: DriveScreen;
@@ -42,12 +36,6 @@ const NAV_ITEMS: Array<{ icon: React.ReactNode; label: string; screen?: DriveScr
   { icon: <Paperclip size={15} />, label: "From Post", screen: "from-post", href: "/drive/from-post" },
   { icon: <Trash2 size={15} />, label: "Trash", screen: "trash", href: "/drive/trash" },
 ];
-
-function formatSize(bytes: number): string {
-  if (bytes < 1000) return `${bytes} B`;
-  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(bytes >= 10_000 ? 0 : 1)} KB`;
-  return `${(bytes / 1_000_000).toFixed(bytes >= 10_000_000 ? 0 : 1)} MB`;
-}
 
 const storageLimit = 30 * 1024 * 1024 * 1024;
 
@@ -162,7 +150,7 @@ export default function DriveSidebar({
 
       <div className="mt-auto pt-4">
         <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full p-0">
-          <Avatar initials={identityInitials(identity)} size={36} />
+          <Avatar initials={identity?.profile?.displayName?.slice(0, 2).toUpperCase() ?? identity?.profile?.name?.slice(0, 2).toUpperCase() ?? identity?.pubkey?.slice(0, 2).toUpperCase() ?? "?"} size={36} />
           <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-[1.5px] border-dock bg-ok" />
         </Button>
       </div>

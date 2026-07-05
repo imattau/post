@@ -2,6 +2,8 @@
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useLayoutEffect } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
+import { useShallow } from "zustand/react/shallow";
 import dynamic from "next/dynamic";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useRelaysStore } from "@/lib/stores/relays";
@@ -42,19 +44,27 @@ export default function MailContent({ children }: { children: React.ReactNode })
 
   const draftCount = useMailboxStore((s) => s.unreadCounts.drafts);
   const startSnoozeWatcher = useMessagesStore((s) => s.startSnoozeWatcher);
-  const markRead = useMessagesStore((s) => s.markRead);
-  const markUnread = useMessagesStore((s) => s.markUnread);
-  const toggleStar = useMessagesStore((s) => s.toggleStar);
-  const toggleArchive = useMessagesStore((s) => s.toggleArchive);
-  const toggleSpam = useMessagesStore((s) => s.toggleSpam);
-  const snooze = useMessagesStore((s) => s.snooze);
-  const deleteMessage = useMessagesStore((s) => s.deleteMessage);
+  const { markRead, markUnread, toggleStar, toggleArchive, toggleSpam, snooze, deleteMessage } = useMessagesStore(
+    useShallow((s) => ({
+      markRead: s.markRead,
+      markUnread: s.markUnread,
+      toggleStar: s.toggleStar,
+      toggleArchive: s.toggleArchive,
+      toggleSpam: s.toggleSpam,
+      snooze: s.snooze,
+      deleteMessage: s.deleteMessage,
+    }))
+  );
 
   const refreshUnreadCounts = useMailboxStore((s) => s.refreshUnreadCounts);
-  const updateStatuses = useRelaysStore((s) => s.updateStatuses);
-  const relayStatuses = useRelaysStore((s) => s.statuses);
-  const healthPercent = useRelaysStore((s) => s.healthPercent);
-  const syncedAgo = useRelaysStore((s) => s.syncedAgo);
+  const { updateStatuses, statuses: relayStatuses, healthPercent, syncedAgo } = useRelaysStore(
+    useShallow((s) => ({
+      updateStatuses: s.updateStatuses,
+      statuses: s.statuses,
+      healthPercent: s.healthPercent,
+      syncedAgo: s.syncedAgo,
+    }))
+  );
   const connectedCount = Object.values(relayStatuses).filter((s) => s.connected).length;
   const totalCount = Object.keys(relayStatuses).length;
 
@@ -105,23 +115,21 @@ export default function MailContent({ children }: { children: React.ReactNode })
     router.replace(pathname, { scroll: false });
   }, [router, pathname]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && selectedMessage && !composeOpen) clearSelection();
-      if (e.key === "n" && !composeOpen && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
-        e.preventDefault();
-        router.push(`${pathname}?compose=true`, { scroll: false });
-      }
-      if (e.key === "u" && selectedMessage && !composeOpen) {
-        handleToggleRead(selectedMessage.id, selectedMessage.read);
-      }
-      if (e.key === "#" && selectedMessage && !composeOpen) {
-        handleDelete(selectedMessage.id);
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [selectedMessage, composeOpen, clearSelection, router, pathname, handleToggleRead, handleDelete]);
+  useHotkeys("Escape", (e) => {
+    if (selectedMessage && !composeOpen) { e.preventDefault(); clearSelection(); }
+  }, { enabled: !composeOpen, enableOnFormTags: false }, [selectedMessage, composeOpen, clearSelection]);
+
+  useHotkeys("n", (e) => {
+    if (!composeOpen) { e.preventDefault(); router.push(`${pathname}?compose=true`, { scroll: false }); }
+  }, { enabled: !composeOpen, enableOnFormTags: false }, [composeOpen, router, pathname]);
+
+  useHotkeys("u", (e) => {
+    if (selectedMessage && !composeOpen) { e.preventDefault(); handleToggleRead(selectedMessage.id, selectedMessage.read); }
+  }, { enabled: !composeOpen, enableOnFormTags: false }, [selectedMessage, composeOpen, handleToggleRead]);
+
+  useHotkeys("#", (e) => {
+    if (selectedMessage && !composeOpen) { e.preventDefault(); handleDelete(selectedMessage.id); }
+  }, { enabled: !composeOpen, enableOnFormTags: false }, [selectedMessage, composeOpen, handleDelete]);
 
   const markReadOnScroll = useSettingsStore((s) => (s.values["mark-read-scroll"] ?? true) as boolean);
 

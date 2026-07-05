@@ -1,4 +1,5 @@
 import { memo } from "react";
+import isEqual from "react-fast-compare";
 import type { MockMessage } from "@/lib/mock/threads";
 import { Check, CheckCheck, X, Reply } from "lucide-react";
 import RelativeTime from "./RelativeTime";
@@ -85,21 +86,4 @@ function MessageRow({
   );
 }
 
-export default memo(MessageRow, (prev, next) => {
-  if (prev.selected !== next.selected) return false;
-  if (prev.batchMode !== next.batchMode) return false;
-  if (prev.batchSelected !== next.batchSelected) return false;
-  if (prev.message.id !== next.message.id) return false;
-  if (prev.message.read !== next.message.read) return false;
-  if (prev.message.starred !== next.message.starred) return false;
-  if (prev.message.deliveryStatus !== next.message.deliveryStatus) return false;
-  if (prev.message.createdAt !== next.message.createdAt) return false;
-  if (prev.message.subject !== next.message.subject) return false;
-  if (prev.message.preview !== next.message.preview) return false;
-  if (prev.message.sender.name !== next.message.sender.name) return false;
-  if (prev.message.sender.avatarInitials !== next.message.sender.avatarInitials) return false;
-  if (prev.message.labels.length !== next.message.labels.length) return false;
-  if (prev.message.labels.some((l, i) => l !== next.message.labels[i])) return false;
-  if (prev.message.replyTo !== next.message.replyTo) return false;
-  return true;
-});
+export default memo(MessageRow, (prev, next) => isEqual(prev, next));

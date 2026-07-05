@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { fetchProfile as fetchProfileFromCore, batchFetchProfiles as batchFetchProfilesFromCore } from "@post/nostr-core";
+import { useRelaysStore } from "@/lib/stores/relays";
 import type { Profile } from "@post/nostr-core";
 
 interface ProfilesState {
@@ -14,12 +16,10 @@ export const useProfilesStore = create<ProfilesState>((set, get) => ({
     const cached = get().byPubkey[pubkey];
     if (cached) return cached;
 
-    const { useRelaysStore } = await import("@/lib/stores/relays");
     const pool = useRelaysStore.getState().pool;
     if (!pool) return null;
 
-    const { fetchProfile } = await import("@post/nostr-core");
-    const profile = await fetchProfile(pool, pubkey);
+    const profile = await fetchProfileFromCore(pool, pubkey);
     if (profile) {
       set((state) => ({ byPubkey: { ...state.byPubkey, [pubkey]: profile } }));
     }
@@ -27,15 +27,13 @@ export const useProfilesStore = create<ProfilesState>((set, get) => ({
   },
 
   async batchFetchProfiles(pubkeys: string[]) {
-    const { useRelaysStore } = await import("@/lib/stores/relays");
     const pool = useRelaysStore.getState().pool;
     if (!pool) return;
 
     const uncached = pubkeys.filter((pk) => !get().byPubkey[pk]);
     if (uncached.length === 0) return;
 
-    const { batchFetchProfiles } = await import("@post/nostr-core");
-    const resolved = await batchFetchProfiles(pool, uncached);
+    const resolved = await batchFetchProfilesFromCore(pool, uncached);
     if (resolved.size > 0) {
       set((state) => ({
         byPubkey: { ...state.byPubkey, ...Object.fromEntries(resolved) },

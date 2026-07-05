@@ -5,12 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, CircleHelp, Settings, X } from "lucide-react";
 import { Command } from "cmdk";
+import { Dialog } from "@base-ui/react/dialog";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useMessagesStore } from "@/lib/stores/messages";
 import { createMessageSearch } from "@/lib/search";
 import type { Message } from "@post/nostr-core";
 import AppSwitcher from "./AppSwitcher";
 import IdentityDialog from "./IdentityDialog";
+import { hashInitials } from "@/lib/utils";
 
 const AVATAR_COLORS = [
   "bg-avatar-1", "bg-avatar-2", "bg-avatar-3", "bg-avatar-4",
@@ -25,12 +27,6 @@ const TILES: Array<{ letter: string; label: string; route: string }> = [
   { letter: "P", label: "Contacts", route: "/contacts" },
   { letter: "T", label: "Tasks", route: "/coming-soon?app=T" },
 ];
-
-function hashInitials(initials: string): number {
-  let hash = 0;
-  for (let i = 0; i < initials.length; i++) hash = initials.charCodeAt(i) + ((hash << 5) - hash);
-  return Math.abs(hash);
-}
 
 export default function IconDock() {
   const pathname = usePathname();
@@ -151,12 +147,13 @@ export default function IconDock() {
 
       {/* Identity dialog */}
       {identityOpen && <IdentityDialog onClose={closeIdentity} />}
-      {searchOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40" onClick={closeSearch}>
-          <div className="absolute left-24 top-20 w-[360px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+      <Dialog.Root open={searchOpen} onOpenChange={(open) => { if (!open) closeSearch(); }}>
+        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40" />
+        <Dialog.Portal>
+          <Dialog.Popup className="fixed left-24 top-20 z-50 w-[360px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg outline-none">
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-text-modal">Search messages</p>
-              <button onClick={closeSearch} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
+              <Dialog.Close className="text-text-modal-2 hover:text-text-modal cursor-pointer"><X size={18} /></Dialog.Close>
             </div>
             <Command shouldFilter={false} className="mt-3">
               <Command.Input
@@ -183,24 +180,25 @@ export default function IconDock() {
                 ))}
               </Command.List>
             </Command>
-          </div>
-        </div>
-      )}
-      {helpOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40" onClick={closeHelp}>
-          <div className="absolute left-24 top-36 w-[320px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+      <Dialog.Root open={helpOpen} onOpenChange={(open) => { if (!open) closeHelp(); }}>
+        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40" />
+        <Dialog.Portal>
+          <Dialog.Popup className="fixed left-24 top-36 z-50 w-[320px] rounded-[14px] border border-border bg-modal-card p-4 shadow-lg outline-none">
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-text-modal">Post help</p>
-              <button onClick={closeHelp} className="text-text-modal-2 hover:text-text-modal"><X size={18} /></button>
+              <Dialog.Close className="text-text-modal-2 hover:text-text-modal cursor-pointer"><X size={18} /></Dialog.Close>
             </div>
             <div className="mt-3 space-y-2 text-[12px] text-text-modal-2">
               <p>Use the mailbox sidebar to move between inboxes, labels, drafts, and sent messages.</p>
               <p>Arrow keys move through message lists. Escape clears the current message selection.</p>
               <p>Version 0.1.0</p>
             </div>
-          </div>
-        </div>
-      )}
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

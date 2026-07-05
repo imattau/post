@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 type SettingValue = boolean | string | number;
 
@@ -79,69 +80,47 @@ interface SettingsState {
   values: SettingsMap;
   setValue: <K extends SettingKey>(key: K, value: SettingValueOf<K>) => void;
   getValue: <K extends SettingKey>(key: K, fallback: SettingValueOf<K>) => SettingValueOf<K>;
-  load: () => void;
   reset: () => void;
 }
 
-const STORAGE_KEY = "post-settings";
 const LEGACY_BLOSSOM_KEY = "blossom-server-url";
 
-function readValues(): SettingsMap {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed: Record<string, SettingValue> = raw ? JSON.parse(raw) : {};
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set, get) => ({
+      values: {},
 
-    const migrated = { ...parsed };
+      setValue: (key, value) => {
+        set((state) => ({
+          values: { ...state.values, [key]: value } as SettingsMap,
+        }));
+      },
 
-    // Migrate legacy blossom-server-url into settings store
-    const legacyBlossom = localStorage.getItem(LEGACY_BLOSSOM_KEY);
-    if (legacyBlossom !== null && !(LEGACY_BLOSSOM_KEY in migrated)) {
-      migrated[LEGACY_BLOSSOM_KEY] = legacyBlossom;
+      getValue: (key, fallback) => {
+        const value = get().values[key];
+        return (value ?? fallback) as SettingValueOf<typeof key>;
+      },
+
+      reset: () => {
+        set({ values: {} });
+      },
+    }),
+    {
+      name: "post-settings",
+      migrate: (persisted: any) => {
+        // Migrate legacy blossom-server-url into settings store
+        try {
+          const legacyBlossom = localStorage.getItem(LEGACY_BLOSSOM_KEY);
+          if (legacyBlossom !== null && persisted && !(LEGACY_BLOSSOM_KEY in (persisted?.state?.values ?? {}))) {
+            return {
+              ...persisted,
+              state: { values: { ...persisted?.state?.values, [LEGACY_BLOSSOM_KEY]: legacyBlossom } },
+            };
+          }
+          localStorage.removeItem(LEGACY_BLOSSOM_KEY);
+        } catch {}
+        return persisted;
+      },
     }
-    localStorage.removeItem(LEGACY_BLOSSOM_KEY);
-
-    return migrated as SettingsMap;
-  } catch {
-    return {};
-  }
-}
-
-function writeValues(values: SettingsMap) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function resetStorage() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-export const useSettingsStore = create<SettingsState>((set, get) => ({
-  values: {},
-
-  setValue: (key, value) => {
-    const values = { ...get().values, [key]: value } as SettingsMap;
-    writeValues(values);
-    set({ values });
-  },
-
-  getValue: (key, fallback) => {
-    const value = get().values[key];
-    return (value ?? fallback) as SettingValueOf<typeof key>;
-  },
-
-  load: () => {
-    set({ values: readValues() });
-  },
-
-  reset: () => {
-    resetStorage();
-    set({ values: {} });
-  },
-}));
+  )
+);

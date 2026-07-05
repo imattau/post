@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { uploadBlob } from "@post/nostr-core";
+import { uploadBlob, fetchBlossomList } from "@post/nostr-core";
 import type { AttachmentRef } from "@post/nostr-core";
+import { useRelaysStore } from "@/lib/stores/relays";
 import { useSettingsStore } from "@/lib/stores/settings";
 
 interface BlossomState {
@@ -31,14 +32,12 @@ export const useBlossomStore = create<BlossomState>((set, get) => ({
   },
 
   loadBlossomListFromNostr: async (pubkey: string) => {
-    const { useRelaysStore } = await import("@/lib/stores/relays");
     const pool = useRelaysStore.getState().pool;
     if (!pool) return;
 
     const enabled = useSettingsStore.getState().values["use-nostr-blossom-list"];
     if (!enabled) return;
 
-    const { fetchBlossomList } = await import("@post/nostr-core");
     const servers = await fetchBlossomList(pool, pubkey);
     if (servers.length === 0) return;
 

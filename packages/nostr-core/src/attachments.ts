@@ -1,28 +1,8 @@
 import { nip44 } from "nostr-tools";
 import { getPublicKey } from "nostr-tools/pure";
+import { toBase64, fromBase64, asArrayBuffer } from "./utils/base64";
 
 const AES_GCM = { name: "AES-GCM", length: 256 } as const;
-
-function toBase64(bytes: Uint8Array): string {
-  if (typeof btoa === "function") {
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
-  }
-  return Buffer.from(bytes).toString("base64");
-}
-
-function fromBase64(value: string): Uint8Array {
-  if (typeof atob !== "function") return new Uint8Array(Buffer.from(value, "base64"));
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-function asArrayBuffer(view: Uint8Array): ArrayBuffer {
-  return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer;
-}
 
 export async function encryptAttachment(
   blob: Blob
@@ -65,10 +45,4 @@ export function unwrapFileKey(
   return fromBase64(base64Key);
 }
 
-export function toBase64Key(bytes: Uint8Array): string {
-  return toBase64(bytes);
-}
-
-export function fromBase64Key(value: string): Uint8Array {
-  return fromBase64(value);
-}
+export { toBase64 as toBase64Key, fromBase64 as fromBase64Key } from "./utils/base64";

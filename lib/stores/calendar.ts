@@ -1,5 +1,8 @@
 import { create } from "zustand";
+import { subMonths, addMonths, subWeeks, addWeeks, startOfMonth, addHours } from "date-fns";
+import { db } from "@/lib/db/schema";
 import { CALENDARS, CALENDAR_EVENTS, CALENDAR_MONTH, CALENDAR_SELECTED_DAY, CALENDAR_SYNC } from "@/lib/mock/calendar";
+import { generateId } from "@/lib/utils";
 import type { CalendarCalendar, CalendarEvent, CalendarSyncState, CalendarViewMode } from "@/lib/types";
 
 interface CalendarState {
@@ -29,10 +32,6 @@ interface CalendarState {
   duplicateEvent: (eventId: string) => Promise<CalendarEvent | null>;
 }
 
-function firstOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
 function recomputeSync(calendars: CalendarCalendar[], events: CalendarEvent[]): CalendarSyncState {
   const syncedCalendars = calendars.filter((c) => c.enabled).length;
   const pendingInvitations = events.filter(
@@ -55,7 +54,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   async load() {
     set({ loading: true, error: null });
     try {
-      const { db } = await import("@/lib/db/schema");
       const [calendarCount, eventCount] = await Promise.all([
         db.calendarCalendars.count(),
         db.calendarEvents.count(),
@@ -98,32 +96,28 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   setMonth(month) {
-    set({ activeMonth: firstOfMonth(month) });
+    set({ activeMonth: startOfMonth(month) });
   },
 
   goToToday() {
-    const today = firstOfMonth(new Date());
+    const today = startOfMonth(new Date());
     set({ activeMonth: today, selectedDate: new Date(), selectedEventId: get().selectedEventId });
   },
 
   previousMonth() {
-    const current = get().activeMonth;
-    set({ activeMonth: new Date(current.getFullYear(), current.getMonth() - 1, 1) });
+    set({ activeMonth: startOfMonth(subMonths(get().activeMonth, 1)) });
   },
 
   nextMonth() {
-    const current = get().activeMonth;
-    set({ activeMonth: new Date(current.getFullYear(), current.getMonth() + 1, 1) });
+    set({ activeMonth: startOfMonth(addMonths(get().activeMonth, 1)) });
   },
 
   previousWeek() {
-    const current = get().selectedDate;
-    set({ selectedDate: new Date(current.getFullYear(), current.getMonth(), current.getDate() - 7) });
+    set({ selectedDate: subWeeks(get().selectedDate, 1) });
   },
 
   nextWeek() {
-    const current = get().selectedDate;
-    set({ selectedDate: new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7) });
+    set({ selectedDate: addWeeks(get().selectedDate, 1) });
   },
 
   async toggleCalendar(calendarId) {
@@ -134,7 +128,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       );
       const sync = recomputeSync(calendars, get().events);
       set({ calendars, sync });
-      const { db } = await import("@/lib/db/schema");
       const updated = calendars.find((calendar) => calendar.id === calendarId);
       if (updated) {
         await db.calendarCalendars.put(updated);
@@ -150,11 +143,10 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     try {
       const created: CalendarEvent = {
         ...event,
-        id: event.id ?? crypto.randomUUID(),
+        id: event.id ?? generateId(),
       };
       const events = [...get().events, created].sort((a, b) => a.startAt - b.startAt);
       set({ events, sync: recomputeSync(get().calendars, events), selectedEventId: created.id });
-      const { db } = await import("@/lib/db/schema");
       await db.calendarEvents.put(created);
       return created;
     } catch (err) {
@@ -171,7 +163,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       set({ events, sync: recomputeSync(get().calendars, events) });
       const updated = events.find((event) => event.id === eventId);
       if (!updated) return;
-      const { db } = await import("@/lib/db/schema");
       await db.calendarEvents.put(updated);
     } catch (err) {
       console.error("Failed to update event:", err);
@@ -184,7 +175,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     try {
       const events = get().events.filter((event) => event.id !== eventId);
       set({ events, sync: recomputeSync(get().calendars, events), selectedEventId: get().selectedEventId === eventId ? null : get().selectedEventId });
-      const { db } = await import("@/lib/db/schema");
       await db.calendarEvents.delete(eventId);
     } catch (err) {
       console.error("Failed to delete event:", err);
@@ -201,8 +191,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const copy = await get().createEvent({
         ...sourceData,
         title: `${source.title} copy`,
-        startAt: source.startAt + 3_600_000,
-        endAt: source.endAt + 3_600_000,
+        startAt: addHours(source.startAt, 1).getTime(),
+        endAt: addHours(source.endAt, 1).getTime(),
         guests: source.guests ? source.guests.map((guest) => ({ ...guest })) : undefined,
       });
       return copy;

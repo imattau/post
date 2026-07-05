@@ -79,10 +79,10 @@ describe("importFromNpub", () => {
 });
 
 describe("formatNpub", () => {
-  it("truncates npub with first 10 chars + … + last 4 hex chars", () => {
-    const { npub, pubkey } = generateKey();
+  it("truncates npub with first 10 chars + … + last 4 npub chars", () => {
+    const { npub } = generateKey();
     const result = formatNpub(npub);
-    expect(result).toMatch(new RegExp(`^${npub.slice(0, 10)}…${pubkey.slice(-4)}$`));
+    expect(result).toMatch(new RegExp(`^${npub.slice(0, 10)}…${npub.slice(-4)}$`));
   });
 
   it("returns the input unchanged if invalid", () => {

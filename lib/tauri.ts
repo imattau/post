@@ -1,5 +1,6 @@
 import type { Identity } from "@post/nostr-core";
 import type { KeyStore } from "@post/nostr-core";
+import { generateId } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -17,7 +18,7 @@ async function getOrCreateVaultPassword(): Promise<string> {
   const store = await (Store.load("post-vault.json") as Promise<any>);
   const existing = await store.get("vault-password") as string | null;
   if (existing) return existing;
-  const password = crypto.randomUUID();
+  const password = generateId();
   await store.set("vault-password", password);
   await store.save();
   return password;
@@ -63,22 +64,22 @@ export function createTauriKeyStore(): KeyStore {
       cached = identity;
       try {
         localStorage.setItem(SESSION_KEY, JSON.stringify({ ...identity, nsec: null }));
-      } catch {}
+      } catch (e) { console.error("Failed to save identity to localStorage:", e); }
       if (identity.nsec) {
         getStrongholdStore().then(({ stronghold, store }) => {
           const data = Array.from(new TextEncoder().encode(identity.nsec!));
           store.insert("nostr-nsec", data).then(() => stronghold.save());
-        }).catch(() => {});
+        }).catch((e) => { console.error("Failed to save nsec to Stronghold:", e); });
       }
     },
     clear(): void {
       cached = null;
       try {
         localStorage.removeItem(SESSION_KEY);
-      } catch {}
+      } catch (e) { console.error("Failed to remove identity from localStorage:", e); }
       getStrongholdStore().then(({ store }) => {
         store.remove("nostr-nsec");
-      }).catch(() => {});
+      }).catch((e) => { console.error("Failed to remove nsec from Stronghold:", e); });
     },
   };
 }

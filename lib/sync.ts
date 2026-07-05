@@ -1,19 +1,54 @@
 import type { RelayPool } from "@post/nostr-core";
 import { decryptEvent, createKeyStore, parseMessagePayloadAndUnwrap } from "@post/nostr-core";
 import type { Message } from "@post/nostr-core";
+import { nip17 } from "nostr-tools";
+import type { NostrEvent } from "nostr-tools";
+import { decode } from "nostr-tools/nip19";
 import { db } from "./db/schema";
 import { useMessagesStore } from "./stores/messages";
 import { useRelaysStore } from "./stores/relays";
 
 let unsubscribe: (() => void) | null = null;
 
-import type { NostrEvent } from "nostr-tools";
+function buildMessage(
+  source: { id: string; kind: number; pubkey: string; content: string; created_at: number; tags: string[][] },
+  identity: { pubkey: string },
+  body: string,
+  subject: string | undefined,
+  attachments: Message["attachments"],
+  isGiftWrapped: boolean,
+): Message {
+  return {
+    id: source.id,
+    kind: source.kind,
+    pubkey: source.pubkey,
+    recipientPubkey: identity.pubkey,
+    content: body,
+    raw: source.content,
+    createdAt: source.created_at,
+    tags: source.tags,
+    subject: subject ?? extractSubject(source.tags, body),
+    preview: body.replace(/\n/g, " ").slice(0, 120),
+    read: false,
+    starred: false,
+    archived: false,
+    snoozedUntil: null,
+    spam: false,
+    mailbox: "inbox",
+    labelIds: [],
+    replyTo: source.tags.find((t) => t[0] === "e")?.[1] ?? null,
+    relayUrls: [],
+    attachments,
+    isEncrypted: true,
+    isGiftWrapped,
+    deliveryStatus: "delivered",
+  };
+}
 
 function loadSk(): Uint8Array | null {
   const keyStore = createKeyStore();
   const identity = keyStore.load();
   if (!identity?.nsec) return null;
-  const { decode } = require("nostr-tools/nip19");
   const decoded = decode(identity.nsec);
   if (decoded.type !== "nsec") return null;
   return decoded.data;
@@ -21,38 +56,13 @@ function loadSk(): Uint8Array | null {
 
 async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
   try {
-    const { createKeyStore } = await import("@post/nostr-core");
     const keyStore = createKeyStore();
     const plaintext = await decryptEvent(event, keyStore);
     const sk = loadSk();
     const { body, subject, attachments } = sk
       ? parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey)
       : { body: plaintext, subject: undefined, attachments: [] };
-    const msg: Message = {
-      id: event.id,
-      kind: event.kind,
-      pubkey: event.pubkey,
-      recipientPubkey: identity.pubkey,
-      content: body,
-      raw: event.content,
-      createdAt: event.created_at,
-      tags: event.tags,
-      subject: subject ?? extractSubject(event, body),
-      preview: body.replace(/\n/g, " ").slice(0, 120),
-      read: false,
-      starred: false,
-      archived: false,
-      snoozedUntil: null,
-      spam: false,
-      mailbox: "inbox",
-      labelIds: [],
-      replyTo: event.tags.find((t) => t[0] === "e")?.[1] ?? null,
-      relayUrls: [],
-      attachments,
-      isEncrypted: true,
-      isGiftWrapped: false,
-      deliveryStatus: "delivered",
-    };
+    const msg = buildMessage(event, identity, body, subject, attachments, false);
 
     useMessagesStore.getState().ingestFromRelay(msg);
     await db.messages.put(msg);
@@ -63,46 +73,17 @@ async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
 
 async function handleKind1059(event: NostrEvent, identity: { pubkey: string }) {
   try {
-    const { createKeyStore } = await import("@post/nostr-core");
-    const keyStore = createKeyStore();
-    const storedIdentity = keyStore.load();
+    const storedIdentity = createKeyStore().load();
     if (!storedIdentity?.nsec) return;
 
-    const { decode } = await import("nostr-tools/nip19");
     const nsecDecoded = decode(storedIdentity.nsec);
     if (nsecDecoded.type !== "nsec") return;
-    const sk = nsecDecoded.data;
+    const sk = nsecDecoded.data as Uint8Array;
 
-    const { nip17 } = await import("nostr-tools");
     const rumor = nip17.unwrapEvent(event, sk) as unknown as { id: string; kind: number; pubkey: string; content: string; created_at: number; tags: string[][] };
 
-    const plaintext = rumor.content;
-    const { body, subject, attachments } = parseMessagePayloadAndUnwrap(plaintext, sk, rumor.pubkey);
-    const msg: Message = {
-      id: event.id,
-      kind: 1059,
-      pubkey: rumor.pubkey,
-      recipientPubkey: identity.pubkey,
-      content: body,
-      raw: event.content,
-      createdAt: rumor.created_at,
-      tags: rumor.tags,
-      subject: subject ?? extractSubject(rumor, body),
-      preview: body.replace(/\n/g, " ").slice(0, 120),
-      read: false,
-      starred: false,
-      archived: false,
-      snoozedUntil: null,
-      spam: false,
-      mailbox: "inbox",
-      labelIds: [],
-      replyTo: rumor.tags.find((t) => t[0] === "e")?.[1] ?? null,
-      relayUrls: [],
-      attachments,
-      isEncrypted: true,
-      isGiftWrapped: true,
-      deliveryStatus: "delivered",
-    };
+    const { body, subject, attachments } = parseMessagePayloadAndUnwrap(rumor.content, sk, rumor.pubkey);
+    const msg = buildMessage({ ...rumor, kind: 1059 }, identity, body, subject, attachments, true);
 
     useMessagesStore.getState().ingestFromRelay(msg);
     await db.messages.put(msg);
@@ -156,8 +137,8 @@ export function stopSync() {
   }
 }
 
-function extractSubject(event: { tags: string[][] }, plaintext: string): string {
-  const subjectTag = event.tags.find((t) => t[0] === "subject");
+function extractSubject(tags: string[][], plaintext: string): string {
+  const subjectTag = tags.find((t) => t[0] === "subject");
   if (subjectTag?.[1]) return subjectTag[1];
   const lines = plaintext.split("\n").filter(Boolean);
   return lines[0]?.slice(0, 80) ?? "(no subject)";

@@ -7,8 +7,11 @@ import {
   isSameDay,
   isSameMonth,
   differenceInCalendarDays,
+  eachWeekOfInterval,
+  eachDayOfInterval,
   format,
 } from "date-fns";
+import { SHORT_DATE } from "@/lib/utils";
 import type { CalendarEvent } from "@/lib/types";
 
 export function buildMonthGrid(month: Date, weekStartsOn: number = 1): Date[][] {
@@ -16,17 +19,8 @@ export function buildMonthGrid(month: Date, weekStartsOn: number = 1): Date[][] 
   const last = endOfMonth(month);
   const gridStart = startOfWeek(first, { weekStartsOn: weekStartsOn as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
   const gridEnd = endOfWeek(addDays(last, 6), { weekStartsOn: weekStartsOn as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-  const weeks: Date[][] = [];
-  let cursor = gridStart;
-  while (cursor <= gridEnd) {
-    const week: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      week.push(cursor);
-      cursor = addDays(cursor, 1);
-    }
-    weeks.push(week);
-  }
-  return weeks;
+  return eachWeekOfInterval({ start: gridStart, end: gridEnd }, { weekStartsOn: weekStartsOn as 0 | 1 | 2 | 3 | 4 | 5 | 6 })
+    .map((weekStart) => eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) }));
 }
 
 export function monthLabel(date: Date): string {
@@ -34,7 +28,7 @@ export function monthLabel(date: Date): string {
 }
 
 export function shortMonthLabel(date: Date): string {
-  return format(date, "MMM d");
+  return format(date, SHORT_DATE);
 }
 
 export function weekdayLabel(date: Date): string {
@@ -46,7 +40,7 @@ export function formatTimeRange(startAt: number, endAt: number): string {
 }
 
 export function formatMonthDay(date: Date): string {
-  return format(date, "MMM d");
+  return format(date, SHORT_DATE);
 }
 
 export function formatLongDate(date: Date): string {

@@ -2,12 +2,8 @@
 
 import { memo, useCallback, useState, useRef, useEffect } from "react";
 import { Link2, Paperclip, SmilePlus } from "lucide-react";
-
-const EMOJIS = [
-  "😀", "😂", "😊", "😍", "🤔", "😎", "🙌", "👍", "👎", "❤️",
-  "🔥", "💯", "🎉", "✨", "🚀", "💡", "📌", "🎯", "💪", "🤝",
-  "😢", "😡", "🥳", "😴", "🤗", "👀", "🗣️", "💬", "📧", "🔒",
-];
+import data from "@emoji-mart/data";
+import Picker from "@emoji-mart/react";
 
 export default memo(function FormatToolbar({
   onFormat,
@@ -38,8 +34,8 @@ export default memo(function FormatToolbar({
     event.preventDefault();
   }, []);
 
-  const handleEmojiClick = useCallback((emoji: string) => {
-    onFormat(emoji);
+  const handleEmojiSelect = useCallback((emoji: { native: string }) => {
+    onFormat(emoji.native);
     setShowEmojiPicker(false);
   }, [onFormat]);
 
@@ -86,20 +82,16 @@ export default memo(function FormatToolbar({
           <SmilePlus size={13} />
         </button>
         {showEmojiPicker && (
-          <div className="absolute bottom-full left-0 mb-1 z-20 w-[232px] rounded-[10px] border border-border bg-modal-card shadow-lg p-2">
-            <div className="grid grid-cols-6 gap-1">
-              {EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  onMouseDown={handleMouseDown}
-                  onClick={() => handleEmojiClick(emoji)}
-                  className="w-8 h-8 flex items-center justify-center text-[16px] rounded hover:bg-surface-active cursor-pointer transition-colors duration-150"
-                  aria-label={emoji}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+          <div className="absolute bottom-full left-0 mb-1 z-20">
+            <Picker
+              data={data}
+              onEmojiSelect={handleEmojiSelect}
+              theme="dark"
+              previewPosition="none"
+              skinTonePosition="none"
+              set="native"
+              maxFrequentRows={2}
+            />
           </div>
         )}
       </div>

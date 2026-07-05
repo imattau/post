@@ -4,16 +4,11 @@ import { useEffect, useState } from "react";
 import { decryptDriveBlob } from "@post/nostr-core";
 import type { DriveFile } from "@/lib/types";
 import type { Identity } from "@post/nostr-core";
+import { formatSize } from "@/lib/utils";
 
 interface FilePreviewProps {
   file: DriveFile;
   identity: Identity | null;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1000) return `${bytes} B`;
-  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(bytes >= 10_000 ? 0 : 1)} KB`;
-  return `${(bytes / 1_000_000).toFixed(bytes >= 10_000_000 ? 0 : 1)} MB`;
 }
 
 export default function FilePreview({ file, identity }: FilePreviewProps) {

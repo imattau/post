@@ -3,6 +3,7 @@
 import { memo, useState, useEffect } from "react";
 import { FileImage, File, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
+import { base64ToUint8Array } from "uint8array-extras";
 import { formatSize } from "@/lib/utils";
 import { useDriveStore } from "@/lib/stores/drive";
 
@@ -82,14 +83,7 @@ const AttachmentCard = memo(function AttachmentCard({
       const serverUrl = (await import("@/lib/stores/blossom")).useBlossomStore.getState().serverUrl;
       const ciphertext = await downloadBlob({ id: sha256, fileName, mimeType, sizeBytes, sha256, url: "", storedInDrive: false, encrypted: true }, sk, serverUrl);
 
-      const b64ToBytes = (b64: string) => {
-        const binary = atob(b64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        return bytes;
-      };
-
-      const plaintext = await decryptAttachment(ciphertext, b64ToBytes(fileKey), b64ToBytes(fileIv));
+      const plaintext = await decryptAttachment(ciphertext, base64ToUint8Array(fileKey), base64ToUint8Array(fileIv));
       const blobUrl = URL.createObjectURL(plaintext);
       setDecryptedUrl(blobUrl);
     } catch {
@@ -166,4 +160,5 @@ const AttachmentCard = memo(function AttachmentCard({
   );
 });
 
+export { isImage };
 export default AttachmentCard;

@@ -33,6 +33,7 @@ export function createRelayPool(relays: RelayConfig[]): RelayPool {
   let lastEventAt = Date.now();
   const errors = new Map<string, string | null>();
 
+  const readUrls = relays.filter((r) => r.read).map((r) => r.url);
   const writeUrls = relays.filter((r) => r.write).map((r) => r.url);
   const allUrls = relays.map((r) => r.url);
 
@@ -76,12 +77,11 @@ export function createRelayPool(relays: RelayConfig[]): RelayPool {
     subscribe(filters: Filter[], cb: (event: Event) => void): () => void {
       const closers = filters.map((filter) =>
         simplePool.subscribeMany(
-          writeUrls,
+          readUrls,
           filter,
           {
             onevent(event: Event) {
               lastEventAt = Date.now();
-              lastEventAtByRelay.set(event.id, Date.now());
               cb(event);
             },
           }

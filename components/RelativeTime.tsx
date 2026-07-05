@@ -1,16 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { formatRelativeTime } from "@/lib/utils";
+import TimeAgo from "react-timeago";
 
 export default function RelativeTime({ ts }: { ts: number }) {
-  const [label, setLabel] = useState(() => formatRelativeTime(ts));
-
-  useEffect(() => {
-    setLabel(formatRelativeTime(ts));
-    const interval = setInterval(() => setLabel(formatRelativeTime(ts)), 60_000);
-    return () => clearInterval(interval);
-  }, [ts]);
-
-  return <>{label}</>;
+  return <TimeAgo date={ts} />;
 }

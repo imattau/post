@@ -41,9 +41,8 @@ export function formatNpub(npub: string): string {
   try {
     const decoded = decode(npub);
     if (decoded.type !== "npub") return npub;
-    const hex = decoded.data;
     const prefix = npub.slice(0, 10);
-    const suffix = hex.slice(-4);
+    const suffix = npub.slice(-4);
     return `${prefix}…${suffix}`;
   } catch {
     return npub;

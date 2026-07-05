@@ -52,8 +52,8 @@ describe("AttachmentCard", () => {
     expect(screen.queryByText("Preview")).not.toBeInTheDocument();
   });
 
-  it("formats small files in KB", () => {
+  it("formats small files in kB", () => {
     render(<AttachmentCard {...baseProps} sizeBytes= {50_000} />);
-    expect(screen.getByText(/50 KB/)).toBeInTheDocument();
+    expect(screen.getByText(/50 kB/)).toBeInTheDocument();
   });
 });

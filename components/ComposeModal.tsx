@@ -1,20 +1,28 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, useMemo, useLayoutEffect, memo } from "react";
+import { useRef, useState, useCallback, useEffect, useLayoutEffect } from "react";
+import { useDropzone } from "react-dropzone";
+import { useHotkeys } from "react-hotkeys-hook";
+import { encryptAttachment } from "@post/nostr-core";
+import { decode } from "nostr-tools/nip19";
+import { createKeyStore } from "@post/nostr-core";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useBlossomStore } from "@/lib/stores/blossom";
 import { useRelaysStore } from "@/lib/stores/relays";
-import { useContactsStore } from "@/lib/stores/contacts";
-import { Minus, X, ChevronDown, LoaderCircle, File, AtSign, Ellipsis } from "lucide-react";
+import { X, ChevronDown, LoaderCircle, AtSign, Ellipsis } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
-import { Command, useCommandState } from "cmdk";
+import { Command } from "cmdk";
 import { toast } from "sonner";
-import { formatSize, wrapTextareaSelection, bytesToBase64, draftHasContent } from "@/lib/utils";
-import { createContactSearch } from "@/lib/search";
+import { generateId, wrapTextareaSelection, draftHasContent, parseRecipientEntry } from "@/lib/utils";
+import { uint8ArrayToBase64 } from "uint8array-extras";
 import FormatToolbar from "./FormatToolbar";
 import MessageBody from "./MessageBody";
 import UploadProgress from "./UploadProgress";
+import { ComposeHeader } from "./compose/ComposeHeader";
+import { ContactSuggestions } from "./compose/ContactSuggestions";
+import { RecipientRow } from "./compose/RecipientRow";
+import { AttachmentCards } from "./compose/AttachmentCards";
 
 interface UploadItem {
   id: string;
@@ -27,185 +35,7 @@ interface UploadItem {
 
 const CONCURRENCY_LIMIT = 3;
 
-const ComposeHeader = memo(function ComposeHeader({ onRequestClose }: { onRequestClose: () => void }) {
-  const status = useComposeStore((s) => s.status);
-  const savedAt = useComposeStore((s) => s.draft.savedAt);
-  const minimize = useComposeStore((s) => s.minimize);
 
-  const isSending = status === "sending";
-
-  const handleMinimize = useCallback(() => {
-    minimize();
-  }, [minimize]);
-
-  const handleClose = useCallback(() => {
-    onRequestClose();
-  }, [onRequestClose]);
-
-  return (
-    <div className="flex items-center justify-between px-5 py-3 border-b border-modal-stroke">
-      <div className="flex items-center gap-3">
-        <span className="text-[16px] font-semibold text-text-modal">New message</span>
-        {savedAt && status === "composing" && (
-          <span className="text-[11px] font-medium text-ok">Draft saved</span>
-        )}
-        {status === "sending" && <span className="text-[11px] font-medium text-brand-light">Sending…</span>}
-        {status === "failed" && <span className="text-[11px] font-medium text-danger">Send failed</span>}
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleMinimize}
-          disabled={isSending}
-          className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
-        >
-          <Minus size={15} className="text-text-modal-2" />
-        </button>
-        <button
-          onClick={handleClose}
-          disabled={isSending}
-          className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
-        >
-          <X size={15} className="text-text-modal-2" />
-        </button>
-      </div>
-    </div>
-  );
-});
-
-const ContactSuggestions = memo(function ContactSuggestions({
-  recipientText,
-  onSelect,
-  highlightedRef,
-}: {
-  recipientText: string;
-  onSelect: (contact: ReturnType<typeof useContactsStore.getState>["contacts"][number]) => void;
-  highlightedRef: React.RefObject<boolean>;
-}) {
-  const contacts = useContactsStore((s) => s.contacts);
-  const search = useMemo(() => createContactSearch(), []);
-  const selectedItemId = useCommandState((state) => state.selectedItemId);
-
-  highlightedRef.current = !!selectedItemId;
-
-  const suggestions = useMemo(() => {
-    if (!recipientText.trim()) return [];
-    return search.search(recipientText, contacts).slice(0, 6);
-  }, [contacts, recipientText, search]);
-
-  if (suggestions.length === 0) return null;
-
-  return (
-    <div className="absolute left-0 top-full mt-1 w-full z-20">
-      <Command.List className="rounded-[10px] border border-border bg-modal-card shadow-lg overflow-hidden p-0">
-        {suggestions.map((contact) => (
-          <Command.Item
-            key={contact.id}
-            value={contact.id}
-            onSelect={() => onSelect(contact)}
-            className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-surface-active data-[highlighted]:bg-surface-active transition-colors duration-150 cursor-pointer"
-          >
-            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: contact.color }}>
-              <span className="text-white text-[10px] font-semibold">{contact.initials}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-[12px] font-medium text-text-modal truncate block">{contact.name}</span>
-              <span className="text-[10px] text-text-tertiary truncate block">{contact.handle}</span>
-            </div>
-          </Command.Item>
-        ))}
-      </Command.List>
-    </div>
-  );
-});
-
-const RecipientRow = memo(function RecipientRow({
-  label,
-  recipients,
-  text,
-  onTextChange,
-  onAdd,
-  placeholder,
-}: {
-  label: string;
-  recipients: { pubkey: string; name: string }[];
-  text: string;
-  onTextChange: (value: string) => void;
-  onAdd: () => void;
-  placeholder: string;
-}) {
-  const isSending = useComposeStore((s) => s.status === "sending");
-
-  return (
-    <div className="flex items-start gap-3 px-5 py-2 border-b border-modal-stroke">
-      <span className="text-[12px] font-medium text-text-modal-2 pt-1">{label}</span>
-      <div className="flex-1 flex flex-wrap items-center gap-1.5">
-        {recipients.map((r) => (
-          <span
-            key={r.pubkey}
-            className="h-7 px-2.5 rounded-pill bg-pill-subtle border border-modal-stroke text-text-modal-2 text-[12px] font-medium leading-[26px]"
-          >
-            {r.name}
-          </span>
-        ))}
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          onBlur={onAdd}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === ",") {
-              e.preventDefault();
-              onAdd();
-            }
-          }}
-          placeholder={placeholder}
-          className="min-w-[180px] flex-1 bg-transparent border-none outline-none text-[13px] text-text-modal placeholder-text-placeholder"
-          disabled={isSending}
-        />
-      </div>
-    </div>
-  );
-});
-
-const AttachmentCards = memo(function AttachmentCards({
-  uploads,
-  onRemove,
-}: {
-  uploads: UploadItem[];
-  onRemove: (id: string, fileName: string) => void;
-}) {
-  if (uploads.length === 0) return null;
-
-  return (
-    <div className="px-5 pb-2 flex flex-col gap-2">
-      {uploads.map((u) => (
-        <div key={u.id} className="flex items-center gap-3 h-[74px] px-3 border border-modal-stroke rounded-pill bg-modal-attach">
-          <div className="w-12 h-14 rounded-[8px] bg-pill-subtle flex items-center justify-center flex-shrink-0">
-            <File size={18} className="text-text-tertiary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-semibold text-text-modal truncate">{u.fileName}</p>
-            <p className="text-[10px] text-text-tertiary mt-0.5">
-              {formatSize(u.sizeBytes)}
-              {u.status === "uploading" && ` · Uploading ${u.progress}%`}
-              {u.status === "uploaded" && " · Encrypted · Stored in Drive"}
-              {u.status === "failed" && ` · Failed: ${u.error}`}
-            </p>
-            {u.status === "uploading" && (
-              <div className="w-full h-[3px] bg-pill-subtle rounded-progress mt-1">
-                <div className="h-full bg-ok rounded-progress" style={{ width: `${u.progress}%` }} />
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => onRemove(u.id, u.fileName)}
-            className="text-text-modal-2 cursor-pointer hover:text-text-modal"
-          ><X size={15} /></button>
-        </div>
-      ))}
-    </div>
-  );
-});
 
 export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -265,17 +95,11 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     }
   }, [status, onClose]);
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (status !== "composing") return;
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        void send();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [status, send]);
+  useHotkeys("meta+enter,ctrl+enter", (e) => {
+    if (status !== "composing") return;
+    e.preventDefault();
+    void send();
+  }, { enableOnFormTags: true }, [status, send]);
 
   const handleClose = useCallback(() => {
     if (to.length > 0 || !!subject || !!body) {
@@ -300,45 +124,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     }
   }, [to, subject, body, handleDiscard]);
 
-  const parseRecipient = useCallback(async (value: string) => {
-    let pubkey = value;
-    let npub = value;
-
-    if (value.startsWith("npub1")) {
-      const { decode } = await import("nostr-tools/nip19");
-      const decoded = decode(value);
-      if (decoded.type !== "npub") throw new Error("Expected an npub");
-      pubkey = decoded.data;
-      npub = value;
-    } else if (value.includes("@") && !value.startsWith("npub1")) {
-      const { resolveNip05 } = await import("@post/nostr-core");
-      const result = await resolveNip05(value);
-      if (!result) throw new Error("NIP-05 lookup failed for this address");
-      pubkey = result.pubkey;
-      npub = result.pubkey;
-      const { npubEncode } = await import("nostr-tools/nip19");
-      npub = npubEncode(result.pubkey);
-      return {
-        pubkey,
-        npub,
-        name: value,
-        avatarUrl: "",
-        isGroup: false,
-      };
-    }
-
-    if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
-      throw new Error("Enter a 64-character pubkey, npub, or NIP-05 address");
-    }
-
-    return {
-      pubkey,
-      npub,
-      name: value.startsWith("npub1") ? `${value.slice(0, 12)}…` : `${pubkey.slice(0, 8)}…`,
-      avatarUrl: "",
-      isGroup: false,
-    };
-  }, []);
+  const parseRecipient = useCallback((value: string) => parseRecipientEntry(value), []);
 
   const addRecipientFromText = useCallback(async () => {
     const value = recipientText.trim();
@@ -355,7 +141,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     }
   }, [bcc, cc, to, parseRecipient, recipientText, updateRecipients]);
 
-  const selectContact = useCallback((contact: ReturnType<typeof useContactsStore.getState>["contacts"][number]) => {
+  const selectContact = useCallback((contact: { pubkey: string; npub: string; name: string; picture?: string }) => {
     updateRecipients(
       [...to, { pubkey: contact.pubkey, npub: contact.npub, name: contact.name, avatarUrl: contact.picture || "", isGroup: false }],
       cc,
@@ -405,12 +191,11 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     onProgress: (id: string, pct: number) => void,
     onDone: (id: string, status: "uploaded" | "failed", error?: string) => void
   ) => {
-    const id = crypto.randomUUID();
+    const id = generateId();
     addAttachment(file);
     onProgress(id, 0);
 
     try {
-      const { encryptAttachment } = await import("@post/nostr-core");
       const { ciphertext, fileKey, fileIv } = await encryptAttachment(file);
       const ciphertextBytes = await ciphertext.arrayBuffer();
       const wrappedFile = new (window as any).File([ciphertextBytes], file.name, { type: "application/octet-stream" }) as File;
@@ -423,8 +208,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
           onProgress(id, pct);
         }
       });
-      result.fileKey = bytesToBase64(fileKey);
-      result.fileIv = bytesToBase64(fileIv);
+      result.fileKey = uint8ArrayToBase64(fileKey);
+      result.fileIv = uint8ArrayToBase64(fileIv);
       result.encrypted = true;
       onDone(id, "uploaded");
     } catch (err) {
@@ -443,18 +228,16 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const processFiles = useCallback(async (files: File[]) => {
     setShowUploadOverlay(true);
 
-    const { createKeyStore } = await import("@post/nostr-core");
     const keyStore = createKeyStore();
     const identity = keyStore.load();
     if (!identity?.nsec) return;
 
-    const { decode } = await import("nostr-tools/nip19");
     const nsecDecoded = decode(identity.nsec);
     if (nsecDecoded.type !== "nsec") return;
     const sk = nsecDecoded.data;
 
     const results: UploadItem[] = files.map((file) => ({
-      id: crypto.randomUUID(),
+      id: generateId(),
       fileName: file.name,
       sizeBytes: file.size,
       progress: 0,
@@ -507,19 +290,13 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     await Promise.all(workers);
   }, [uploadSingleFile, updateAttachment]);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      void processFiles(files);
-    }
-  }, [processFiles]);
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: useCallback((acceptedFiles: File[]) => {
+      void processFiles(acceptedFiles);
+    }, [processFiles]),
+    noClick: true,
+    noKeyboard: true,
+  });
 
   const applyFormat = useCallback((prefix: string, suffix = "", fallback = "") => {
     if (!textareaRef.current) return;
@@ -597,9 +374,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       <Dialog.Popup className="fixed z-50 animate-[composeOpen_250ms_ease-out]" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 730, height: 784 }}>
         <div className="w-full h-full rounded-[24px]" style={{ boxShadow: "0 20px 40px 0 rgba(0,0,0,0.5)" }}>
           <div
-            className="w-full h-full rounded-[20px] bg-modal-card border border-modal-stroke flex flex-col overflow-hidden"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
+            {...getRootProps()}
+            className={`w-full h-full rounded-[20px] bg-modal-card border border-modal-stroke flex flex-col overflow-hidden ${isDragActive ? "ring-2 ring-brand" : ""}`}
           >
             <ComposeHeader onRequestClose={handleClose} />
 

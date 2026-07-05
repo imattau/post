@@ -2,38 +2,17 @@ import { nip44 } from "nostr-tools";
 import { getPublicKey } from "nostr-tools/pure";
 import { decode } from "nostr-tools/nip19";
 import type { Identity, EncryptedBlobMetadata, DriveFile, DriveFolder } from "./types";
+import { toBase64, fromBase64, asArrayBuffer } from "./utils/base64";
 
 const DRIVE_INFO = new TextEncoder().encode("post-drive-v1");
 const AES_GCM = { name: "AES-GCM", length: 256 } as const;
 const HKDF = { name: "HKDF", hash: "SHA-256" } as const;
-
-function toBase64(bytes: ArrayBuffer | Uint8Array): string {
-  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  if (typeof btoa === "function") {
-    let binary = "";
-    for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i]);
-    return btoa(binary);
-  }
-  return Buffer.from(view).toString("base64");
-}
-
-function fromBase64(value: string): Uint8Array {
-  if (typeof atob !== "function") return new Uint8Array(Buffer.from(value, "base64"));
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
 
 function requireSecretKey(identity: Identity): Uint8Array {
   if (!identity.nsec) throw new Error("Cannot encrypt drive file");
   const decoded = decode(identity.nsec);
   if (decoded.type !== "nsec") throw new Error("Cannot encrypt drive file");
   return decoded.data;
-}
-
-function asArrayBuffer(view: Uint8Array): ArrayBuffer {
-  return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer;
 }
 
 async function deriveMasterKey(secretKey: Uint8Array, salt: Uint8Array): Promise<CryptoKey> {
@@ -186,7 +165,7 @@ export function parseFileMetadataEvent(event: {
     sizeBytes: parseInt(sizeStr, 10) || 0,
     createdAt,
     updatedAt: createdAt,
-    modifiedLabel: new Date(createdAt).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }),
+    modifiedLabel: new Date(createdAt).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }),
     ownerName: event.pubkey.slice(0, 8),
     ownerInitials: event.pubkey.slice(0, 2).toUpperCase(),
     source: "blossom",
