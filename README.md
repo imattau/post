@@ -8,9 +8,9 @@ Post is an **enterprise productivity suite for the Nostr protocol**. It combines
 
 ## Screenshots
 
-| Mail — Inbox | Calendar | Contacts |
-|:---:|:---:|:---:|
-| ![Inbox](public/screenshots/mail-inbox.png) | ![Calendar](public/screenshots/calendar.png) | ![Contacts](public/screenshots/contacts.png) |
+| Mail — Inbox | Calendar | Contacts | Drive |
+|:---:|:---:|:---:|:---:|
+| ![Inbox](public/screenshots/mail-inbox.png) | ![Calendar](public/screenshots/calendar.png) | ![Contacts](public/screenshots/contacts.png) | ![Drive](public/screenshots/drive.png) |
 
 | Welcome / onboarding | Settings & relays | Passkey sign-in |
 |:---:|:---:|:---:|
