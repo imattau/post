@@ -25,14 +25,20 @@ interface UploadItem {
 
 const CONCURRENCY_LIMIT = 3;
 
-const ComposeHeader = memo(function ComposeHeader() {
+const ComposeHeader = memo(function ComposeHeader({ onRequestClose }: { onRequestClose: () => void }) {
   const status = useComposeStore((s) => s.status);
   const savedAt = useComposeStore((s) => s.draft.savedAt);
   const minimize = useComposeStore((s) => s.minimize);
-  const requestDiscard = useComposeStore((s) => s.discard);
-  const onClose = useComposeStore((s) => s.close);
 
   const isSending = status === "sending";
+
+  const handleMinimize = useCallback(() => {
+    minimize();
+  }, [minimize]);
+
+  const handleClose = useCallback(() => {
+    onRequestClose();
+  }, [onRequestClose]);
 
   return (
     <div className="flex items-center justify-between px-5 py-3 border-b border-modal-stroke">
@@ -46,14 +52,14 @@ const ComposeHeader = memo(function ComposeHeader() {
       </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={minimize}
+          onClick={handleMinimize}
           disabled={isSending}
           className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
         >
           <Minus size={15} className="text-text-modal-2" />
         </button>
         <button
-          onClick={requestDiscard}
+          onClick={handleClose}
           disabled={isSending}
           className="w-[30px] h-[30px] rounded-[8px] bg-modal-2 border border-modal-stroke flex items-center justify-center cursor-pointer hover:brightness-110 transition-all duration-150 disabled:opacity-40"
         >
@@ -590,7 +596,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
             onDrop={handleDrop}
             onDragOver={handleDragOver}
           >
-            <ComposeHeader />
+            <ComposeHeader onRequestClose={handleClose} />
 
             {/* To field */}
             <div className="flex items-start gap-3 px-5 py-3 border-b border-modal-stroke">
