@@ -1,9 +1,10 @@
+import { memo } from "react";
 import type { MockMessage } from "@/lib/mock/threads";
 import { Check, CheckCheck, X, Reply } from "lucide-react";
-import { formatRelativeTime } from "@/lib/utils";
+import RelativeTime from "./RelativeTime";
 import Avatar from "./Avatar";
 
-export default function MessageRow({
+function MessageRow({
   message,
   selected,
   onClick,
@@ -56,7 +57,7 @@ export default function MessageRow({
           {message.deliveryStatus === "delivered" && <CheckCheck size={12} className="text-ok flex-shrink-0" />}
           {message.deliveryStatus === "failed" && <X size={12} className="text-danger flex-shrink-0" />}
           <span className={`ml-auto text-[11px] flex-shrink-0 ${!message.read ? "font-semibold text-white" : "text-text-tertiary"}`}>
-            {formatRelativeTime(message.createdAt)}
+            <RelativeTime ts={message.createdAt} />
           </span>
         </div>
         <p
@@ -83,3 +84,22 @@ export default function MessageRow({
     </div>
   );
 }
+
+export default memo(MessageRow, (prev, next) => {
+  if (prev.selected !== next.selected) return false;
+  if (prev.batchMode !== next.batchMode) return false;
+  if (prev.batchSelected !== next.batchSelected) return false;
+  if (prev.message.id !== next.message.id) return false;
+  if (prev.message.read !== next.message.read) return false;
+  if (prev.message.starred !== next.message.starred) return false;
+  if (prev.message.deliveryStatus !== next.message.deliveryStatus) return false;
+  if (prev.message.createdAt !== next.message.createdAt) return false;
+  if (prev.message.subject !== next.message.subject) return false;
+  if (prev.message.preview !== next.message.preview) return false;
+  if (prev.message.sender.name !== next.message.sender.name) return false;
+  if (prev.message.sender.avatarInitials !== next.message.sender.avatarInitials) return false;
+  if (prev.message.labels.length !== next.message.labels.length) return false;
+  if (prev.message.labels.some((l, i) => l !== next.message.labels[i])) return false;
+  if (prev.message.replyTo !== next.message.replyTo) return false;
+  return true;
+});

@@ -1,16 +1,22 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useLayoutEffect } from "react";
+import dynamic from "next/dynamic";
+import { useComposeStore } from "@/lib/stores/compose";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useMessagesStore } from "@/lib/stores/messages";
 import { useMailboxStore } from "@/lib/stores/mailboxes";
+import { useSettingsStore } from "@/lib/stores/settings";
 import { useMailboxMessages } from "../_components/useMailboxMessages";
 import { getThreadMessages } from "@/lib/thread";
 import Sidebar from "./Sidebar";
 import RelayBanner from "./RelayBanner";
 import ReadingPane from "@/components/ReadingPane";
-import ComposeModal from "@/components/ComposeModal";
+const ComposeModal = dynamic(() => import("@/components/ComposeModal"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function MailContent({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
@@ -35,7 +41,6 @@ export default function MailContent({ children }: { children: React.ReactNode })
   );
 
   const draftCount = useMailboxStore((s) => s.unreadCounts.drafts);
-  const messageById = useMessagesStore((s) => s.byId);
   const startSnoozeWatcher = useMessagesStore((s) => s.startSnoozeWatcher);
   const markRead = useMessagesStore((s) => s.markRead);
   const markUnread = useMessagesStore((s) => s.markUnread);
@@ -46,6 +51,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
   const deleteMessage = useMessagesStore((s) => s.deleteMessage);
 
   const refreshUnreadCounts = useMailboxStore((s) => s.refreshUnreadCounts);
+  const updateStatuses = useRelaysStore((s) => s.updateStatuses);
   const relayStatuses = useRelaysStore((s) => s.statuses);
   const healthPercent = useRelaysStore((s) => s.healthPercent);
   const syncedAgo = useRelaysStore((s) => s.syncedAgo);
@@ -117,21 +123,34 @@ export default function MailContent({ children }: { children: React.ReactNode })
     return () => document.removeEventListener("keydown", handler);
   }, [selectedMessage, composeOpen, clearSelection, router, pathname, handleToggleRead, handleDelete]);
 
+  const markReadOnScroll = useSettingsStore((s) => (s.values["mark-read-scroll"] ?? true) as boolean);
+
   useEffect(() => {
-    if (selectedMessage && !selectedMessage.read) {
+    if (selectedMessage && !selectedMessage.read && markReadOnScroll) {
       markRead(selectedMessage.id);
     }
-  }, [selectedMessage, markRead]);
+  }, [selectedMessage, markRead, markReadOnScroll]);
 
   useEffect(() => {
     const cleanup = startSnoozeWatcher();
     return cleanup;
   }, [startSnoozeWatcher]);
 
+  useEffect(() => {
+    const interval = setInterval(() => void updateStatuses(), 30_000);
+    return () => clearInterval(interval);
+  }, [updateStatuses]);
+
   const messageCount = useMessagesStore((s) => s.ids.length);
   useEffect(() => {
     refreshUnreadCounts();
   }, [messageCount, refreshUnreadCounts]);
+
+  useLayoutEffect(() => {
+    if (composeOpen) {
+      useComposeStore.getState().open();
+    }
+  }, [composeOpen]);
 
   return (
     <>
@@ -155,7 +174,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
           <ReadingPane
             message={selectedMessage}
             starred={selectedMessage.starred}
-            spam={messageById[selectedMessage.id]?.spam ?? currentMailbox === "spam"}
+            spam={messagesById[selectedMessage.id]?.spam ?? currentMailbox === "spam"}
             onBack={clearSelection}
             onToggleStar={() => handleToggleStar(selectedMessage.id)}
             onArchive={() => handleArchive(selectedMessage.id)}
