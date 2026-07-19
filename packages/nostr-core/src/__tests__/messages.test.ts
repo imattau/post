@@ -7,7 +7,7 @@ import { nip44 } from "nostr-tools";
 function makeKeys(sk: Uint8Array) {
   const pubkey = getPublicKey(sk);
   return {
-    load: vi.fn(() => ({
+    load: vi.fn(async () => ({
       npub: "npub1test",
       nsec: nsecEncode(sk),
       pubkey,

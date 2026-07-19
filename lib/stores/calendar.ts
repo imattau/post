@@ -4,6 +4,10 @@ import { db } from "@/lib/db/schema";
 import { CALENDARS, CALENDAR_EVENTS, CALENDAR_MONTH, CALENDAR_SELECTED_DAY, CALENDAR_SYNC } from "@/lib/mock/calendar";
 import { generateId } from "@/lib/utils";
 import type { CalendarCalendar, CalendarEvent, CalendarSyncState, CalendarViewMode } from "@/lib/types";
+import { publishCalendarEvent, deleteCalendarEvent as deleteCalendarEventOnRelay } from "@/lib/calendar";
+import { useIdentityStore } from "@/lib/stores/identity";
+import { useRelaysStore } from "@/lib/stores/relays";
+import { useSettingsStore } from "@/lib/stores/settings";
 
 interface CalendarState {
   calendars: CalendarCalendar[];
@@ -37,7 +41,9 @@ function recomputeSync(calendars: CalendarCalendar[], events: CalendarEvent[]): 
   const pendingInvitations = events.filter(
     (e) => e.invitation === "pending" || e.invitation === "maybe"
   ).length;
-  return { syncedCalendars, pendingInvitations, healthyRelays: 5, updatedAt: Date.now() };
+  const statuses = useRelaysStore.getState().statuses;
+  const healthyRelays = Object.values(statuses).filter((s) => s.connected).length || 5;
+  return { syncedCalendars, pendingInvitations, healthyRelays, updatedAt: Date.now() };
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
@@ -148,6 +154,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const events = [...get().events, created].sort((a, b) => a.startAt - b.startAt);
       set({ events, sync: recomputeSync(get().calendars, events), selectedEventId: created.id });
       await db.calendarEvents.put(created);
+      const identity = useIdentityStore.getState().identity;
+      const pool = useRelaysStore.getState().pool;
+      if (identity && pool) {
+        publishCalendarEvent(created, identity, pool).catch(() => {});
+      }
       return created;
     } catch (err) {
       console.error("Failed to create event:", err);
@@ -164,6 +175,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const updated = events.find((event) => event.id === eventId);
       if (!updated) return;
       await db.calendarEvents.put(updated);
+      const identity = useIdentityStore.getState().identity;
+      const pool = useRelaysStore.getState().pool;
+      if (identity && pool) {
+        publishCalendarEvent(updated, identity, pool).catch(() => {});
+      }
     } catch (err) {
       console.error("Failed to update event:", err);
       set({ error: "Failed to update event" });
@@ -176,6 +192,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const events = get().events.filter((event) => event.id !== eventId);
       set({ events, sync: recomputeSync(get().calendars, events), selectedEventId: get().selectedEventId === eventId ? null : get().selectedEventId });
       await db.calendarEvents.delete(eventId);
+      const identity = useIdentityStore.getState().identity;
+      const pool = useRelaysStore.getState().pool;
+      if (identity && pool) {
+        deleteCalendarEventOnRelay(eventId, identity, pool).catch(() => {});
+      }
     } catch (err) {
       console.error("Failed to delete event:", err);
       set({ error: "Failed to delete event" });

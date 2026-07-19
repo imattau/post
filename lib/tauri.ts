@@ -1,5 +1,6 @@
 import type { Identity } from "@post/nostr-core";
 import type { KeyStore } from "@post/nostr-core";
+import { nsecEncode } from "nostr-tools/nip19";
 import { generateId } from "@/lib/utils";
 
 declare global {
@@ -47,14 +48,36 @@ const SESSION_KEY = "nostr-identity";
 
 export function createTauriKeyStore(): KeyStore {
   let cached: Identity | null = null;
+  let nsecPromise: Promise<string | null> | null = null;
 
   return {
-    load(): Identity | null {
+    async load(): Promise<Identity | null> {
       if (cached) return cached;
       try {
         const raw = localStorage.getItem(SESSION_KEY);
         if (!raw) return null;
         cached = JSON.parse(raw) as Identity;
+
+        if (!cached.nsec) {
+          if (!nsecPromise) {
+            nsecPromise = (async () => {
+              try {
+                const { store } = await getStrongholdStore();
+                const data = await store.get("nostr-nsec") as number[] | null;
+                if (data && data.length > 0) {
+                  const sk = new Uint8Array(data);
+                  return nsecEncode(sk);
+                }
+              } catch {}
+              return null;
+            })();
+          }
+          const nsec = await nsecPromise;
+          if (nsec) {
+            cached = { ...cached, nsec };
+          }
+        }
+
         return cached;
       } catch {
         return null;

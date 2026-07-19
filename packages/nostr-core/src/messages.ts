@@ -94,7 +94,7 @@ export async function sendMessage(
   keys: KeyStore,
   opts: SendOptions
 ): Promise<SendResult> {
-  const identity = keys.load();
+  const identity = await keys.load();
   if (!identity || !identity.nsec) throw new Error("Cannot send message");
 
   const nsecDecoded = decode(identity.nsec);
@@ -158,7 +158,7 @@ export async function decryptEvent(
   event: Event,
   keys: KeyStore
 ): Promise<string> {
-  const identity = keys.load();
+  const identity = await keys.load();
   if (!identity || !identity.nsec) throw new Error("Cannot decrypt message");
 
   const nsecDecoded = decode(identity.nsec);
@@ -169,7 +169,7 @@ export async function decryptEvent(
   return nip44.v2.decrypt(event.content, conversationKey);
 }
 
-function extractSubject(event: Event): string {
+export function extractSubject(event: Event): string {
   const subjectTag = event.tags.find((t) => t[0] === "subject");
   if (subjectTag?.[1]) return subjectTag[1];
   const lines = event.content.split("\n").filter(Boolean);
@@ -180,12 +180,12 @@ function extractPreview(content: string): string {
   return content.replace(/\n/g, " ").slice(0, 120);
 }
 
-export function decryptIncoming(
+export async function decryptIncoming(
   pool: RelayPool,
   keys: KeyStore,
   onMessage: (msg: Message) => void
-): () => void {
-  const identity = keys.load();
+): Promise<() => void> {
+  const identity = await keys.load();
   if (!identity || !identity.nsec) throw new Error("Cannot decrypt message");
 
   const nsecDecoded = decode(identity.nsec);

@@ -73,7 +73,7 @@ const AttachmentCard = memo(function AttachmentCard({
       const { decryptAttachment, downloadBlob } = await import("@post/nostr-core");
       const { createKeyStore } = await import("@post/nostr-core");
       const keyStore = createKeyStore();
-      const identity = keyStore.load();
+      const identity = await keyStore.load();
       if (!identity?.nsec) return;
       const { decode } = await import("nostr-tools/nip19");
       const decoded = decode(identity.nsec);

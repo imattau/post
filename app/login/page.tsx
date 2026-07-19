@@ -21,7 +21,7 @@ export default function WelcomePage() {
     setNip07Available(typeof window !== "undefined" && !!window.nostr);
     setInTauri(isTauri());
     const keyStore = isTauri() ? createTauriKeyStore() : createKeyStore();
-    setExistingIdentity(keyStore.load());
+    keyStore.load().then(setExistingIdentity);
   }, []);
 
   const handleTauriCreate = async () => {

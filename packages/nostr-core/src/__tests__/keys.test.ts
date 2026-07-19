@@ -96,9 +96,9 @@ describe("KeyStore", () => {
     localStorage.clear();
   });
 
-  it("load returns null when no identity stored", () => {
+  it("load returns null when no identity stored", async () => {
     const store = createKeyStore();
-    expect(store.load()).toBeNull();
+    await expect(store.load()).resolves.toBeNull();
   });
 
   it("save persists identity to localStorage", () => {
@@ -118,7 +118,7 @@ describe("KeyStore", () => {
     );
   });
 
-  it("load retrieves saved identity", () => {
+  it("load retrieves saved identity", async () => {
     const store = createKeyStore();
     const identity = {
       npub: "npub1test",
@@ -129,11 +129,11 @@ describe("KeyStore", () => {
       profile: null,
     };
     store.save(identity);
-    const loaded = store.load();
+    const loaded = await store.load();
     expect(loaded).toEqual(identity);
   });
 
-  it("clear removes identity from storage and cache", () => {
+  it("clear removes identity from storage and cache", async () => {
     const store = createKeyStore();
     store.save({
       npub: "npub1test",
@@ -144,7 +144,7 @@ describe("KeyStore", () => {
       profile: null,
     });
     store.clear();
-    expect(store.load()).toBeNull();
+    await expect(store.load()).resolves.toBeNull();
     expect(localStorage.removeItem).toHaveBeenCalledWith("nostr-identity");
   });
 });

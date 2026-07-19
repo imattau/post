@@ -229,7 +229,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     setShowUploadOverlay(true);
 
     const keyStore = createKeyStore();
-    const identity = keyStore.load();
+    const identity = await keyStore.load();
     if (!identity?.nsec) return;
 
     const nsecDecoded = decode(identity.nsec);

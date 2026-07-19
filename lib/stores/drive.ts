@@ -532,9 +532,6 @@ async function publishFolderEvent(folder: DriveFolder): Promise<void> {
 
     const encryptedContent = encryptContentForOwner(eventTemplate.content, sk);
     eventTemplate.content = encryptedContent;
-    // Replace plaintext title tag with encrypted content
-    const titleIdx = eventTemplate.tags.findIndex((t) => t[0] === "title");
-    if (titleIdx >= 0) eventTemplate.tags[titleIdx] = ["title", encryptedContent];
     eventTemplate.tags.push(["content-encryption", "nip44-v2"]);
 
     const signedEvent = finalizeEvent(eventTemplate, sk);

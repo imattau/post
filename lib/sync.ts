@@ -1,5 +1,5 @@
 import type { RelayPool } from "@post/nostr-core";
-import { decryptEvent, createKeyStore, parseMessagePayloadAndUnwrap } from "@post/nostr-core";
+import { decryptEvent, createKeyStore, parseMessagePayloadAndUnwrap, extractSubject } from "@post/nostr-core";
 import type { Message } from "@post/nostr-core";
 import { nip17 } from "nostr-tools";
 import type { NostrEvent } from "nostr-tools";
@@ -27,7 +27,7 @@ function buildMessage(
     raw: source.content,
     createdAt: source.created_at,
     tags: source.tags,
-    subject: subject ?? extractSubject(source.tags, body),
+    subject: subject ?? extractSubject({ tags: source.tags, content: source.content } as any),
     preview: body.replace(/\n/g, " ").slice(0, 120),
     read: false,
     starred: false,
@@ -45,9 +45,9 @@ function buildMessage(
   };
 }
 
-function loadSk(): Uint8Array | null {
+async function loadSk(): Promise<Uint8Array | null> {
   const keyStore = createKeyStore();
-  const identity = keyStore.load();
+  const identity = await keyStore.load();
   if (!identity?.nsec) return null;
   const decoded = decode(identity.nsec);
   if (decoded.type !== "nsec") return null;
@@ -58,7 +58,7 @@ async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
   try {
     const keyStore = createKeyStore();
     const plaintext = await decryptEvent(event, keyStore);
-    const sk = loadSk();
+    const sk = await loadSk();
     const { body, subject, attachments } = sk
       ? parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey)
       : { body: plaintext, subject: undefined, attachments: [] };
@@ -73,7 +73,7 @@ async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
 
 async function handleKind1059(event: NostrEvent, identity: { pubkey: string }) {
   try {
-    const storedIdentity = createKeyStore().load();
+    const storedIdentity = await createKeyStore().load();
     if (!storedIdentity?.nsec) return;
 
     const nsecDecoded = decode(storedIdentity.nsec);
@@ -92,12 +92,12 @@ async function handleKind1059(event: NostrEvent, identity: { pubkey: string }) {
   }
 }
 
-export function startSync() {
+export async function startSync() {
   const pool = useRelaysStore.getState().pool;
   if (!pool) return;
 
   const keyStore = createKeyStore();
-  const identity = keyStore.load();
+  const identity = await keyStore.load();
 
   if (!identity?.pubkey) return;
 
@@ -135,13 +135,6 @@ export function stopSync() {
     unsubscribe();
     unsubscribe = null;
   }
-}
-
-function extractSubject(tags: string[][], plaintext: string): string {
-  const subjectTag = tags.find((t) => t[0] === "subject");
-  if (subjectTag?.[1]) return subjectTag[1];
-  const lines = plaintext.split("\n").filter(Boolean);
-  return lines[0]?.slice(0, 80) ?? "(no subject)";
 }
 
 export async function loadCachedMessages(): Promise<void> {

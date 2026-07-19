@@ -38,17 +38,25 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       set({ contacts: SEED_CONTACTS });
       return;
     }
+    const colors = ["var(--color-avatar-1)", "var(--color-avatar-2)", "var(--color-avatar-3)", "var(--color-avatar-4)", "var(--color-avatar-5)", "var(--color-avatar-6)"];
     set({
-      contacts: stored.map((contact, index) => ({
-        ...SEED_CONTACTS[index % SEED_CONTACTS.length],
-        ...contact,
+      contacts: stored.map((contact) => ({
         id: contact.pubkey,
+        pubkey: contact.pubkey,
+        npub: contact.npub,
+        name: contact.name,
+        about: contact.about || "",
+        picture: contact.picture || "",
+        nip05: contact.nip05 || "",
+        nip05Verified: contact.nip05Verified,
+        lastMessageAt: contact.lastMessageAt,
+        relayRecommended: contact.relayRecommended || "",
         initials: contact.name.slice(0, 2).toUpperCase(),
         handle: contact.nip05 ? `@${contact.nip05.split("@")[0]}` : `@${contact.name.toLowerCase().replace(/\s+/g, "")}`,
-        bio: contact.about,
+        bio: contact.about || "",
         status: ((contact as ContactView).status ?? "Following") as ContactStatus,
         timestamp: contact.lastMessageAt ? new Date(contact.lastMessageAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "",
-        color: SEED_CONTACTS[index % SEED_CONTACTS.length].color,
+        color: colors[Math.abs(contact.name.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % colors.length],
       })),
     });
   },

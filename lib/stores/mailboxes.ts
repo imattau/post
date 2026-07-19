@@ -34,7 +34,7 @@ export const useMailboxStore = create<MailboxState>((set) => ({
     const now = Date.now();
     const all = ids.map((id) => byId[id]).filter(Boolean);
     const inboxUnread = all.filter((m) => !m!.archived && !m!.spam && m!.snoozedUntil === null && !m!.read).length;
-    const starred = all.filter((m) => m!.starred).length;
+    const starred = all.filter((m) => m!.starred && !m!.archived && !m!.spam).length;
     const snoozed = all.filter((m) => m!.snoozedUntil !== null && m!.snoozedUntil > now).length;
     const sent = all.filter((m) => m!.mailbox === "sent").length;
     const archive = all.filter((m) => m!.archived).length;

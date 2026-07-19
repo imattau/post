@@ -50,7 +50,7 @@ export function formatNpub(npub: string): string {
 }
 
 export interface KeyStore {
-  load(): Identity | null;
+  load(): Promise<Identity | null>;
   save(identity: Identity): void;
   clear(): void;
 }
@@ -61,7 +61,7 @@ export function createKeyStore(): KeyStore {
   let cached: Identity | null = null;
 
   return {
-    load(): Identity | null {
+    async load(): Promise<Identity | null> {
       if (cached) return cached;
       try {
         const raw = localStorage.getItem(SESSION_KEY);

@@ -34,10 +34,12 @@ interface IdentityState {
   identity: Identity | null;
   keyStore: ReturnType<typeof createKeyStore> | null;
   usingNip07: boolean;
+  usingNip46: boolean;
   usingPasskey: boolean;
   nip07Available: boolean;
   isNewUser: boolean;
   passkeySigner: PasskeySignerWrapper | null;
+  nip46Signer: { getPublicKey(): Promise<string>; signEvent(e: any): Promise<{ sig: string }> } | null;
   needsPasskeyReauth: boolean;
   setIdentity: (identity: Identity) => void;
   createOrImport: (nsec?: string, storeNsec?: boolean) => Promise<Identity>;
@@ -62,10 +64,12 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   identity: null,
   keyStore: null,
   usingNip07: false,
+  usingNip46: false,
   usingPasskey: false,
   nip07Available: typeof window !== "undefined" && !!window.nostr,
   isNewUser: false,
   passkeySigner: null,
+  nip46Signer: null,
   needsPasskeyReauth: false,
 
   setIdentity(identity: Identity) {
@@ -99,7 +103,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
     keyStore.save(identity);
     const method = nsec ? "existing-key" : "os-keychain";
     try { localStorage.setItem(LAST_METHOD_KEY, method); } catch {}
-    set({ identity, keyStore, usingNip07: false, usingPasskey: false, passkeySigner: null, needsPasskeyReauth: false, isNewUser: !nsec });
+    set({ identity, keyStore, usingNip07: false, usingNip46: false, usingPasskey: false, passkeySigner: null, nip46Signer: null, needsPasskeyReauth: false, isNewUser: !nsec });
     return identity;
   },
 
@@ -121,7 +125,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
     const keyStore = createKeyStore();
     keyStore.save(identity);
     try { localStorage.setItem(LAST_METHOD_KEY, "nip07"); } catch {}
-    set({ identity, keyStore, usingNip07: true, usingPasskey: false, passkeySigner: null, needsPasskeyReauth: false, isNewUser: false });
+    set({ identity, keyStore, usingNip07: true, usingNip46: false, usingPasskey: false, passkeySigner: null, nip46Signer: null, needsPasskeyReauth: false, isNewUser: false });
     return identity;
   },
 
@@ -153,7 +157,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       destroy: () => shim.destroy(),
     };
     try { localStorage.setItem(LAST_METHOD_KEY, "passkey"); } catch {}
-    set({ identity, keyStore, usingPasskey: true, usingNip07: false, passkeySigner, needsPasskeyReauth: false, isNewUser: true });
+    set({ identity, keyStore, usingPasskey: true, usingNip07: false, usingNip46: false, passkeySigner, nip46Signer: null, needsPasskeyReauth: false, isNewUser: true });
     return identity;
   },
 
@@ -163,7 +167,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
     const npub = npubEncode(pubkey);
 
     const keyStore = getKeyStore();
-    let existing = keyStore.load();
+    let existing = await keyStore.load();
     if (existing && existing.pubkey !== pubkey) {
       existing = null;
     }
@@ -184,7 +188,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       destroy: () => shim.destroy(),
     };
     try { localStorage.setItem(LAST_METHOD_KEY, "passkey"); } catch {}
-    set({ identity, keyStore, usingPasskey: true, usingNip07: false, passkeySigner, needsPasskeyReauth: false, isNewUser: !existing });
+    set({ identity, keyStore, usingPasskey: true, usingNip07: false, usingNip46: false, passkeySigner, nip46Signer: null, needsPasskeyReauth: false, isNewUser: !existing });
     return identity;
   },
 
@@ -206,25 +210,30 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       profile: null,
     };
 
+    const nip46Signer: IdentityState["nip46Signer"] = {
+      getPublicKey: () => signer.getPublicKey(),
+      signEvent: (e) => signer.signEvent(e),
+    };
+
     const keyStore = getKeyStore();
     keyStore.save(identity);
     try {
       localStorage.setItem(LAST_METHOD_KEY, "nip46");
       localStorage.setItem(NIP46_URI_KEY, uri);
     } catch {}
-    set({ identity, keyStore, usingNip07: false, usingPasskey: false, passkeySigner: null, needsPasskeyReauth: false, isNewUser: false });
+    set({ identity, keyStore, usingNip07: false, usingNip46: true, usingPasskey: false, passkeySigner: null, nip46Signer, needsPasskeyReauth: false, isNewUser: false });
     return identity;
   },
 
   async bootstrap(): Promise<void> {
     const keyStore = getKeyStore();
-    const identity = keyStore.load();
+    const identity = await keyStore.load();
     if (!identity) return;
 
     const lastMethod = (() => { try { return localStorage.getItem(LAST_METHOD_KEY); } catch { return null; } })();
 
     if (lastMethod === "nip07" && typeof window !== "undefined" && window.nostr) {
-      set({ identity, keyStore, usingNip07: true, needsPasskeyReauth: false });
+      set({ identity, keyStore, usingNip07: true, usingNip46: false, nip46Signer: null, needsPasskeyReauth: false });
     } else if (lastMethod === "nip46") {
       const uri = (() => { try { return localStorage.getItem(NIP46_URI_KEY); } catch { return null; } })();
       if (uri) {
@@ -235,20 +244,24 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
           const signer = await BunkerSigner.fromURI(clientSecretKey, uri);
           const pubkey = await signer.getPublicKey();
           if (pubkey === identity.pubkey) {
-            set({ identity, keyStore, usingNip07: false, usingPasskey: false, passkeySigner: null, needsPasskeyReauth: false });
+            const nip46Signer: IdentityState["nip46Signer"] = {
+              getPublicKey: () => signer.getPublicKey(),
+              signEvent: (e) => signer.signEvent(e),
+            };
+            set({ identity, keyStore, usingNip07: false, usingNip46: true, usingPasskey: false, passkeySigner: null, nip46Signer, needsPasskeyReauth: false });
           } else {
-            set({ identity, keyStore, needsPasskeyReauth: false });
+            set({ identity, keyStore, usingNip46: false, nip46Signer: null, needsPasskeyReauth: false });
           }
         } catch {
-          set({ identity, keyStore, needsPasskeyReauth: false });
+          set({ identity, keyStore, usingNip46: false, nip46Signer: null, needsPasskeyReauth: false });
         }
       } else {
-        set({ identity, keyStore, needsPasskeyReauth: false });
+        set({ identity, keyStore, usingNip46: false, nip46Signer: null, needsPasskeyReauth: false });
       }
     } else if (lastMethod === "passkey") {
-      set({ identity, keyStore, needsPasskeyReauth: true });
+      set({ identity, keyStore, usingNip46: false, nip46Signer: null, needsPasskeyReauth: true });
     } else {
-      set({ identity, keyStore, needsPasskeyReauth: false });
+      set({ identity, keyStore, usingNip46: false, nip46Signer: null, needsPasskeyReauth: false });
     }
   },
 
@@ -261,7 +274,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       localStorage.removeItem(LAST_METHOD_KEY);
       localStorage.removeItem(NIP46_URI_KEY);
     } catch {}
-    set({ identity: null, keyStore: null, usingNip07: false, usingPasskey: false, passkeySigner: null, needsPasskeyReauth: false, isNewUser: false });
+    set({ identity: null, keyStore: null, usingNip07: false, usingNip46: false, usingPasskey: false, passkeySigner: null, nip46Signer: null, needsPasskeyReauth: false, isNewUser: false });
   },
 
   async refreshProfile() {
@@ -318,6 +331,22 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       };
       const sig = await passkeySigner.signEvent(event);
       signedEvent = { ...event, sig, id: "" };
+    } else if (get().usingNip46 && get().nip46Signer) {
+      const pubkey = await get().nip46Signer!.getPublicKey();
+      const event = {
+        kind: 0,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: JSON.stringify({
+          name: profileData.username,
+          display_name: profileData.displayName,
+          about: profileData.about,
+          picture: profileData.picture,
+        }),
+        pubkey,
+      };
+      const sig = await get().nip46Signer!.signEvent(event);
+      signedEvent = { ...event, sig, id: "" };
     } else if (identity.nsec) {
       const nsecDecoded = decode(identity.nsec);
       if (nsecDecoded.type !== "nsec") throw new Error("Invalid nsec");
@@ -361,9 +390,15 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   },
 
   getSigner: () => {
-    const { usingNip07, usingPasskey, passkeySigner, identity } = get();
+    const { usingNip07, usingNip46, nip46Signer, usingPasskey, passkeySigner, identity } = get();
     if (usingNip07 && window.nostr) {
       return window.nostr;
+    }
+    if (usingNip46 && nip46Signer) {
+      return {
+        getPublicKey: async () => nip46Signer.getPublicKey(),
+        signEvent: async (event: any) => nip46Signer.signEvent(event),
+      } as Nip07Signer;
     }
     if (usingPasskey && passkeySigner) {
       return {

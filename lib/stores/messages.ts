@@ -19,7 +19,7 @@ interface MessagesState {
   toggleSpam: (id: string) => Promise<void>;
   snooze: (id: string, until: number) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
-  ingestFromRelay: (message: Message) => void;
+  ingestFromRelay: (message: Message) => Promise<void>;
   upsertMessage: (message: Message) => Promise<void>;
   startSnoozeWatcher: () => () => void;
 }
@@ -76,7 +76,12 @@ export const useMessagesStore = create<MessagesState>()(immer((set, get) => ({
     const { byId } = get();
     const msg = byId[id];
     if (!msg) return;
-    const updated = { ...msg, archived: !msg.archived, mailbox: (msg.archived ? "inbox" : "archive") as MailboxKind };
+    const becomingArchived = !msg.archived;
+    const updated = {
+      ...msg,
+      archived: becomingArchived,
+      mailbox: becomingArchived ? "archive" as MailboxKind : (msg.mailbox === "archive" ? "inbox" as MailboxKind : msg.mailbox),
+    };
     await db.messages.put(updated);
     set((state) => { state.byId[id] = updated; });
   },
@@ -85,7 +90,12 @@ export const useMessagesStore = create<MessagesState>()(immer((set, get) => ({
     const { byId } = get();
     const msg = byId[id];
     if (!msg) return;
-    const updated = { ...msg, spam: !msg.spam, mailbox: (msg.spam ? "inbox" : "spam") as MailboxKind };
+    const becomingSpam = !msg.spam;
+    const updated = {
+      ...msg,
+      spam: becomingSpam,
+      mailbox: becomingSpam ? "spam" as MailboxKind : (msg.mailbox === "spam" ? "inbox" as MailboxKind : msg.mailbox),
+    };
     await db.messages.put(updated);
     set((state) => { state.byId[id] = updated; });
   },
@@ -105,9 +115,10 @@ export const useMessagesStore = create<MessagesState>()(immer((set, get) => ({
     set((state) => { delete state.byId[id]; state.ids = state.ids.filter((i) => i !== id); });
   },
 
-  ingestFromRelay: (message: Message) => {
-    const { byId, ids } = get();
+  ingestFromRelay: async (message: Message) => {
+    const { byId } = get();
     if (byId[message.id]) return;
+    await db.messages.put(message);
     set((state) => { state.byId[message.id] = message; state.ids.unshift(message.id); });
   },
 

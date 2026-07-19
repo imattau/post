@@ -2,9 +2,11 @@ import type { RelayPool } from "../relays";
 
 export const SKIP = Symbol("skip");
 
+import type { Filter } from "nostr-tools/filter";
+
 export function subscribeSingle<T>(
   pool: RelayPool,
-  filters: any[],
+  filters: Filter[],
   onEvent: (event: any) => T | typeof SKIP,
   timeoutMs: number = 5000
 ): Promise<T | null> {
@@ -22,7 +24,7 @@ export function subscribeSingle<T>(
 
 export function subscribeAccumulate<T>(
   pool: RelayPool,
-  filters: any[],
+  filters: Filter[],
   onEvent: (event: any, acc: T[]) => void,
   timeoutMs: number = 5000
 ): Promise<T[]> {

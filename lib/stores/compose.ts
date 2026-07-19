@@ -178,7 +178,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
     try {
       const { draft, encrypted, giftWrap, relayOverrides, uploads } = get();
       const keyStore = createKeyStore();
-      const identity = keyStore.load();
+      const identity = await keyStore.load();
       if (!identity?.nsec) throw new Error("Cannot send message");
 
       if (draft.to.length === 0) throw new Error("Cannot send message");
@@ -193,48 +193,58 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         .filter((u): u is AttachmentUpload & { result: NonNullable<AttachmentUpload["result"]> } => u.status === "uploaded" && u.result !== null)
         .map((u) => u.result);
 
-      const result = await sendMessage(pool, keyStore, {
-        to: draft.to[0].pubkey,
-        content: draft.body,
-        subject: draft.subject || undefined,
-        attachments: attachments.length > 0 ? attachments : undefined,
-        replyTo: draft.replyTo ?? undefined,
-        relayOverrides: relayOverrides.length > 0 ? relayOverrides : undefined,
-        giftWrap,
-      });
-
+      let overallDelivered = 0;
       const now = Date.now();
-      const sentMessage = {
-        id: result.eventId || draft.id,
-        kind: giftWrap ? 1059 : 14,
-        pubkey: identity.pubkey,
-        recipientPubkey: draft.to[0].pubkey,
-        content: draft.body,
-        raw: "",
-        createdAt: now,
-        tags: draft.replyTo ? [["e", draft.replyTo]] : [],
-        subject: draft.subject || "(no subject)",
-        preview: draft.body.replace(/\n/g, " ").slice(0, 120),
-        read: true,
-        starred: false,
-        archived: false,
-        snoozedUntil: null,
-        spam: false,
-        mailbox: "sent" as const,
-        labelIds: [],
-        replyTo: draft.replyTo,
-        relayUrls: relayOverrides,
-        attachments,
-        isEncrypted: encrypted,
-        isGiftWrapped: giftWrap,
-        deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
-      };
-      await db.messages.put(sentMessage);
+
+      for (const recipient of draft.to) {
+        const result = await sendMessage(pool, keyStore, {
+          to: recipient.pubkey,
+          content: draft.body,
+          subject: draft.subject || undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
+          replyTo: draft.replyTo ?? undefined,
+          relayOverrides: relayOverrides.length > 0 ? relayOverrides : undefined,
+          giftWrap,
+        });
+
+        if (result.delivered > 0) overallDelivered++;
+
+        const sentMessage = {
+          id: result.eventId || draft.id,
+          kind: giftWrap ? 1059 : 14,
+          pubkey: identity.pubkey,
+          recipientPubkey: recipient.pubkey,
+          content: draft.body,
+          raw: "",
+          createdAt: now,
+          tags: [
+            ...(draft.replyTo ? [["e", draft.replyTo]] : []),
+            ["p", recipient.pubkey],
+          ],
+          subject: draft.subject || "(no subject)",
+          preview: draft.body.replace(/\n/g, " ").slice(0, 120),
+          read: true,
+          starred: false,
+          archived: false,
+          snoozedUntil: null,
+          spam: false,
+          mailbox: "sent" as const,
+          labelIds: [],
+          replyTo: draft.replyTo,
+          relayUrls: relayOverrides,
+          attachments,
+          isEncrypted: encrypted,
+          isGiftWrapped: giftWrap,
+          deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
+        };
+        await db.messages.put(sentMessage);
+        await useMessagesStore.getState().upsertMessage(sentMessage);
+      }
+
       await db.drafts.delete(draft.id);
-      await useMessagesStore.getState().upsertMessage(sentMessage);
 
       set({ status: "sent", draft: emptyDraft(), uploads: [] });
-      return result;
+      return { eventId: "", published: new Map(), delivered: overallDelivered };
     } catch (err) {
       console.error("Send failed:", err);
       set({ status: "failed", error: "Send failed" });
@@ -280,7 +290,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
   async sendDirect(to: RecipientEntry[], subject: string, body: string, replyTo: string | null): Promise<boolean> {
     try {
       const keyStore = createKeyStore();
-      const identity = keyStore.load();
+      const identity = await keyStore.load();
       if (!identity?.nsec) throw new Error("Cannot send message");
 
       if (to.length === 0) throw new Error("Cannot send message");
@@ -291,43 +301,52 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
       const pool = useRelaysStore.getState().pool;
       if (!pool) throw new Error("Cannot send message");
 
-      const result = await sendMessage(pool, keyStore, {
-        to: to[0].pubkey,
-        content: body,
-        subject: subject || undefined,
-        replyTo: replyTo ?? undefined,
-      });
-
+      let overallDelivered = 0;
       const now = Date.now();
-      const sentMessage = {
-        id: result.eventId,
-        kind: 14,
-        pubkey: identity.pubkey,
-        recipientPubkey: to[0].pubkey,
-        content: body,
-        raw: "",
-        createdAt: now,
-        tags: replyTo ? [["e", replyTo]] : [],
-        subject: subject || "(no subject)",
-        preview: body.replace(/\n/g, " ").slice(0, 120),
-        read: true,
-        starred: false,
-        archived: false,
-        snoozedUntil: null,
-        spam: false,
-        mailbox: "sent" as const,
-        labelIds: [],
-        replyTo,
-        relayUrls: [],
-        attachments: [],
-        isEncrypted: true,
-        isGiftWrapped: false,
-        deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
-      };
-      await db.messages.put(sentMessage);
-      await useMessagesStore.getState().upsertMessage(sentMessage);
 
-      return result.delivered > 0;
+      for (const recipient of to) {
+        const result = await sendMessage(pool, keyStore, {
+          to: recipient.pubkey,
+          content: body,
+          subject: subject || undefined,
+          replyTo: replyTo ?? undefined,
+        });
+
+        if (result.delivered > 0) overallDelivered++;
+
+        const sentMessage = {
+          id: result.eventId,
+          kind: 14,
+          pubkey: identity.pubkey,
+          recipientPubkey: recipient.pubkey,
+          content: body,
+          raw: "",
+          createdAt: now,
+          tags: [
+            ...(replyTo ? [["e", replyTo]] : []),
+            ["p", recipient.pubkey],
+          ],
+          subject: subject || "(no subject)",
+          preview: body.replace(/\n/g, " ").slice(0, 120),
+          read: true,
+          starred: false,
+          archived: false,
+          snoozedUntil: null,
+          spam: false,
+          mailbox: "sent" as const,
+          labelIds: [],
+          replyTo,
+          relayUrls: [],
+          attachments: [],
+          isEncrypted: true,
+          isGiftWrapped: false,
+          deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
+        };
+        await db.messages.put(sentMessage);
+        await useMessagesStore.getState().upsertMessage(sentMessage);
+      }
+
+      return overallDelivered > 0;
     } catch {
       return false;
     }

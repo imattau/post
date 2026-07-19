@@ -12,12 +12,13 @@ export default function Home() {
 
   useEffect(() => {
     const keyStore = createKeyStore();
-    const existing = keyStore.load();
-    if (existing) {
-      router.replace("/mail/inbox");
-    } else {
-      setChecking(false);
-    }
+    keyStore.load().then((existing) => {
+      if (existing) {
+        router.replace("/mail/inbox");
+      } else {
+        setChecking(false);
+      }
+    });
   }, [router]);
 
   if (checking) return null;

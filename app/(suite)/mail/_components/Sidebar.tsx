@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Inbox, Star, Clock, ArrowUpRight, FileEdit, Archive, ShieldAlert, SquarePen, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { useShallow } from "zustand/shallow";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { toast } from "sonner";
@@ -56,19 +57,19 @@ export default function Sidebar({
         <p className="text-text-secondary text-[11px] mt-[5px]">Private messaging for Nostr</p>
       </div>
 
-      <a
+      <Link
         href="/mail/inbox?compose=true"
         className="w-[200px] h-12 bg-brand rounded-pill flex items-center gap-[15px] pl-4 no-underline hover:brightness-110 active:scale-[0.97] transition-all duration-150"
       >
         <SquarePen size={21} className="text-white" />
         <span className="text-white text-[14px] font-semibold">Compose</span>
-      </a>
+      </Link>
 
       <nav className="flex flex-col gap-[6px] mt-6">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
-            <a
+            <Link
               key={item.label}
               href={item.href}
               className={`-ml-2 flex h-[38px] w-[216px] items-center gap-3 rounded-[10px] pl-4 pr-3 no-underline transition-all duration-150 ${
@@ -84,7 +85,7 @@ export default function Sidebar({
               {item.count != null && (
                 <span className="text-brand-light text-[12px] font-semibold">{item.count}</span>
               )}
-            </a>
+            </Link>
           );
         })}
       </nav>
@@ -105,7 +106,7 @@ export default function Sidebar({
           if (!label) return null;
           const isActive = pathname === `/mail/labels/${id}`;
           return (
-            <a
+            <Link
               key={id}
               href={`/mail/labels/${id}`}
               className={`flex items-center gap-3 h-[30px] px-3 rounded-[10px] no-underline transition-all duration-150 ${
@@ -116,7 +117,7 @@ export default function Sidebar({
             >
               <span className="w-[10px] h-[10px] rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
               <span className="text-[13px] font-medium">{label.name}</span>
-            </a>
+            </Link>
           );
         })}
         {showLabelInput && (

@@ -13,6 +13,8 @@ import {
 } from "date-fns";
 import { SHORT_DATE } from "@/lib/utils";
 import type { CalendarEvent } from "@/lib/types";
+import { finalizeEvent } from "nostr-tools/pure";
+import { decode } from "nostr-tools/nip19";
 
 export function buildMonthGrid(month: Date, weekStartsOn: number = 1): Date[][] {
   const first = startOfMonth(month);
@@ -76,6 +78,65 @@ export function weekStartFromSetting(setting: string | undefined): number {
   if (setting === "sunday") return 0;
   if (setting === "saturday") return 6;
   return 1;
+}
+
+export function publishCalendarEvent(
+  event: CalendarEvent,
+  identity: { nsec: string | null; pubkey: string },
+  pool: { publish: (evt: any) => Promise<Map<string, boolean>> },
+): Promise<Map<string, boolean>> {
+  if (!identity.nsec) return Promise.reject(new Error("Cannot sign calendar event"));
+
+  const decoded = decode(identity.nsec);
+  if (decoded.type !== "nsec") return Promise.reject(new Error("Cannot sign calendar event"));
+  const sk = decoded.data;
+
+  const tags: string[][] = [
+    ["d", event.id],
+    ["title", event.title],
+    ["start", String(Math.floor(event.startAt / 1000))],
+    ["end", String(Math.floor(event.endAt / 1000))],
+    ["calendar", event.calendarId],
+    ["client", "Post"],
+  ];
+  if (event.location) tags.push(["location", event.location]);
+  if (event.guests) {
+    for (const guest of event.guests) {
+      tags.push(["p", guest.id]);
+    }
+  }
+
+  const eventTemplate = {
+    kind: event.allDay ? 31922 : 31923,
+    created_at: Math.floor(Date.now() / 1000),
+    tags,
+    content: event.description ?? "",
+  };
+
+  const signed = finalizeEvent(eventTemplate, sk);
+  return pool.publish(signed);
+}
+
+export function deleteCalendarEvent(
+  eventId: string,
+  identity: { nsec: string | null; pubkey: string },
+  pool: { publish: (evt: any) => Promise<Map<string, boolean>> },
+): Promise<Map<string, boolean>> {
+  if (!identity.nsec) return Promise.reject(new Error("Cannot sign deletion"));
+
+  const decoded = decode(identity.nsec);
+  if (decoded.type !== "nsec") return Promise.reject(new Error("Cannot sign deletion"));
+  const sk = decoded.data;
+
+  const eventTemplate = {
+    kind: 5,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [["e", eventId]],
+    content: "",
+  };
+
+  const signed = finalizeEvent(eventTemplate, sk);
+  return pool.publish(signed);
 }
 
 export { addDays, isSameDay, isSameMonth };

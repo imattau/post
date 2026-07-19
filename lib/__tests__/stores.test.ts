@@ -163,7 +163,7 @@ describe("messages store", () => {
   it("ingestFromRelay adds message to store", async () => {
     const { useMessagesStore } = await import("@/lib/stores/messages");
     const msg: any = { id: "new-msg", kind: 14, pubkey: "x", content: "hello", createdAt: Date.now(), mailbox: "inbox" };
-    useMessagesStore.getState().ingestFromRelay(msg);
+    await useMessagesStore.getState().ingestFromRelay(msg);
     expect(useMessagesStore.getState().byId["new-msg"]).toBeDefined();
     expect(useMessagesStore.getState().ids).toContain("new-msg");
   });
@@ -171,9 +171,9 @@ describe("messages store", () => {
   it("ingestFromRelay deduplicates", async () => {
     const { useMessagesStore } = await import("@/lib/stores/messages");
     const msg: any = { id: "dup", kind: 14, pubkey: "x", content: "hello", createdAt: Date.now(), mailbox: "inbox" };
-    useMessagesStore.getState().ingestFromRelay(msg);
+    await useMessagesStore.getState().ingestFromRelay(msg);
     const ids1 = useMessagesStore.getState().ids.length;
-    useMessagesStore.getState().ingestFromRelay(msg);
+    await useMessagesStore.getState().ingestFromRelay(msg);
     const ids2 = useMessagesStore.getState().ids.length;
     expect(ids2).toBe(ids1);
   });
