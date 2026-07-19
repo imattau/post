@@ -1,6 +1,5 @@
 "use client";
 
-import Avatar from "@/components/Avatar";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -22,6 +21,8 @@ const formSchema = z.object({
   guestQuery: z.string().optional(),
   location: z.string().optional(),
   description: z.string().optional(),
+  private: z.boolean().optional(),
+  notifyGuests: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -33,7 +34,8 @@ export default function CalendarNewEventPage() {
   const activeMonth = useCalendarStore((s) => s.activeMonth);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const load = useCalendarStore((s) => s.load);
-  const [guest, _setGuest] = useState("Alice Nguyen");
+  const [privateEvent, setPrivateEvent] = useState(false);
+  const [notifyGuests, setNotifyGuests] = useState(false);
 
   const defaultDate = useMemo(() => {
     const d = selectedDate ?? new Date();
@@ -43,7 +45,7 @@ export default function CalendarNewEventPage() {
   const { register, handleSubmit, watch, setValue } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: "Suite planning workshop",
+      title: "",
       date: defaultDate,
       startTime: "10:00",
       endTime: "11:30",
@@ -51,6 +53,8 @@ export default function CalendarNewEventPage() {
       guestQuery: "",
       location: "",
       description: "",
+      private: false,
+      notifyGuests: false,
     },
   });
 
@@ -73,11 +77,7 @@ export default function CalendarNewEventPage() {
       endAt,
       description: data.description ?? "",
       location: data.location ?? "",
-      guests: [{ id: "alice", initials: "AL", name: guest, accepted: true }],
-      meetingLabel: data.location || "Nostr room",
-      invitation: "pending",
-      syncStatus: "Published to 3 relays",
-      attachedNote: "Event note",
+      meetingLabel: data.location ? `Meeting: ${data.location}` : undefined,
     });
     router.push(`/calendar/events/${created.id}`);
   }
@@ -89,7 +89,7 @@ export default function CalendarNewEventPage() {
       subtitle="Create a private or shared Nostr calendar event."
       headerActions={
         <div className="rounded-pill border border-border bg-pill-subtle px-4 py-2 text-[12px] text-text-secondary">
-          {activeMonth ? monthLabel(activeMonth) : "July 2026"}
+          {activeMonth ? monthLabel(activeMonth) : "Select a month"}
         </div>
       }
     >
@@ -152,12 +152,10 @@ export default function CalendarNewEventPage() {
             <label className="block">
               <span className="text-[11px] text-text-secondary">Guests</span>
               <div className="mt-2 flex h-12 items-center gap-3 rounded-[12px] border border-border bg-[#11151D] px-3">
-                <Avatar initials="AL" size={34} />
-                <span className="text-[13px] text-text-near-white">{guest}</span>
                 <input
                   {...register("guestQuery")}
-                  placeholder="Add people or npubs"
-                  className="ml-2 flex-1 bg-transparent text-[13px] text-text-secondary outline-none placeholder:text-text-placeholder"
+                  placeholder="Add people or npubs (coming soon)"
+                  className="flex-1 bg-transparent text-[13px] text-text-secondary outline-none placeholder:text-text-placeholder"
                 />
               </div>
             </label>
@@ -182,11 +180,21 @@ export default function CalendarNewEventPage() {
 
             <div className="flex items-center justify-between gap-3 pt-2">
               <div className="flex gap-2">
-                <Button type="button" variant="secondary" size="sm">
-                  Private
+                <Button
+                  type="button"
+                  variant={privateEvent ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setPrivateEvent(!privateEvent)}
+                >
+                  {privateEvent ? "✓ " : ""}Private
                 </Button>
-                <Button type="button" variant="outline" size="sm">
-                  Notify guests
+                <Button
+                  type="button"
+                  variant={notifyGuests ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setNotifyGuests(!notifyGuests)}
+                >
+                  {notifyGuests ? "✓ " : ""}Notify guests
                 </Button>
               </div>
               <div className="flex gap-2">

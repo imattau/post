@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import { monthLabel } from "@/lib/calendar";
 import CalendarPageFrame from "../_components/CalendarPageFrame";
 import { viewButtonClass } from "../_components/CalendarViewControls";
 import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarSharedPage() {
+  const router = useRouter();
   const calendars = useCalendarStore((s) => s.calendars);
   const activeMonth = useCalendarStore((s) => s.activeMonth);
   const loading = useCalendarStore((s) => s.loading);
@@ -75,7 +78,7 @@ export default function CalendarSharedPage() {
               <button
                 type="button"
                 className="h-8 rounded-pill border border-border bg-pill-subtle px-4 text-[12px] font-medium text-text-secondary"
-                onClick={() => {}}
+                onClick={() => router.push("/calendar/settings")}
               >
                 Manage sharing
               </button>

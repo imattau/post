@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { X } from "lucide-react";
 import { useComposeStore } from "@/lib/stores/compose";
 
 export interface RecipientRowProps {
@@ -9,6 +10,7 @@ export interface RecipientRowProps {
   text: string;
   onTextChange: (value: string) => void;
   onAdd: () => void;
+  onRemove: (pubkey: string) => void;
   placeholder: string;
 }
 
@@ -18,6 +20,7 @@ export const RecipientRow = memo(function RecipientRow({
   text,
   onTextChange,
   onAdd,
+  onRemove,
   placeholder,
 }: RecipientRowProps) {
   const isSending = useComposeStore((s) => s.status === "sending");
@@ -29,9 +32,14 @@ export const RecipientRow = memo(function RecipientRow({
         {recipients.map((r) => (
           <span
             key={r.pubkey}
-            className="h-7 px-2.5 rounded-pill bg-pill-subtle border border-modal-stroke text-text-modal-2 text-[12px] font-medium leading-[26px]"
+            className="h-7 pl-2.5 pr-1 rounded-pill bg-pill-subtle border border-modal-stroke text-text-modal-2 text-[12px] font-medium leading-[26px] flex items-center gap-1"
           >
             {r.name}
+            <button
+              onClick={() => onRemove(r.pubkey)}
+              className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-white/10 cursor-pointer"
+              disabled={isSending}
+            ><X size={10} /></button>
           </span>
         ))}
         <input

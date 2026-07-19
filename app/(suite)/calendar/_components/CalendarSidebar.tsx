@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useCalendarStore } from "@/lib/stores/calendar";
+import { useIdentityStore } from "@/lib/stores/identity";
 
 type ActiveNav = "month" | "week" | "agenda" | "invitations" | "shared" | "settings";
 
@@ -22,7 +24,21 @@ const NAV_ITEMS: Array<{
 
 export default function CalendarSidebar({ activeNav }: { activeNav: ActiveNav | undefined }) {
   const calendars = useCalendarStore((s) => s.calendars);
+  const identity = useIdentityStore((s) => s.identity);
   const visibleCalendars = calendars.filter((calendar) => calendar.id !== "public");
+
+  const avatarInitials = useMemo(() => {
+    if (identity?.profile?.displayName) {
+      return identity.profile.displayName.slice(0, 2).toUpperCase();
+    }
+    if (identity?.profile?.name) {
+      return identity.profile.name.slice(0, 2).toUpperCase();
+    }
+    if (identity?.npub) {
+      return identity.npub.slice(0, 2).toUpperCase();
+    }
+    return "?";
+  }, [identity]);
 
   return (
     <aside className="flex min-h-0 w-[248px] flex-col overflow-y-auto border-r border-border bg-[#11151D] px-6 pb-5 pt-[24px]">
@@ -75,7 +91,7 @@ export default function CalendarSidebar({ activeNav }: { activeNav: ActiveNav | 
       <div className="flex-1" />
 
       <button type="button" className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-full bg-avatar-6 text-[11px] font-semibold text-white">
-        MT
+        {avatarInitials}
         <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-[#11151D] bg-ok" />
       </button>
     </aside>

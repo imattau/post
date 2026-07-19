@@ -15,6 +15,8 @@ import { SHORT_DATE } from "@/lib/utils";
 import type { CalendarEvent } from "@/lib/types";
 import { finalizeEvent } from "nostr-tools/pure";
 import { decode } from "nostr-tools/nip19";
+import { subscribeAccumulate } from "@post/nostr-core";
+import type { RelayPool } from "@post/nostr-core";
 
 export function buildMonthGrid(month: Date, weekStartsOn: number = 1): Date[][] {
   const first = startOfMonth(month);
@@ -137,6 +139,98 @@ export function deleteCalendarEvent(
 
   const signed = finalizeEvent(eventTemplate, sk);
   return pool.publish(signed);
+}
+
+export function parseCalendarEventFromNostr(event: {
+  id: string;
+  kind: number;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+}): CalendarEvent | null {
+  const tagMap = new Map<string, string[]>();
+  for (const [key, ...values] of event.tags) {
+    if (values.length > 0) {
+      tagMap.set(key, values);
+    }
+  }
+
+  const title = tagMap.get("title")?.[0];
+  const startTag = tagMap.get("start")?.[0];
+  const endTag = tagMap.get("end")?.[0];
+  const calendarId = tagMap.get("calendar")?.[0] ?? "personal";
+
+  if (!title || !startTag || !endTag) return null;
+
+  const startAt = parseInt(startTag, 10) * 1000;
+  const endAt = parseInt(endTag, 10) * 1000;
+  if (isNaN(startAt) || isNaN(endAt)) return null;
+
+  const guestPubkeys = event.tags.filter((t) => t[0] === "p").map((t) => t[1]);
+  const location = tagMap.get("location")?.[0];
+
+  return {
+    id: event.id,
+    title,
+    calendarId,
+    startAt,
+    endAt,
+    allDay: event.kind === 31922,
+    location,
+    description: event.content || undefined,
+    guests: guestPubkeys.length > 0
+      ? guestPubkeys.map((pubkey) => ({
+          id: pubkey,
+          initials: pubkey.slice(0, 2).toUpperCase(),
+          name: pubkey.slice(0, 8),
+          accepted: false,
+        }))
+      : undefined,
+  };
+}
+
+export async function syncCalendarFromRelays(
+  pool: RelayPool,
+  pubkey: string,
+  existingEventIds: Set<string>,
+): Promise<CalendarEvent[]> {
+  const newEvents: CalendarEvent[] = [];
+
+  const rawEvents = await subscribeAccumulate<{
+    id: string;
+    kind: number;
+    pubkey: string;
+    content: string;
+    tags: string[][];
+    created_at: number;
+  }>(
+    pool,
+    [
+      { kinds: [31922, 31923], authors: [pubkey], limit: 200 },
+    ],
+    (event, acc) => {
+      acc.push({
+        id: event.id,
+        kind: event.kind,
+        pubkey: event.pubkey,
+        content: event.content,
+        tags: event.tags,
+        created_at: event.created_at,
+      });
+    },
+    5000,
+  );
+
+  for (const raw of rawEvents) {
+    if (existingEventIds.has(raw.id)) continue;
+    const parsed = parseCalendarEventFromNostr(raw);
+    if (parsed) {
+      newEvents.push(parsed);
+    }
+  }
+
+  return newEvents;
 }
 
 export { addDays, isSameDay, isSameMonth };

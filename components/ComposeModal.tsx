@@ -371,7 +371,15 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     <Dialog.Root open modal onOpenChange={(open) => { if (!open) handleClose(); }}>
       <Dialog.Backdrop className="fixed inset-0 z-40 transition-opacity duration-200" style={{ backgroundColor: "rgba(5,7,11,0.44)" }} />
       <Dialog.Portal>
-      <Dialog.Popup className="fixed z-50 animate-[composeOpen_250ms_ease-out]" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 730, height: 784 }}>
+      <Dialog.Popup className="fixed z-50 animate-[composeOpen_250ms_ease-out]"         style={{
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 730,
+          height: 784,
+          maxWidth: "min(730px, calc(100vw - 48px))",
+          maxHeight: "min(784px, calc(100dvh - 48px))",
+        }}>
         <div className="w-full h-full rounded-[24px]" style={{ boxShadow: "0 20px 40px 0 rgba(0,0,0,0.5)" }}>
           <div
             {...getRootProps()}
@@ -386,9 +394,14 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 {to.map((recipient) => (
                   <span
                     key={recipient.pubkey}
-                    className="h-7 px-2.5 rounded-pill bg-surface-active border border-brand text-brand-light text-[12px] font-medium leading-[26px]"
+                    className="h-7 pl-2.5 pr-1 rounded-pill bg-surface-active border border-brand text-brand-light text-[12px] font-medium leading-[26px] flex items-center gap-1"
                   >
                     {recipient.name}
+                    <button
+                      onClick={() => updateRecipients(to.filter((r) => r.pubkey !== recipient.pubkey), cc, bcc)}
+                      className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-brand/20 cursor-pointer"
+                      disabled={isSending}
+                    ><X size={10} /></button>
                   </span>
                 ))}
                 <input
@@ -426,6 +439,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 text={ccText}
                 onTextChange={handleCcTextChange}
                 onAdd={handleCcAdd}
+                onRemove={(pubkey) => updateRecipients(to, cc.filter((r) => r.pubkey !== pubkey), bcc)}
                 placeholder="Add Cc npub or pubkey"
               />
             )}
@@ -436,6 +450,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 text={bccText}
                 onTextChange={handleBccTextChange}
                 onAdd={handleBccAdd}
+                onRemove={(pubkey) => updateRecipients(to, cc, bcc.filter((r) => r.pubkey !== pubkey))}
                 placeholder="Add Bcc npub or pubkey"
               />
             )}
@@ -465,7 +480,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 onChange={(e) => updateBody(e.target.value)}
                 placeholder="Write your message…"
                 disabled={isSending}
-                className="flex-1 p-5 text-[14px] text-text-modal outline-none overflow-y-auto resize-none bg-transparent placeholder-text-placeholder"
+                className="flex-1 p-5 text-[14px] text-text-modal outline-none overflow-y-auto resize-none bg-transparent placeholder-text-placeholder min-h-0"
               />
             )}
 

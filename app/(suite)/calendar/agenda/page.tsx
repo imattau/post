@@ -95,7 +95,7 @@ export default function CalendarAgendaPage() {
                       </div>
                       <div className="max-w-[240px] text-right">
                         <p className="text-[12px] text-text-secondary">
-                          {event.guests?.[0]?.name ?? "Alice Nguyen"}
+                          {event.guests?.[0]?.name ?? ""}
                         </p>
                         <p className="mt-1 text-[12px] text-text-tertiary">
                           {calendar?.name ?? "Calendar"}

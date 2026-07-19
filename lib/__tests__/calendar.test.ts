@@ -162,7 +162,7 @@ describe("calendar store", () => {
 
   it("load sets error on failure", async () => {
     const { db } = await import("@/lib/db/schema");
-    vi.mocked(db.calendarCalendars.count).mockRejectedValueOnce(new Error("DB error"));
+    vi.mocked(db.calendarCalendars.toArray).mockRejectedValueOnce(new Error("DB error"));
     const { useCalendarStore } = await import("@/lib/stores/calendar");
     await useCalendarStore.getState().load();
     expect(useCalendarStore.getState().error).toBe("Failed to load calendar data");

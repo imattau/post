@@ -51,7 +51,7 @@ export default function CalendarWorkspace() {
   const weekStartsOn = weekStartFromSetting(weekStartSetting);
   const weeks = useMemo(() => buildMonthGrid(activeMonth, weekStartsOn), [activeMonth, weekStartsOn]);
   const selectedEvent = useMemo(
-    () => visibleEvents.find((event) => event.id === selectedEventId) ?? visibleEvents[0] ?? null,
+    () => visibleEvents.find((event) => event.id === selectedEventId) ?? null,
     [selectedEventId, visibleEvents]
   );
 

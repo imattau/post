@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
 import { formatLongDate, formatTimeRange } from "@/lib/calendar";
+import { useIdentityStore } from "@/lib/stores/identity";
 import type { CalendarEvent, CalendarCalendar } from "@/lib/types";
 import GuestsRow from "./GuestsRow";
 
@@ -46,7 +49,15 @@ export default function EventDetailsPanel({
   onDecline,
   onDelete,
 }: EventDetailsPanelProps) {
+  const identity = useIdentityStore((s) => s.identity);
   const guests = event.guests ?? [];
+
+  const signerName = useMemo(() => {
+    if (identity?.profile?.displayName) return identity.profile.displayName;
+    if (identity?.profile?.name) return identity.profile.name;
+    if (identity?.npub) return `${identity.npub.slice(0, 8)}…`;
+    return null;
+  }, [identity]);
 
   return (
     <div className="space-y-5">
@@ -67,13 +78,15 @@ export default function EventDetailsPanel({
         </CardContent>
       </Card>
 
-      <section>
-        <p className="text-[12px] font-semibold text-text-near-white">Video meeting</p>
-        <p className="mt-1 text-[11px] text-text-secondary">{event.meetingLabel ?? "Meeting details unavailable"}</p>
-        <Button size="lg" className="mt-3 w-full">
-          Join meeting
-        </Button>
-      </section>
+      {event.meetingLabel && (
+        <section>
+          <p className="text-[12px] font-semibold text-text-near-white">Video meeting</p>
+          <p className="mt-1 text-[11px] text-text-secondary">{event.meetingLabel}</p>
+          <Button size="lg" className="mt-3 w-full" onClick={() => toast.info("Meeting link not available")}>
+            Join meeting
+          </Button>
+        </section>
+      )}
 
       <Separator />
 
@@ -115,10 +128,12 @@ export default function EventDetailsPanel({
         <p className="text-[12px] font-semibold text-text-near-white">Nostr delivery</p>
         <div className="mt-2 flex items-center gap-2 text-[12px] text-text-secondary">
           <span className="h-2 w-2 rounded-full bg-ok" />
-          <span>{event.syncStatus ?? "Published to 4 relays"}</span>
+          <span>{event.syncStatus ?? "Pending publication"}</span>
         </div>
-        <p className="mt-3 text-[11px] text-text-tertiary">Signed by Alice Nguyen</p>
-        <p className="mt-1 text-[11px] text-text-tertiary">Event ID nostr:event1…</p>
+        {signerName && (
+          <p className="mt-3 text-[11px] text-text-tertiary">Signed by {signerName}</p>
+        )}
+        <p className="mt-1 text-[11px] text-text-tertiary">Event ID {event.id}</p>
       </section>
 
       <div className="grid grid-cols-2 gap-3">
@@ -127,7 +142,7 @@ export default function EventDetailsPanel({
             Edit event
           </Button>
         </Link>
-        <Button variant="outline" size="lg" onClick={() => {}}>
+        <Button variant="outline" size="lg" onClick={() => toast.info("Messaging guests coming soon")}>
           Message guests
         </Button>
       </div>
@@ -138,14 +153,16 @@ export default function EventDetailsPanel({
         </Button>
       )}
 
-      <Card>
-        <CardContent className="px-4 py-3">
-          <p className="text-[11px] text-text-tertiary">Attached note</p>
-          <p className="mt-1 text-[12px] font-medium text-brand-light">
-            {event.attachedNote ?? event.noteTitle ?? "Event note"}
-          </p>
-        </CardContent>
-      </Card>
+      {(event.attachedNote || event.noteTitle) && (
+        <Card>
+          <CardContent className="px-4 py-3">
+            <p className="text-[11px] text-text-tertiary">Attached note</p>
+            <p className="mt-1 text-[12px] font-medium text-brand-light">
+              {event.attachedNote ?? event.noteTitle}
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

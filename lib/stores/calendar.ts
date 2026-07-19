@@ -1,13 +1,11 @@
 import { create } from "zustand";
 import { subMonths, addMonths, subWeeks, addWeeks, startOfMonth, addHours } from "date-fns";
 import { db } from "@/lib/db/schema";
-import { CALENDARS, CALENDAR_EVENTS, CALENDAR_MONTH, CALENDAR_SELECTED_DAY, CALENDAR_SYNC } from "@/lib/mock/calendar";
 import { generateId } from "@/lib/utils";
 import type { CalendarCalendar, CalendarEvent, CalendarSyncState, CalendarViewMode } from "@/lib/types";
-import { publishCalendarEvent, deleteCalendarEvent as deleteCalendarEventOnRelay } from "@/lib/calendar";
+import { publishCalendarEvent, deleteCalendarEvent as deleteCalendarEventOnRelay, syncCalendarFromRelays } from "@/lib/calendar";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
-import { useSettingsStore } from "@/lib/stores/settings";
 
 interface CalendarState {
   calendars: CalendarCalendar[];
@@ -47,41 +45,46 @@ function recomputeSync(calendars: CalendarCalendar[], events: CalendarEvent[]): 
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
-  calendars: CALENDARS,
-  events: CALENDAR_EVENTS,
-  sync: recomputeSync(CALENDARS, CALENDAR_EVENTS),
-  activeMonth: CALENDAR_MONTH,
-  selectedDate: CALENDAR_SELECTED_DAY,
-  selectedEventId: "suite-planning",
+  calendars: [],
+  events: [],
+  sync: { syncedCalendars: 0, pendingInvitations: 0, healthyRelays: 0, updatedAt: Date.now() },
+  activeMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  selectedDate: new Date(),
+  selectedEventId: null,
   viewMode: "month",
-  loading: false,
+  loading: true,
   error: null,
 
   async load() {
     set({ loading: true, error: null });
     try {
-      const [calendarCount, eventCount] = await Promise.all([
-        db.calendarCalendars.count(),
-        db.calendarEvents.count(),
-      ]);
-
-      if (calendarCount === 0) {
-        await db.calendarCalendars.bulkPut(CALENDARS);
-      }
-      if (eventCount === 0) {
-        await db.calendarEvents.bulkPut(CALENDAR_EVENTS);
-      }
-
-      const [calendars, events] = await Promise.all([
+      const [calendars, events, identity] = await Promise.all([
         db.calendarCalendars.toArray(),
         db.calendarEvents.toArray(),
+        useIdentityStore.getState().identity
+          ? Promise.resolve(useIdentityStore.getState().identity)
+          : Promise.resolve(null),
       ]);
+
+      let mergedEvents = events;
+      if (identity?.pubkey) {
+        const pool = useRelaysStore.getState().pool;
+        if (pool) {
+          const existingIds = new Set(events.map((e) => e.id));
+          const relayEvents = await syncCalendarFromRelays(pool, identity.pubkey, existingIds).catch(() => []);
+          if (relayEvents.length > 0) {
+            await db.calendarEvents.bulkPut(relayEvents);
+            mergedEvents = [...events, ...relayEvents].sort((a, b) => a.startAt - b.startAt);
+          }
+        }
+      }
+
       set({
         calendars,
-        events,
-        sync: recomputeSync(calendars, events),
+        events: mergedEvents,
+        sync: recomputeSync(calendars, mergedEvents),
         loading: false,
-        selectedEventId: get().selectedEventId ?? events[0]?.id ?? null,
+        selectedEventId: get().selectedEventId ?? mergedEvents[0]?.id ?? null,
       });
     } catch (err) {
       console.error("Failed to load calendar data:", err);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -130,7 +131,7 @@ export default function EventPageClient() {
             <CardContent className="px-5 py-4">
               <p className="text-[11px] text-text-tertiary">Meeting</p>
               <p className="mt-1 text-[13px] text-text-near-white">{event.meetingLabel}</p>
-              <Button size="sm" className="mt-3">Join meeting</Button>
+              <Button size="sm" className="mt-3" onClick={() => toast.info("Meeting link not available")}>Join meeting</Button>
             </CardContent>
           </Card>
         )}
@@ -140,7 +141,7 @@ export default function EventPageClient() {
             <p className="text-[11px] text-text-tertiary">Nostr delivery</p>
             <div className="mt-2 flex items-center gap-2 text-[12px] text-text-secondary">
               <span className="h-2 w-2 rounded-full bg-ok" />
-              <span>{event.syncStatus ?? "Published to 4 relays"}</span>
+              <span>{event.syncStatus ?? "Pending publication"}</span>
             </div>
           </CardContent>
         </Card>
