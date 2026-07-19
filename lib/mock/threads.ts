@@ -47,6 +47,7 @@ export interface MockMessage {
   mailbox?: string;
   labelIds?: string[];
   relayUrls?: string[];
+  conversationId?: string | null;
 }
 
 const now = Date.now();

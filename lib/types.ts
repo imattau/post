@@ -58,6 +58,7 @@ export type {
   Label,
   RecipientEntry,
   Draft,
+  GroupInbox,
   Contact,
   DriveFile,
   DriveFolder,

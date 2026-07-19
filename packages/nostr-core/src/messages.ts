@@ -1,4 +1,4 @@
-import { nip44, nip17, finalizeEvent } from "nostr-tools";
+import { nip44, nip17, nip59, finalizeEvent } from "nostr-tools";
 import { decode } from "nostr-tools/nip19";
 import type { NostrEvent } from "nostr-tools";
 import type { RelayPool } from "./relays";
@@ -14,6 +14,10 @@ export interface SendOptions {
   subject?: string;
   attachments?: AttachmentRef[];
   replyTo?: string;
+  conversationId?: string;
+  groupPubkey?: string;
+  groupMembers?: string[];
+  groupKey?: { pubkey: string; privkey: string };
   relayOverrides?: string[];
   giftWrap?: boolean;
 }
@@ -24,36 +28,41 @@ export interface SendResult {
   delivered: number;
 }
 
-function buildMessagePayload(content: string, subject: string | undefined, attachments: AttachmentRef[] | undefined, sk: Uint8Array, to: string): string {
-  if (!attachments?.length) return content;
+function buildMessagePayload(content: string, subject: string | undefined, attachments: AttachmentRef[] | undefined, sk: Uint8Array, to: string, conversationId?: string, groupKey?: { pubkey: string; privkey: string }): string {
+  if (!attachments?.length && !subject && !conversationId && !groupKey) return content;
 
-  const attachmentPayloads = attachments.map((att) => {
-    const encryptedKey = att.encrypted && att.fileKey
-      ? wrapFileKey(fromBase64Key(att.fileKey), sk, to)
-      : undefined;
-    return {
-      fileName: att.fileName,
-      mimeType: att.mimeType,
-      sizeBytes: att.sizeBytes,
-      sha256: att.sha256,
-      url: att.url,
-      encryptedKey,
-      fileIv: att.fileIv,
-    };
-  });
+  const payload: Record<string, any> = { body: content, v: 1 };
 
-  return JSON.stringify({
-    body: content,
-    subject,
-    attachments: attachmentPayloads,
-    v: 1,
-  });
+  if (attachments?.length) {
+    payload.attachments = attachments.map((att) => {
+      const encryptedKey = att.encrypted && att.fileKey
+        ? wrapFileKey(fromBase64Key(att.fileKey), sk, to)
+        : undefined;
+      return {
+        fileName: att.fileName,
+        mimeType: att.mimeType,
+        sizeBytes: att.sizeBytes,
+        sha256: att.sha256,
+        url: att.url,
+        encryptedKey,
+        fileIv: att.fileIv,
+      };
+    });
+  }
+
+  if (subject) payload.subject = subject;
+  if (conversationId) payload.conversationId = conversationId;
+  if (groupKey) payload.groupKey = groupKey;
+
+  return JSON.stringify(payload);
 }
 
 export function parseMessagePayloadAndUnwrap(plaintext: string, sk: Uint8Array, senderPubkey: string): {
   body: string;
   subject: string | undefined;
   attachments: AttachmentRef[];
+  conversationId: string | undefined;
+  groupKey: { pubkey: string; privkey: string } | undefined;
 } {
   try {
     const parsed = JSON.parse(plaintext);
@@ -81,12 +90,12 @@ export function parseMessagePayloadAndUnwrap(plaintext: string, sk: Uint8Array, 
         }
         return ref;
       });
-      return { body: parsed.body || "", subject: parsed.subject, attachments };
+      return { body: parsed.body || "", subject: parsed.subject, attachments, conversationId: parsed.conversationId, groupKey: parsed.groupKey };
     }
   } catch {
     // Not JSON format — treat as plain text
   }
-  return { body: plaintext, subject: undefined, attachments: [] };
+  return { body: plaintext, subject: undefined, attachments: [], conversationId: undefined, groupKey: undefined };
 }
 
 export async function sendMessage(
@@ -103,28 +112,52 @@ export async function sendMessage(
 
   let event: NostrEvent;
 
-  if (opts.giftWrap) {
-    event = nip17.wrapEvent(
-      sk,
-      { publicKey: opts.to },
-      buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.to),
-      opts.subject,
-      opts.replyTo ? { eventId: opts.replyTo } : undefined
-    );
-  } else {
-    const conversationKey = nip44.v2.utils.getConversationKey(sk, opts.to);
-    const payload = buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.to);
-    const encrypted = nip44.v2.encrypt(payload, conversationKey);
-    const tags: string[][] = [["p", opts.to]];
-    if (opts.subject) tags.push(["subject", opts.subject]);
-    if (opts.replyTo) tags.push(["e", opts.replyTo]);
+  if (opts.groupPubkey) {
+    const payload = buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.groupPubkey, opts.conversationId, opts.groupKey);
+    const rumorTags: string[][] = [["p", opts.groupPubkey]];
+    if (opts.groupMembers) {
+      for (const pk of opts.groupMembers) {
+        if (pk !== opts.groupPubkey) rumorTags.push(["p", pk]);
+      }
+    }
+    if (opts.subject) rumorTags.push(["subject", opts.subject]);
+    if (opts.replyTo) rumorTags.push(["e", opts.replyTo]);
+    if (opts.conversationId) rumorTags.push(["conversation", opts.conversationId]);
 
-    event = finalizeEvent({
+    const rumorEvent = {
       kind: 14,
-      content: encrypted,
+      content: payload,
       created_at: Math.floor(Date.now() / 1000),
-      tags,
-    }, sk);
+      tags: rumorTags,
+    };
+    event = nip59.wrapEvent(rumorEvent, sk, opts.groupPubkey);
+  } else {
+    const baseTags: string[][] = [["p", opts.to]];
+    if (opts.subject) baseTags.push(["subject", opts.subject]);
+    if (opts.replyTo) baseTags.push(["e", opts.replyTo]);
+    if (opts.conversationId) baseTags.push(["conversation", opts.conversationId]);
+
+    if (opts.giftWrap) {
+      const payload = buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.to, opts.conversationId, opts.groupKey);
+      const rumorEvent = {
+        kind: 14,
+        content: payload,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: baseTags,
+      };
+      event = nip59.wrapEvent(rumorEvent, sk, opts.to);
+    } else {
+      const conversationKey = nip44.v2.utils.getConversationKey(sk, opts.to);
+      const payload = buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.to, opts.conversationId, opts.groupKey);
+      const encrypted = nip44.v2.encrypt(payload, conversationKey);
+
+      event = finalizeEvent({
+        kind: 14,
+        content: encrypted,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: baseTags,
+      }, sk);
+    }
   }
 
   const published = await pool.publish(event, opts.relayOverrides);
@@ -198,7 +231,7 @@ export async function decryptIncoming(
       try {
         const conversationKey = nip44.v2.utils.getConversationKey(sk, event.pubkey);
         const plaintext = nip44.v2.decrypt(event.content, conversationKey);
-        const { body, subject, attachments } = parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey);
+        const { body, subject, attachments, conversationId } = parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey);
         const msg: Message = {
           id: event.id,
           kind: event.kind,
@@ -218,6 +251,7 @@ export async function decryptIncoming(
           mailbox: "inbox" as const,
           labelIds: [],
           replyTo: event.tags.find((t) => t[0] === "e")?.[1] ?? null,
+          conversationId: conversationId ?? null,
           relayUrls: [],
           attachments,
           isEncrypted: true,

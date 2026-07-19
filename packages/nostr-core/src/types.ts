@@ -140,6 +140,7 @@ export interface Message {
   mailbox: MailboxKind;
   labelIds: string[];
   replyTo: string | null;
+  conversationId: string | null;
   relayUrls: string[];
   attachments: AttachmentRef[];
   isEncrypted: boolean;
@@ -164,6 +165,7 @@ export interface RecipientEntry {
 
 export interface Draft {
   id: string;
+  conversationId: string;
   to: RecipientEntry[];
   cc: RecipientEntry[];
   bcc: RecipientEntry[];
@@ -176,6 +178,14 @@ export interface Draft {
   updatedAt: number;
   savedAt: number | null;
   scheduledFor: number | null;
+}
+
+export interface GroupInbox {
+  id: string;
+  pubkey: string;
+  privkey: string;
+  members: RecipientEntry[];
+  createdAt: number;
 }
 
 export interface Contact {

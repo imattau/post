@@ -10,6 +10,8 @@ import { useRelaysStore } from "@/lib/stores/relays";
 import { useMessagesStore } from "@/lib/stores/messages";
 import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { useSettingsStore } from "@/lib/stores/settings";
+import { useIdentityStore } from "@/lib/stores/identity";
+import { useGroupsStore } from "@/lib/stores/groups";
 import { useMailboxMessages } from "../_components/useMailboxMessages";
 import { getThreadMessages } from "@/lib/thread";
 import Sidebar from "./Sidebar";
@@ -108,18 +110,34 @@ export default function MailContent({ children }: { children: React.ReactNode })
 
   const handleReplyAll = useCallback(() => {
     if (!selectedMessage) return;
-    useComposeStore.getState().open({
-      to: [{
-        pubkey: selectedMessage.sender.id,
-        npub: selectedMessage.sender.npub,
-        name: selectedMessage.sender.name,
-        avatarUrl: "",
-        isGroup: false,
-      }],
-      subject: selectedMessage.subject.startsWith("Re:") ? selectedMessage.subject : `Re: ${selectedMessage.subject}`,
-      body: `> ${selectedMessage.body.replace(/\n/g, "\n> ")}\n\n`,
-      replyTo: selectedMessage.id,
-    });
+
+    const realMsg = useMessagesStore.getState().byId[selectedMessage.id];
+    const conversationId = realMsg?.conversationId;
+    const groupInbox = conversationId ? useGroupsStore.getState().getGroupInbox(conversationId) : null;
+
+    if (groupInbox) {
+      const myPubkey = useIdentityStore.getState().identity?.pubkey ?? null;
+      const members = groupInbox.members.filter((m) => m.pubkey !== myPubkey);
+      useComposeStore.getState().open({
+        to: members.map((m) => ({ pubkey: m.pubkey, npub: m.npub, name: m.name, avatarUrl: m.avatarUrl, isGroup: false })),
+        subject: selectedMessage.subject.startsWith("Re:") ? selectedMessage.subject : `Re: ${selectedMessage.subject}`,
+        body: `> ${selectedMessage.body.replace(/\n/g, "\n> ")}\n\n`,
+        replyTo: selectedMessage.id,
+      });
+    } else {
+      useComposeStore.getState().open({
+        to: [{
+          pubkey: selectedMessage.sender.id,
+          npub: selectedMessage.sender.npub,
+          name: selectedMessage.sender.name,
+          avatarUrl: "",
+          isGroup: false,
+        }],
+        subject: selectedMessage.subject.startsWith("Re:") ? selectedMessage.subject : `Re: ${selectedMessage.subject}`,
+        body: `> ${selectedMessage.body.replace(/\n/g, "\n> ")}\n\n`,
+        replyTo: selectedMessage.id,
+      });
+    }
     router.push(`${pathname}?compose=true`, { scroll: false });
   }, [selectedMessage, router, pathname]);
 

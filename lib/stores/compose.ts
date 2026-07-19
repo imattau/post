@@ -48,6 +48,7 @@ interface ComposeState {
 function emptyDraft(): Draft {
   return {
     id: generateId(),
+    conversationId: generateId(),
     to: [],
     cc: [],
     bcc: [],
@@ -74,7 +75,13 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
   draftVersion: 0,
 
   open: (draft?: Partial<Draft>) => {
-    const next = { ...emptyDraft(), ...draft, updatedAt: Date.now() };
+    const base = emptyDraft();
+    let conversationId = base.conversationId;
+    if (draft?.replyTo) {
+      const parent = useMessagesStore.getState().byId[draft.replyTo];
+      if (parent?.conversationId) conversationId = parent.conversationId;
+    }
+    const next = { ...base, conversationId, ...draft, updatedAt: Date.now() };
     set({
       status: "composing",
       draft: next,
@@ -181,7 +188,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
       const identity = await keyStore.load();
       if (!identity?.nsec) throw new Error("Cannot send message");
 
-      if (draft.to.length === 0) throw new Error("Cannot send message");
+      if (draft.to.length === 0 && draft.cc.length === 0) throw new Error("Cannot send message");
 
       const nsecDecoded = decode(identity.nsec);
       if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
@@ -195,31 +202,22 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
 
       let overallDelivered = 0;
       const now = Date.now();
+      const toCcRecipients = [...draft.to, ...draft.cc];
+      const hasMultipleToCc = toCcRecipients.length > 1;
 
-      for (const recipient of draft.to) {
-        const result = await sendMessage(pool, keyStore, {
-          to: recipient.pubkey,
-          content: draft.body,
-          subject: draft.subject || undefined,
-          attachments: attachments.length > 0 ? attachments : undefined,
-          replyTo: draft.replyTo ?? undefined,
-          relayOverrides: relayOverrides.length > 0 ? relayOverrides : undefined,
-          giftWrap,
-        });
-
-        if (result.delivered > 0) overallDelivered++;
-
-        const sentMessage = {
-          id: result.eventId || draft.id,
-          kind: giftWrap ? 1059 : 14,
-          pubkey: identity.pubkey,
-          recipientPubkey: recipient.pubkey,
+      async function saveSent(eventId: string, recipientPubkey: string, kind: number, deliveryStatus: "delivered" | "failed", isGiftWrapped?: boolean) {
+        const msg = {
+          id: eventId || draft.id,
+          kind,
+          pubkey: identity!.pubkey,
+          recipientPubkey,
           content: draft.body,
           raw: "",
           createdAt: now,
           tags: [
             ...(draft.replyTo ? [["e", draft.replyTo]] : []),
-            ["p", recipient.pubkey],
+            ["p", recipientPubkey],
+            ...(draft.conversationId ? [["conversation", draft.conversationId]] : []),
           ],
           subject: draft.subject || "(no subject)",
           preview: draft.body.replace(/\n/g, " ").slice(0, 120),
@@ -231,14 +229,68 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
           mailbox: "sent" as const,
           labelIds: [],
           replyTo: draft.replyTo,
+          conversationId: draft.conversationId,
           relayUrls: relayOverrides,
           attachments,
           isEncrypted: encrypted,
-          isGiftWrapped: giftWrap,
-          deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
+          isGiftWrapped: isGiftWrapped ?? kind === 1059,
+          deliveryStatus,
         };
-        await db.messages.put(sentMessage);
-        await useMessagesStore.getState().upsertMessage(sentMessage);
+        await db.messages.put(msg);
+        await useMessagesStore.getState().upsertMessage(msg);
+      }
+
+      if (hasMultipleToCc) {
+        const { useGroupsStore } = await import("@/lib/stores/groups");
+        const groupsStore = useGroupsStore.getState();
+        const allMembers = toCcRecipients.map((r) => ({ pubkey: r.pubkey, npub: r.npub, name: r.name, avatarUrl: r.avatarUrl, isGroup: false }));
+        const groupInbox = groupsStore.createGroupInbox(draft.conversationId, allMembers);
+        const result = await sendMessage(pool, keyStore, {
+          to: groupInbox.pubkey,
+          content: draft.body,
+          subject: draft.subject || undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
+          replyTo: draft.replyTo ?? undefined,
+          conversationId: draft.conversationId,
+          groupPubkey: groupInbox.pubkey,
+          groupMembers: allMembers.map((m) => m.pubkey),
+          groupKey: { pubkey: groupInbox.pubkey, privkey: groupInbox.privkey },
+          giftWrap: true,
+        });
+        if (result.delivered > 0) overallDelivered++;
+        await saveSent(result.eventId, groupInbox.pubkey, 1059, result.delivered > 0 ? "delivered" : "failed", true);
+        const { resubscribeGroupPubkeys } = await import("@/lib/sync");
+        await resubscribeGroupPubkeys();
+      } else {
+        for (const recipient of toCcRecipients) {
+          const result = await sendMessage(pool, keyStore, {
+            to: recipient.pubkey,
+            content: draft.body,
+            subject: draft.subject || undefined,
+            attachments: attachments.length > 0 ? attachments : undefined,
+            replyTo: draft.replyTo ?? undefined,
+            conversationId: draft.conversationId,
+            relayOverrides: relayOverrides.length > 0 ? relayOverrides : undefined,
+            giftWrap,
+          });
+          if (result.delivered > 0) overallDelivered++;
+          const kind = giftWrap ? 1059 : 14;
+          await saveSent(result.eventId || draft.id, recipient.pubkey, kind, result.delivered > 0 ? "delivered" : "failed", giftWrap);
+        }
+      }
+
+      for (const recipient of draft.bcc) {
+        const result = await sendMessage(pool, keyStore, {
+          to: recipient.pubkey,
+          content: draft.body,
+          subject: draft.subject || undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
+          replyTo: draft.replyTo ?? undefined,
+          conversationId: draft.conversationId,
+          relayOverrides: relayOverrides.length > 0 ? relayOverrides : undefined,
+        });
+        if (result.delivered > 0) overallDelivered++;
+        await saveSent(result.eventId, recipient.pubkey, 14, result.delivered > 0 ? "delivered" : "failed");
       }
 
       await db.drafts.delete(draft.id);
@@ -301,6 +353,10 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
       const pool = useRelaysStore.getState().pool;
       if (!pool) throw new Error("Cannot send message");
 
+      const conversationId = replyTo
+        ? (useMessagesStore.getState().byId[replyTo]?.conversationId ?? generateId())
+        : generateId();
+
       let overallDelivered = 0;
       const now = Date.now();
 
@@ -310,6 +366,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
           content: body,
           subject: subject || undefined,
           replyTo: replyTo ?? undefined,
+          conversationId,
         });
 
         if (result.delivered > 0) overallDelivered++;
@@ -325,6 +382,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
           tags: [
             ...(replyTo ? [["e", replyTo]] : []),
             ["p", recipient.pubkey],
+            ...(conversationId ? [["conversation", conversationId]] : []),
           ],
           subject: subject || "(no subject)",
           preview: body.replace(/\n/g, " ").slice(0, 120),
@@ -336,6 +394,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
           mailbox: "sent" as const,
           labelIds: [],
           replyTo,
+          conversationId,
           relayUrls: [],
           attachments: [],
           isEncrypted: true,

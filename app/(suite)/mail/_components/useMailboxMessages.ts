@@ -3,6 +3,7 @@ import { useLabelsStore } from "@/lib/stores/labels";
 import { useProfilesStore } from "@/lib/stores/profiles";
 import { useComposeStore } from "@/lib/stores/compose";
 import { useIdentityStore } from "@/lib/stores/identity";
+import { useGroupsStore } from "@/lib/stores/groups";
 import { useMemo, useEffect, useState, useRef } from "react";
 import type { MockMessage, MockContact } from "@/lib/mock/threads";
 import type { AttachmentRef, Draft } from "@/lib/types";
@@ -33,6 +34,7 @@ function draftToMessage(draft: Draft): MockMessage {
     encrypted: true,
     relayCount: draft.relayOverrides.length || 3,
     threadLength: 1,
+    conversationId: draft.conversationId,
   };
 }
 
@@ -85,9 +87,14 @@ export function useMailboxMessages(mailbox: string): {
         .map((id) => byId[id])
         .filter((m): m is NonNullable<typeof m> => m != null)
         .filter((m) => {
+          const isGroupInbox = (pubkey: string) => {
+            const groups = useGroupsStore.getState().byPubkey;
+            return pubkey in groups;
+          };
+
           switch (mailbox) {
             case "inbox":
-              return !m.archived && !m.spam && m.snoozedUntil === null && (myPubkey === null || m.recipientPubkey === myPubkey);
+              return !m.archived && !m.spam && m.snoozedUntil === null && (myPubkey === null || m.recipientPubkey === myPubkey || isGroupInbox(m.recipientPubkey));
             case "starred":
               return m.starred;
             case "snoozed":
@@ -123,11 +130,18 @@ export function realToMock(
 ): MockMessage {
   const isSent = myPubkey !== null && real.pubkey === myPubkey;
   const targetPubkey = isSent ? (real.recipientPubkey ?? real.pubkey) : real.pubkey;
-  const profile = profiles[targetPubkey];
-  const displayName = profile?.name || profile?.displayName || targetPubkey.slice(0, 8);
-  const initials = profile?.name
-    ? profile.name.slice(0, 2).toUpperCase()
-    : targetPubkey.slice(0, 2).toUpperCase();
+  const groups = useGroupsStore.getState().byPubkey;
+  const isGroupTarget = !!(targetPubkey in groups);
+  const groupData = isGroupTarget ? groups[targetPubkey] : null;
+  const profile = isGroupTarget ? null : profiles[targetPubkey];
+  const displayName = isGroupTarget
+    ? `Group (${groupData?.members.length ?? 0})`
+    : profile?.name || profile?.displayName || targetPubkey.slice(0, 8);
+  const initials = isGroupTarget
+    ? "GR"
+    : profile?.name
+      ? profile.name.slice(0, 2).toUpperCase()
+      : targetPubkey.slice(0, 2).toUpperCase();
 
   const contact: MockContact = {
     id: targetPubkey,
@@ -158,6 +172,7 @@ export function realToMock(
     relayCount: real.relayUrls?.length ?? 3,
     threadLength: 1,
     deliveryStatus: real.deliveryStatus,
+    conversationId: real.conversationId,
     replyTo: real.replyTo,
     kind: real.kind,
     pubkey: real.pubkey,
