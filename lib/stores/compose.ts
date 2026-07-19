@@ -3,7 +3,7 @@ import { immer } from "zustand/middleware/immer";
 import { sendMessage, createKeyStore } from "@post/nostr-core";
 import { decode } from "nostr-tools/nip19";
 import { generateId, draftHasContent } from "@/lib/utils";
-import { db } from "@/lib/db/schema";
+import { db, addEdge, ensureConversation, EDGE } from "@/lib/db/poly";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useMessagesStore } from "@/lib/stores/messages";
 import type { Draft, RecipientEntry, AttachmentUpload, SendResult } from "@/lib/types";
@@ -238,6 +238,11 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         };
         await db.messages.put(msg);
         await useMessagesStore.getState().upsertMessage(msg);
+        if (msg.replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, msg.replyTo);
+        if (msg.conversationId) {
+          await ensureConversation(msg.conversationId);
+          await addEdge(msg.id, EDGE.PART_OF, msg.conversationId);
+        }
       }
 
       if (hasMultipleToCc) {
@@ -403,6 +408,11 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         };
         await db.messages.put(sentMessage);
         await useMessagesStore.getState().upsertMessage(sentMessage);
+        if (replyTo) await addEdge(sentMessage.id, EDGE.REPLIES_TO, replyTo);
+        if (conversationId) {
+          await ensureConversation(conversationId);
+          await addEdge(sentMessage.id, EDGE.PART_OF, conversationId);
+        }
       }
 
       return overallDelivered > 0;

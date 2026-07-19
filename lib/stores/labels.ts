@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { generateId } from "@/lib/utils";
-import { db } from "@/lib/db/schema";
+import { db, addEdge, removeEdges, EDGE } from "@/lib/db/poly";
 import type { Label } from "@/lib/types";
 
 interface LabelsState {
@@ -37,6 +37,7 @@ export const useLabelsStore = create<LabelsState>()(immer((set, get) => ({
     if (!label || label.messageIds.includes(messageId)) return;
     const updated = { ...label, messageIds: [...label.messageIds, messageId] };
     await db.labels.put(updated);
+    await addEdge(messageId, EDGE.HAS_LABEL, labelId);
     set((state) => { state.byId[labelId] = updated; });
   },
 
@@ -46,6 +47,7 @@ export const useLabelsStore = create<LabelsState>()(immer((set, get) => ({
     if (!label) return;
     const updated = { ...label, messageIds: label.messageIds.filter((id) => id !== messageId) };
     await db.labels.put(updated);
+    await removeEdges(messageId, EDGE.HAS_LABEL, labelId);
     set({ byId: { ...byId, [labelId]: updated } });
   },
 })));

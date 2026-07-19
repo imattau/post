@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createRelayPool, DEFAULT_RELAYS, fetchRelayList } from "@post/nostr-core";
 import type { RelayPool } from "@post/nostr-core";
-import { db } from "@/lib/db/schema";
+import { db } from "@/lib/db/poly";
 import { useSettingsStore } from "@/lib/stores/settings";
 import type { RelayConfig, RelayStatus } from "@/lib/types";
 

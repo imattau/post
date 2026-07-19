@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { db } from "@/lib/db/schema";
+import { db } from "@/lib/db/poly";
 import { npubEncode } from "nostr-tools/nip19";
 import { fetchContactList, batchFetchProfiles } from "@post/nostr-core";
 import { useRelaysStore } from "@/lib/stores/relays";

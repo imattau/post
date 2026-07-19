@@ -3,7 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const driveFolderRows: any[] = [];
 const driveFileRows: any[] = [];
 
-vi.mock("@/lib/db/schema", () => ({
+vi.mock("@/lib/db/poly", () => ({
+  EDGE: { HAS_LABEL: "HAS_LABEL", IN_FOLDER: "IN_FOLDER", CHILD_OF: "CHILD_OF", BELONGS_TO: "BELONGS_TO", REPLIES_TO: "REPLIES_TO", PART_OF: "PART_OF" },
+  addEdge: vi.fn(),
+  removeEdges: vi.fn(),
+  ensureConversation: vi.fn(),
   db: {
     messages: { orderBy: vi.fn(() => ({ reverse: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })), put: vi.fn(), delete: vi.fn(), where: vi.fn(() => ({ count: vi.fn(async () => 0) })) },
     drafts: {

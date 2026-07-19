@@ -1,7 +1,7 @@
 import type { RelayPool } from "@post/nostr-core";
 import { parseFileMetadataEvent, parseFolderEvent, decryptContentForOwner, subscribeAccumulate } from "@post/nostr-core";
 import type { DriveFile, DriveFolder } from "@/lib/types";
-import { db } from "@/lib/db/schema";
+import { db, addEdge, EDGE } from "@/lib/db/poly";
 
 export async function syncDriveFromRelays(
   pool: RelayPool,
@@ -34,6 +34,9 @@ export async function syncDriveFromRelays(
 
   if (newFiles.length > 0) {
     await db.driveFiles.bulkPut(newFiles);
+    for (const f of newFiles) {
+      if (f.folderId) await addEdge(f.id, EDGE.IN_FOLDER, f.folderId);
+    }
   }
 
   const existingFolders = await db.driveFolders.toArray();

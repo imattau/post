@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useDebounce } from "use-debounce";
 import { useDropzone } from "react-dropzone";
 import prettyBytes from "pretty-bytes";
-import { db } from "@/lib/db/schema";
+import { db } from "@/lib/db/poly";
 import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";

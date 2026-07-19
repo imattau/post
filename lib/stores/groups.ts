@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { nip17 } from "nostr-tools";
 import type { GroupInbox, RecipientEntry } from "@post/nostr-core";
-import { db } from "@/lib/db/schema";
+import { db } from "@/lib/db/poly";
 
 interface GroupsState {
   byConversationId: Record<string, GroupInbox>;

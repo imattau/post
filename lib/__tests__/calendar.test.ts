@@ -3,7 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const calendarCalendarRows: any[] = [];
 const calendarEventRows: any[] = [];
 
-vi.mock("@/lib/db/schema", () => ({
+vi.mock("@/lib/db/poly", () => ({
+  EDGE: { HAS_LABEL: "HAS_LABEL", IN_FOLDER: "IN_FOLDER", CHILD_OF: "CHILD_OF", BELONGS_TO: "BELONGS_TO", REPLIES_TO: "REPLIES_TO", PART_OF: "PART_OF" },
+  addEdge: vi.fn(),
+  removeEdges: vi.fn(),
+  ensureConversation: vi.fn(),
   db: {
     calendarCalendars: {
       count: vi.fn(async () => calendarCalendarRows.length),
@@ -161,7 +165,7 @@ describe("calendar store", () => {
   });
 
   it("load sets error on failure", async () => {
-    const { db } = await import("@/lib/db/schema");
+    const { db } = await import("@/lib/db/poly");
     vi.mocked(db.calendarCalendars.toArray).mockRejectedValueOnce(new Error("DB error"));
     const { useCalendarStore } = await import("@/lib/stores/calendar");
     await useCalendarStore.getState().load();
@@ -190,7 +194,7 @@ describe("calendar store", () => {
   it("createEvent persists to DB", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
     await useCalendarStore.getState().createEvent(MOCK_EVENT);
-    const { db } = await import("@/lib/db/schema");
+    const { db } = await import("@/lib/db/poly");
     expect(db.calendarEvents.put).toHaveBeenCalled();
   });
 

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { db } from "@/lib/db/schema";
+import { db } from "@/lib/db/poly";
 import type { Message, MailboxKind } from "@/lib/types";
 
 interface MessagesState {

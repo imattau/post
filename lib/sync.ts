@@ -4,7 +4,7 @@ import type { Message } from "@post/nostr-core";
 import { nip17 } from "nostr-tools";
 import type { NostrEvent } from "nostr-tools";
 import { decode } from "nostr-tools/nip19";
-import { db } from "./db/schema";
+import { db, addEdge, ensureConversation, EDGE } from "./db/poly";
 import { useMessagesStore } from "./stores/messages";
 import { useRelaysStore } from "./stores/relays";
 import { useGroupsStore } from "./stores/groups";
@@ -112,6 +112,11 @@ async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
 
     useMessagesStore.getState().ingestFromRelay(msg);
     await db.messages.put(msg);
+    if (msg.replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, msg.replyTo);
+    if (msg.conversationId) {
+      await ensureConversation(msg.conversationId);
+      await addEdge(msg.id, EDGE.PART_OF, msg.conversationId);
+    }
   } catch {
     // Skip events that fail to decrypt
   }
@@ -165,6 +170,11 @@ async function handleKind1059(event: NostrEvent, identity: { pubkey: string }) {
 
     useMessagesStore.getState().ingestFromRelay(msg);
     await db.messages.put(msg);
+    if (msg.replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, msg.replyTo);
+    if (msg.conversationId) {
+      await ensureConversation(msg.conversationId);
+      await addEdge(msg.id, EDGE.PART_OF, msg.conversationId);
+    }
   } catch {
     // Skip events that fail to decrypt
   }

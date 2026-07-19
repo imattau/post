@@ -6,7 +6,7 @@ import { encryptDriveBlob, uploadBlob, deleteBlob, createFileMetadataEvent, encr
 import type { BlossomServer } from "@post/nostr-core";
 import { decode } from "nostr-tools/nip19";
 import { finalizeEvent } from "nostr-tools/pure";
-import { db } from "@/lib/db/schema";
+import { db, addEdge, EDGE } from "@/lib/db/poly";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useSettingsStore } from "@/lib/stores/settings";
@@ -321,6 +321,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     
 
         await db.driveFiles.put(fileRecord);
+        if (targetFolderId) await addEdge(driveFile.id, EDGE.IN_FOLDER, targetFolderId);
         set((state) => ({
           files: [driveFile, ...state.files],
           folders: state.folders.map((folder) =>

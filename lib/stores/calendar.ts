@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { subMonths, addMonths, subWeeks, addWeeks, startOfMonth, addHours } from "date-fns";
-import { db } from "@/lib/db/schema";
+import { db, addEdge, EDGE } from "@/lib/db/poly";
 import { generateId } from "@/lib/utils";
 import type { CalendarCalendar, CalendarEvent, CalendarSyncState, CalendarViewMode } from "@/lib/types";
 import { publishCalendarEvent, deleteCalendarEvent as deleteCalendarEventOnRelay, syncCalendarFromRelays } from "@/lib/calendar";
@@ -157,6 +157,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const events = [...get().events, created].sort((a, b) => a.startAt - b.startAt);
       set({ events, sync: recomputeSync(get().calendars, events), selectedEventId: created.id });
       await db.calendarEvents.put(created);
+      await addEdge(created.id, EDGE.BELONGS_TO, created.calendarId);
       const identity = useIdentityStore.getState().identity;
       const pool = useRelaysStore.getState().pool;
       if (identity && pool) {
