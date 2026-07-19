@@ -1,24 +1,24 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Contacts", () => {
-  test("contacts overview shows stats", async ({ page }) => {
+  test("contacts overview shows stat labels", async ({ page }) => {
     await page.goto("/contacts");
-    await expect(page.locator("text=328")).toBeVisible();
-    await expect(page.locator("text=Following")).toBeVisible();
-    await expect(page.locator("text=Muted")).toBeVisible();
-    await expect(page.locator("text=Blocked")).toBeVisible();
+    // Stat labels are always visible (values are dynamic)
+    await expect(page.getByText("Following").first()).toBeVisible();
+    await expect(page.getByText("Muted").first()).toBeVisible();
+    await expect(page.getByText("Blocked").first()).toBeVisible();
   });
 
   test("contacts list shows names", async ({ page }) => {
     await page.goto("/contacts");
-    await expect(page.locator("text=Alice Nguyen")).toBeVisible();
-    await expect(page.locator("text=Jonas Berg")).toBeVisible();
+    await expect(page.getByText("Alice Nguyen")).toBeVisible();
+    await expect(page.getByText("Jonas Berg")).toBeVisible();
   });
 
   test("clicking contact shows profile detail", async ({ page }) => {
     await page.goto("/contacts");
-    await page.locator("text=Alice Nguyen").click();
-    await expect(page.locator("text=@alice")).toBeVisible();
-    await expect(page.locator("text=Back to contacts")).toBeVisible();
+    await page.getByText("Alice Nguyen").click();
+    await expect(page.getByText("@alice")).toBeVisible();
+    await expect(page.getByText("Back to contacts")).toBeVisible();
   });
 });

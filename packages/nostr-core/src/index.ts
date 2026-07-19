@@ -5,7 +5,7 @@ export { createRelayPool, DEFAULT_RELAYS } from "./relays";
 export type { RelayPool } from "./relays";
 export { sendMessage, replyToThread, decryptEvent, decryptIncoming, parseMessagePayloadAndUnwrap, extractSubject } from "./messages";
 export type { SendOptions, SendResult } from "./messages";
-export { fetchProfile, resolveNip05, searchProfiles, batchFetchProfiles } from "./profiles";
+export { fetchProfile, resolveNip05, searchProfiles, batchFetchProfiles, fetchContactList } from "./profiles";
 export { uploadBlob, downloadBlob, deleteBlob } from "./blossom";
 export type { BlossomServer } from "./blossom";
 export { fetchRelayList, fetchBlossomList } from "./relay-list";

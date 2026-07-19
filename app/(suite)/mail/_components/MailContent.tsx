@@ -106,6 +106,34 @@ export default function MailContent({ children }: { children: React.ReactNode })
     await navigator.clipboard?.writeText(id);
   }, []);
 
+  const handleReplyAll = useCallback(() => {
+    if (!selectedMessage) return;
+    useComposeStore.getState().open({
+      to: [{
+        pubkey: selectedMessage.sender.id,
+        npub: selectedMessage.sender.npub,
+        name: selectedMessage.sender.name,
+        avatarUrl: "",
+        isGroup: false,
+      }],
+      subject: selectedMessage.subject.startsWith("Re:") ? selectedMessage.subject : `Re: ${selectedMessage.subject}`,
+      body: `> ${selectedMessage.body.replace(/\n/g, "\n> ")}\n\n`,
+      replyTo: selectedMessage.id,
+    });
+    router.push(`${pathname}?compose=true`, { scroll: false });
+  }, [selectedMessage, router, pathname]);
+
+  const handleForward = useCallback(() => {
+    if (!selectedMessage) return;
+    useComposeStore.getState().open({
+      to: [],
+      subject: `Fwd: ${selectedMessage.subject}`,
+      body: `\n\n-------- Forwarded message --------\nFrom: ${selectedMessage.sender.name}\nSubject: ${selectedMessage.subject}\nDate: ${new Date(selectedMessage.createdAt).toLocaleString()}\n\n${selectedMessage.body}`,
+      replyTo: null,
+    });
+    router.push(`${pathname}?compose=true`, { scroll: false });
+  }, [selectedMessage, router, pathname]);
+
   const handleThreadSelect = useCallback(
     (id: string) => router.push(`${pathname}?c=${id}`, { scroll: false }),
     [router, pathname]
@@ -183,6 +211,7 @@ export default function MailContent({ children }: { children: React.ReactNode })
             message={selectedMessage}
             starred={selectedMessage.starred}
             spam={messagesById[selectedMessage.id]?.spam ?? currentMailbox === "spam"}
+            archived={messagesById[selectedMessage.id]?.archived ?? currentMailbox === "archive"}
             onBack={clearSelection}
             onToggleStar={() => handleToggleStar(selectedMessage.id)}
             onArchive={() => handleArchive(selectedMessage.id)}
@@ -191,6 +220,8 @@ export default function MailContent({ children }: { children: React.ReactNode })
             onToggleRead={() => handleToggleRead(selectedMessage.id, selectedMessage.read)}
             onToggleSpam={() => handleToggleSpam(selectedMessage.id)}
             onCopyEventId={() => handleCopyEventId(selectedMessage.id)}
+            onReplyAll={handleReplyAll}
+            onForward={handleForward}
             threadMessages={threadMessages}
             onThreadSelect={handleThreadSelect}
           />

@@ -66,6 +66,7 @@ export default function MessageListView({
 
   const batchToggleStar = useMessagesStore((s) => s.toggleStar);
   const batchToggleArchive = useMessagesStore((s) => s.toggleArchive);
+  const batchToggleSpam = useMessagesStore((s) => s.toggleSpam);
   const batchDeleteMessage = useMessagesStore((s) => s.deleteMessage);
   const batchMarkRead = useMessagesStore((s) => s.markRead);
   const batchMarkUnread = useMessagesStore((s) => s.markUnread);
@@ -228,6 +229,12 @@ export default function MessageListView({
               className="h-8 px-3 rounded-[10px] border border-border bg-sidebar text-[11px] font-medium text-text-secondary hover:border-brand/50 cursor-pointer transition-all duration-150"
             >
               Star
+            </button>
+            <button
+              onClick={() => performBatchAction(batchToggleSpam)}
+              className="h-8 px-3 rounded-[10px] border border-border bg-sidebar text-[11px] font-medium text-text-secondary hover:border-brand/50 cursor-pointer transition-all duration-150"
+            >
+              Spam
             </button>
             <button
               onClick={() => performBatchAction(batchMarkRead)}

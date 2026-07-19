@@ -60,6 +60,26 @@ export async function searchProfiles(
   );
 }
 
+export async function fetchContactList(
+  pool: RelayPool,
+  pubkey: string
+): Promise<string[]> {
+  return subscribeSingle(
+    pool,
+    [{ kinds: [3], authors: [pubkey], limit: 1 }],
+    (event) => {
+      const pubkeys: string[] = [];
+      for (const tag of event.tags) {
+        if (tag[0] === "p" && tag[1]) {
+          pubkeys.push(tag[1]);
+        }
+      }
+      return pubkeys;
+    },
+    5000
+  ).then((r) => r ?? []);
+}
+
 export async function batchFetchProfiles(
   pool: RelayPool,
   pubkeys: string[]

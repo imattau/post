@@ -16,6 +16,7 @@ export default function ReadingPane({
   message,
   starred,
   spam,
+  archived,
   onBack,
   onToggleStar,
   onArchive,
@@ -24,6 +25,8 @@ export default function ReadingPane({
   onToggleRead,
   onToggleSpam,
   onCopyEventId,
+  onReplyAll,
+  onForward,
   threadMessages,
   onThreadSelect,
 }: {
@@ -38,6 +41,9 @@ export default function ReadingPane({
   onToggleRead: () => void;
   onToggleSpam: () => void;
   onCopyEventId: () => void;
+  onReplyAll: () => void;
+  onForward: () => void;
+  archived: boolean;
   threadMessages?: Message[];
   onThreadSelect?: (id: string) => void;
 }) {
@@ -60,8 +66,11 @@ export default function ReadingPane({
         onToggleRead={onToggleRead}
         onToggleSpam={onToggleSpam}
         onCopyEventId={onCopyEventId}
+        onReplyAll={onReplyAll}
+        onForward={onForward}
         read={message.read}
         spam={spam}
+        archived={archived}
         messageId={message.id}
       />
 

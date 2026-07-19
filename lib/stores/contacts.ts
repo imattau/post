@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import { db } from "@/lib/db/schema";
+import { npubEncode } from "nostr-tools/nip19";
+import { fetchContactList, batchFetchProfiles } from "@post/nostr-core";
+import { useRelaysStore } from "@/lib/stores/relays";
 import type { Contact } from "@/lib/types";
 
 export type ContactStatus = "Following" | "Muted" | "Blocked";
@@ -14,31 +17,32 @@ export interface ContactView extends Contact {
   color: string;
 }
 
-const SEED_CONTACTS: ContactView[] = [
-  { id: "1", pubkey: "alice", initials: "AL", name: "Alice Nguyen", handle: "@alice", npub: "npub1alice…x9k2", bio: "Designer · Melbourne", about: "Designer · Melbourne", picture: "", nip05: "", nip05Verified: false, lastMessageAt: Date.now(), relayRecommended: "", status: "Following", timestamp: "Today", color: "var(--color-avatar-1)" },
-  { id: "2", pubkey: "jonas", initials: "JB", name: "Jonas Berg", handle: "@jonas", npub: "npub1jonas…m4p8", bio: "Relay developer · Oslo", about: "Relay developer · Oslo", picture: "", nip05: "", nip05Verified: false, lastMessageAt: Date.now() - 86_400_000, relayRecommended: "", status: "Following", timestamp: "Yesterday", color: "var(--color-avatar-2)" },
-  { id: "3", pubkey: "noise", initials: "NW", name: "Noise Watch", handle: "@noisewatch", npub: "npub1noise…j7h4", bio: "Photographer · Seoul", about: "Photographer · Seoul", picture: "", nip05: "", nip05Verified: false, lastMessageAt: Date.now(), relayRecommended: "", status: "Following", timestamp: "Friday", color: "var(--color-avatar-5)" },
-  { id: "4", pubkey: "spam", initials: "SP", name: "Spam Account", handle: "@fastprofit", npub: "npub1spam…z6n1", bio: "Product strategist · Madrid", about: "Product strategist · Madrid", picture: "", nip05: "", nip05Verified: false, lastMessageAt: Date.now(), relayRecommended: "", status: "Following", timestamp: "Thursday", color: "var(--color-avatar-4)" },
-  { id: "5", pubkey: "relay", initials: "RM", name: "Relay Monitor", handle: "@relaymon", npub: "npub1relay…h7j3", bio: "Automated service identity", about: "Automated service identity", picture: "", nip05: "", nip05Verified: false, lastMessageAt: Date.now(), relayRecommended: "", status: "Following", timestamp: "Wednesday", color: "var(--color-avatar-6)" },
+const AVATAR_COLORS = [
+  "var(--color-avatar-1)", "var(--color-avatar-2)", "var(--color-avatar-3)",
+  "var(--color-avatar-4)", "var(--color-avatar-5)", "var(--color-avatar-6)",
+  "var(--color-avatar-7)",
 ];
+
+function pickColor(name: string): string {
+  const hash = Math.abs(name.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0));
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
 
 interface ContactsState {
   contacts: ContactView[];
+  loading: boolean;
   loadContacts: () => Promise<void>;
+  fetchNostrContacts: () => Promise<void>;
   setStatus: (id: string, status: ContactStatus) => Promise<void>;
 }
 
 export const useContactsStore = create<ContactsState>((set, get) => ({
-  contacts: SEED_CONTACTS,
+  contacts: [],
+  loading: false,
 
   async loadContacts() {
     const stored = await db.contacts.toArray();
-    if (stored.length === 0) {
-      await db.contacts.bulkPut(SEED_CONTACTS);
-      set({ contacts: SEED_CONTACTS });
-      return;
-    }
-    const colors = ["var(--color-avatar-1)", "var(--color-avatar-2)", "var(--color-avatar-3)", "var(--color-avatar-4)", "var(--color-avatar-5)", "var(--color-avatar-6)"];
+    if (stored.length === 0) return;
     set({
       contacts: stored.map((contact) => ({
         id: contact.pubkey,
@@ -56,9 +60,65 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
         bio: contact.about || "",
         status: ((contact as ContactView).status ?? "Following") as ContactStatus,
         timestamp: contact.lastMessageAt ? new Date(contact.lastMessageAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "",
-        color: colors[Math.abs(contact.name.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % colors.length],
+        color: pickColor(contact.name),
       })),
     });
+  },
+
+  async fetchNostrContacts() {
+    const pool = useRelaysStore.getState().pool;
+    if (!pool) return;
+
+    set({ loading: true });
+
+    const myPubkey = (await (await import("@/lib/stores/identity")).useIdentityStore.getState().identity)?.pubkey;
+    if (!myPubkey) {
+      set({ loading: false });
+      return;
+    }
+
+    const pubkeys = await fetchContactList(pool, myPubkey);
+    if (pubkeys.length === 0) {
+      set({ loading: false });
+      return;
+    }
+
+    const profileMap = await batchFetchProfiles(pool, pubkeys);
+
+    const existing = get().contacts;
+    const existingByPubkey = new Map(existing.map((c) => [c.pubkey, c]));
+
+    const contacts: ContactView[] = pubkeys.map((pubkey) => {
+      const existingContact = existingByPubkey.get(pubkey);
+      const profile = profileMap.get(pubkey);
+      const name = profile?.name || profile?.displayName || existingContact?.name || pubkey.slice(0, 8);
+      const nip05 = profile?.nip05 || existingContact?.nip05 || "";
+      const picture = profile?.picture || existingContact?.picture || "";
+      const about = profile?.about || existingContact?.about || "";
+
+      return {
+        id: pubkey,
+        pubkey,
+        npub: npubEncode(pubkey),
+        name,
+        about,
+        picture,
+        nip05,
+        nip05Verified: existingContact?.nip05Verified ?? false,
+        lastMessageAt: existingContact?.lastMessageAt ?? 0,
+        relayRecommended: existingContact?.relayRecommended || "",
+        initials: name.slice(0, 2).toUpperCase(),
+        handle: nip05 ? `@${nip05.split("@")[0]}` : `@${name.toLowerCase().replace(/\s+/g, "")}`,
+        bio: about,
+        status: (existingContact?.status ?? "Following") as ContactStatus,
+        timestamp: existingContact?.lastMessageAt ? new Date(existingContact.lastMessageAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "",
+        color: pickColor(name),
+      };
+    });
+
+    await db.contacts.clear();
+    await db.contacts.bulkPut(contacts);
+    set({ contacts, loading: false });
   },
 
   async setStatus(id, status) {

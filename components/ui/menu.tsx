@@ -18,6 +18,7 @@ function MenuTrigger({ className, ...props }: MenuPrimitive.Trigger.Props) {
   return (
     <MenuPrimitive.Trigger
       data-slot="menu-trigger"
+      nativeButton={false}
       className={cn("cursor-pointer", className)}
       {...props}
     />

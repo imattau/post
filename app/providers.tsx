@@ -61,7 +61,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       const downloadMetadata = settings["download-profile-metadata"] ?? true;
 
       if (downloadMetadata) {
-        await useContactsStore.getState().loadContacts();
         useIdentityStore.getState().refreshProfile();
       }
       await useRelaysStore.getState().loadRelayConfigs();
@@ -80,6 +79,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       }
 
       startSync();
+
+      if (downloadMetadata) {
+        useContactsStore.getState().fetchNostrContacts();
+      }
     })();
   }, [identity]);
 

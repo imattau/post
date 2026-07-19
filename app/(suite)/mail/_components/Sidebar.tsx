@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Inbox, Star, Clock, ArrowUpRight, FileEdit, Archive, ShieldAlert, SquarePen, Plus } from "lucide-react";
+import { Inbox, Star, Clock, ArrowUpRight, FileEdit, Archive, ShieldAlert, SquarePen, Plus, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useShallow } from "zustand/shallow";
@@ -29,16 +29,20 @@ export default function Sidebar({
 
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState("#60A5FA");
+
+  const labelColors = ["#60A5FA", "#34D399", "#FBBF24", "#FB7185", "#A78BFA", "#14B8A6", "#F97316", "#64748B"];
+
+  const deleteLabel = useLabelsStore((s) => s.deleteLabel);
 
   const createLabel = useCallback(async () => {
     if (!newLabelName.trim()) return;
-    const colors = ["#60A5FA", "#34D399", "#FBBF24", "#FB7185", "#A78BFA", "#14B8A6"];
-    const color = colors[labelIds.length % colors.length];
-    await useLabelsStore.getState().createLabel(newLabelName.trim(), color);
+    await useLabelsStore.getState().createLabel(newLabelName.trim(), newLabelColor);
     toast.success(`Label "${newLabelName.trim()}" created`);
     setNewLabelName("");
+    setNewLabelColor("#60A5FA");
     setShowLabelInput(false);
-  }, [newLabelName, labelIds.length]);
+  }, [newLabelName, newLabelColor]);
 
   const navItems = [
     { icon: <Inbox size={15} />, label: "Inbox", count: inboxUnreadCount, href: "/mail/inbox" },
@@ -109,29 +113,49 @@ export default function Sidebar({
             <Link
               key={id}
               href={`/mail/labels/${id}`}
-              className={`flex items-center gap-3 h-[30px] px-3 rounded-[10px] no-underline transition-all duration-150 ${
+              className={`group flex items-center gap-3 h-[30px] px-3 rounded-[10px] no-underline transition-all duration-150 ${
                 isActive
                   ? "bg-surface-active text-white"
                   : "text-text-secondary hover:text-text-near-white"
               }`}
             >
               <span className="w-[10px] h-[10px] rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
-              <span className="text-[13px] font-medium">{label.name}</span>
+              <span className="flex-1 text-[13px] font-medium truncate">{label.name}</span>
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); void deleteLabel(id); toast.success(`Label "${label.name}" deleted`); }}
+                className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-danger cursor-pointer transition-all duration-150"
+                aria-label={`Delete label ${label.name}`}
+              >
+                <X size={12} />
+              </button>
             </Link>
           );
         })}
         {showLabelInput && (
-          <div className="flex items-center gap-2 px-3 py-1">
+          <div className="flex flex-col gap-2 px-3 py-1">
             <input
               type="text"
               value={newLabelName}
               onChange={(e) => setNewLabelName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") createLabel(); if (e.key === "Escape") setShowLabelInput(false); }}
               placeholder="Label name"
-              className="flex-1 h-7 px-2 text-[12px] bg-pill-subtle border border-border rounded text-text-primary placeholder-text-placeholder outline-none"
+              className="h-7 px-2 text-[12px] bg-pill-subtle border border-border rounded text-text-primary placeholder-text-placeholder outline-none"
               autoFocus
             />
-            <button onClick={createLabel} className="text-ok text-[12px] font-medium cursor-pointer">Add</button>
+            <div className="flex items-center gap-1.5">
+              {labelColors.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setNewLabelColor(color)}
+                  className={`w-5 h-5 rounded-full cursor-pointer border-2 transition-all duration-150 ${
+                    newLabelColor === color ? "border-white scale-110" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Color ${color}`}
+                />
+              ))}
+            </div>
+            <button onClick={createLabel} className="self-end text-ok text-[12px] font-medium cursor-pointer">Add</button>
           </div>
         )}
       </div>

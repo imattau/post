@@ -15,8 +15,11 @@ export default function ReadingTopBar({
   onToggleRead,
   onToggleSpam,
   onCopyEventId,
+  onReplyAll,
+  onForward,
   read,
   spam,
+  archived,
   messageId,
 }: {
   onBack: () => void;
@@ -28,8 +31,11 @@ export default function ReadingTopBar({
   onToggleRead: () => void;
   onToggleSpam: () => void;
   onCopyEventId: () => void;
+  onReplyAll: () => void;
+  onForward: () => void;
   read: boolean;
   spam: boolean;
+  archived: boolean;
   messageId: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -40,11 +46,11 @@ export default function ReadingTopBar({
 
   const actions = useMemo(
     () => [
-      { label: "Archive", onClick: onArchive },
+      { label: spam ? "Not spam" : archived ? "Move to inbox" : "Archive", onClick: spam ? onToggleSpam : onArchive },
       { label: "Snooze", onClick: onSnooze },
       { label: "Delete", onClick: onDelete },
     ],
-    [onArchive, onSnooze, onDelete]
+    [spam, archived, onArchive, onSnooze, onDelete, onToggleSpam]
   );
 
   return (
@@ -93,6 +99,13 @@ export default function ReadingTopBar({
         <Menu.Portal>
           <Menu.Positioner className="z-20" side="bottom" align="end">
             <Menu.Popup className="w-44 overflow-hidden rounded-[10px] border border-border bg-pill-subtle shadow-lg">
+              <Menu.Item onClick={() => { onReplyAll(); setMenuOpen(false); }} className="block w-full px-3 py-2 text-left text-[12px] text-text-primary hover:bg-surface-active data-[highlighted]:bg-surface-active cursor-pointer">
+                Reply all
+              </Menu.Item>
+              <Menu.Item onClick={() => { onForward(); setMenuOpen(false); }} className="block w-full px-3 py-2 text-left text-[12px] text-text-primary hover:bg-surface-active data-[highlighted]:bg-surface-active cursor-pointer">
+                Forward
+              </Menu.Item>
+              <Menu.Separator className="border-t border-border my-1" />
               <Menu.Item onClick={() => { onToggleSpam(); setMenuOpen(false); }} className="block w-full px-3 py-2 text-left text-[12px] text-text-primary hover:bg-surface-active data-[highlighted]:bg-surface-active cursor-pointer">
                 {spam ? "Not spam" : "Mark spam"}
               </Menu.Item>

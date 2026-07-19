@@ -10,6 +10,7 @@ function renderTopBar(overrides: Partial<ComponentProps<typeof ReadingTopBar>> =
     starred: false,
     read: true,
     spam: false,
+    archived: false,
     onToggleStar: vi.fn(),
     onArchive: vi.fn(),
     onSnooze: vi.fn(),
@@ -17,6 +18,8 @@ function renderTopBar(overrides: Partial<ComponentProps<typeof ReadingTopBar>> =
     onToggleRead: vi.fn(),
     onToggleSpam: vi.fn(),
     onCopyEventId: vi.fn(),
+    onReplyAll: vi.fn(),
+    onForward: vi.fn(),
     messageId: "test-msg-1",
     ...overrides,
   };
@@ -78,6 +81,20 @@ describe("ReadingTopBar", () => {
     expect(onToggleRead).toHaveBeenCalledOnce();
   });
 
+  it("more menu calls reply all and forward handlers", async () => {
+    const onReplyAll = vi.fn();
+    const onForward = vi.fn();
+    renderTopBar({ onReplyAll, onForward });
+
+    await userEvent.click(screen.getByRole("button", { name: "More message actions" }));
+    await userEvent.click(await screen.findByText("Reply all"));
+    await userEvent.click(screen.getByRole("button", { name: "More message actions" }));
+    await userEvent.click(await screen.findByText("Forward"));
+
+    expect(onReplyAll).toHaveBeenCalledOnce();
+    expect(onForward).toHaveBeenCalledOnce();
+  });
+
   it("more menu calls spam and copy handlers", async () => {
     const onToggleSpam = vi.fn();
     const onCopyEventId = vi.fn();
@@ -90,5 +107,15 @@ describe("ReadingTopBar", () => {
 
     expect(onToggleSpam).toHaveBeenCalledOnce();
     expect(onCopyEventId).toHaveBeenCalledOnce();
+  });
+
+  it("shows Move to inbox when archived", () => {
+    renderTopBar({ archived: true });
+    expect(screen.getByText("Move to inbox")).toBeInTheDocument();
+  });
+
+  it("shows Not spam when spam", () => {
+    renderTopBar({ spam: true });
+    expect(screen.getByText("Not spam")).toBeInTheDocument();
   });
 });

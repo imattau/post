@@ -21,7 +21,11 @@ export const ContactSuggestions = memo(function ContactSuggestions({
   highlightedRef.current = !!selectedItemId;
 
   const suggestions = useMemo(() => {
-    if (!recipientText.trim()) return [];
+    if (!recipientText.trim()) {
+      return [...contacts]
+        .sort((a, b) => b.lastMessageAt - a.lastMessageAt)
+        .slice(0, 6);
+    }
     return search.search(recipientText, contacts).slice(0, 6);
   }, [contacts, recipientText, search]);
 
