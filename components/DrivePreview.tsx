@@ -106,11 +106,11 @@ export default function DrivePreview({
 
       <h4 className="mt-6 text-[16px] font-semibold text-text-near-white">{file.name}</h4>
       <p className="mt-2 text-[11px] text-text-secondary">
-        {formatSize(file.sizeBytes)} · Updated {file.modifiedLabel.toLowerCase()}
+        {formatSize(file.sizeBytes)} · Updated {file.modifiedLabel?.toLowerCase() ?? "unknown"}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {file.tags.map((tag, index) => (
+        {(file.tags ?? []).map((tag, index) => (
           <Pill key={`${tag}-${index}`} active={index === 0}>
             {tag}
           </Pill>

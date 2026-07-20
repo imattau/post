@@ -1,5 +1,5 @@
 import {
-  PolyGraph, IndexedDBAdapter, MemoryAdapter, defineEdges, buildEmbeddingText,
+  PolyGraph, defineEdges, buildEmbeddingText, BinaryStoreAdapter,
 } from "@0xx0lostcause0xx0/polypack";
 import type { DataTransform } from "@0xx0lostcause0xx0/polypack";
 
@@ -87,13 +87,7 @@ const dataTransform: DataTransform = {
   },
 };
 
-const adapter = typeof indexedDB !== "undefined"
-  ? new IndexedDBAdapter({
-      name: "PostDB-Poly",
-      version: 1,
-      nodeIndexes: ["createdAt", "updatedAt"],
-    })
-  : new MemoryAdapter();
+const adapter = new BinaryStoreAdapter({ storeDir: "PostDB-Poly" });
 
 export const graph = new PolyGraph(adapter, 1_000_000, undefined, dataTransform);
 
@@ -256,4 +250,4 @@ export const db = {
   },
 };
 
-export { PolyGraph, IndexedDBAdapter, MemoryAdapter };
+export { PolyGraph, BinaryStoreAdapter };

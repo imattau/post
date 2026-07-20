@@ -86,8 +86,8 @@ const SCREEN_META: Record<DriveScreen, { title: string; subtitle: string; emptyT
   },
 };
 
-function formatSize(bytes: number): string {
-  return prettyBytes(bytes);
+function formatSize(bytes: number | undefined | null): string {
+  return prettyBytes(Number.isFinite(bytes) ? bytes! : 0);
 }
 
 function labelForKind(kind: DriveFile["fileKind"]): string {

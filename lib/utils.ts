@@ -10,8 +10,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatSize(bytes: number): string {
-  return prettyBytes(bytes);
+export function formatSize(bytes: number | undefined | null): string {
+  return prettyBytes(Number.isFinite(bytes) ? bytes! : 0);
 }
 
 export function formatRelativeTime(ts: number): string {
