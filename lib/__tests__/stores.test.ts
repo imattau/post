@@ -8,42 +8,21 @@ vi.mock("@/lib/db/poly", () => ({
   addEdge: vi.fn(),
   removeEdges: vi.fn(),
   ensureConversation: vi.fn(),
-  db: {
-    messages: { orderBy: vi.fn(() => ({ reverse: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })), put: vi.fn(), delete: vi.fn(), where: vi.fn(() => ({ count: vi.fn(async () => 0) })) },
-    drafts: {
-      put: vi.fn(),
-      delete: vi.fn(),
-      get: vi.fn(async () => null),
-      orderBy: vi.fn(() => ({ reverse: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })),
-    },
-    labels: { put: vi.fn(), delete: vi.fn() },
-    contacts: { toArray: vi.fn(async () => []), bulkPut: vi.fn(), put: vi.fn() },
-    relayConfigs: { toArray: vi.fn(async () => []), put: vi.fn(), delete: vi.fn() },
-    driveFiles: {
-      count: vi.fn(async () => driveFileRows.length),
-      bulkPut: vi.fn(async (rows: any[]) => { driveFileRows.splice(0, driveFileRows.length, ...rows); }),
-      toArray: vi.fn(async () => [...driveFileRows]),
-      put: vi.fn(async (row: any) => {
-        const index = driveFileRows.findIndex((item) => item.id === row.id);
-        if (index >= 0) driveFileRows[index] = row;
-        else driveFileRows.push(row);
-      }),
-      delete: vi.fn(async (id: string) => {
-        const index = driveFileRows.findIndex((item) => item.id === id);
-        if (index >= 0) driveFileRows.splice(index, 1);
-      }),
-    },
-    driveFolders: {
-      count: vi.fn(async () => driveFolderRows.length),
-      bulkPut: vi.fn(async (rows: any[]) => { driveFolderRows.splice(0, driveFolderRows.length, ...rows); }),
-      toArray: vi.fn(async () => [...driveFolderRows]),
-      put: vi.fn(async (row: any) => {
-        const index = driveFolderRows.findIndex((item) => item.id === row.id);
-        if (index >= 0) driveFolderRows[index] = row;
-        else driveFolderRows.push(row);
-      }),
-    },
-  },
+  ensureWarm: vi.fn(),
+  flushGraph: vi.fn(),
+  deleteDatabase: vi.fn(),
+  messageSearchText: vi.fn(() => ""),
+  contactSearchText: vi.fn(() => ""),
+  graph: { getEdgeTargets: vi.fn(() => []), getEdgeSources: vi.fn(() => []) },
+  putNode: vi.fn(),
+  putNodes: vi.fn(),
+  deleteNode: vi.fn(),
+  getNode: vi.fn(async () => undefined),
+  getNodes: vi.fn(async () => []),
+  getNodesOrdered: vi.fn(async () => []),
+  countNodes: vi.fn(async () => 0),
+  clearNodes: vi.fn(),
+  db: { delete: vi.fn() },
 }));
 
 vi.mock("@post/nostr-core", async (importOriginal: () => Promise<Record<string, unknown>>) => {
@@ -199,11 +178,12 @@ describe("labels store", () => {
     expect(useLabelsStore.getState().byId[id].name).toBe("Test");
   });
 
-  it("assignLabel adds messageId to label", async () => {
+  it("assignLabel calls addEdge", async () => {
     const { useLabelsStore } = await import("@/lib/stores/labels");
     const id = await useLabelsStore.getState().createLabel("Work", "#60A5FA");
     await useLabelsStore.getState().assignLabel("msg-1", id);
-    expect(useLabelsStore.getState().byId[id].messageIds).toContain("msg-1");
+    const { addEdge } = await import("@/lib/db/poly");
+    expect(addEdge).toHaveBeenCalledWith("msg-1", "HAS_LABEL", id);
   });
 });
 
@@ -346,6 +326,8 @@ describe("drive store", () => {
       files: [],
       folders: [],
       selectedFileId: null,
+      selectedFolderId: null,
+      selectedFileIds: [],
       query: "",
       filter: "all",
       sort: "recent",
@@ -353,19 +335,26 @@ describe("drive store", () => {
       uploadJobs: [],
       loading: false,
       error: null,
+      page: 1,
+      pageSize: 50,
+      hasMore: true,
     });
   });
 
   it("loads seeded demo drive records", async () => {
     const { useDriveStore } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     expect(useDriveStore.getState().files.length).toBeGreaterThan(0);
     expect(useDriveStore.getState().folders.length).toBeGreaterThan(0);
   });
 
   it("filters files by query and category", async () => {
     const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     useDriveStore.getState().setQuery("planning");
     useDriveStore.getState().setFilter("documents");
     const visible = getVisibleDriveFiles(useDriveStore.getState());
@@ -374,7 +363,9 @@ describe("drive store", () => {
 
   it("filters files by drive screen", async () => {
     const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     const state = useDriveStore.getState();
 
     const recentCutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
@@ -418,7 +409,9 @@ describe("drive store", () => {
 
   it("sorts files by name", async () => {
     const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     useDriveStore.getState().setSort("name");
     const visible = getVisibleDriveFiles(useDriveStore.getState());
     for (let i = 1; i < visible.length; i++) {
@@ -428,7 +421,9 @@ describe("drive store", () => {
 
   it("sorts files by size (descending)", async () => {
     const { useDriveStore, getVisibleDriveFiles } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     useDriveStore.getState().setSort("size");
     const visible = getVisibleDriveFiles(useDriveStore.getState());
     for (let i = 1; i < visible.length; i++) {
@@ -438,7 +433,9 @@ describe("drive store", () => {
 
   it("paginates files with loadMore", async () => {
     const { useDriveStore, getPaginatedFiles } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     useDriveStore.setState({ pageSize: 2 });
     useDriveStore.getState().resetPage();
     const page1 = getPaginatedFiles(useDriveStore.getState());
@@ -450,7 +447,9 @@ describe("drive store", () => {
 
   it("creates and renames a folder", async () => {
     const { useDriveStore } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     const initialCount = useDriveStore.getState().folders.length;
     const id = await useDriveStore.getState().createFolder("Test Folder");
     expect(useDriveStore.getState().folders.length).toBe(initialCount + 1);
@@ -461,7 +460,9 @@ describe("drive store", () => {
 
   it("stars, trashes, and deletes a file permanently", async () => {
     const { useDriveStore } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     const file = useDriveStore.getState().files[0];
     expect(file).toBeDefined();
 
@@ -480,7 +481,9 @@ describe("drive store", () => {
 
   it("trashes and restores a folder", async () => {
     const { useDriveStore } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     const folder = useDriveStore.getState().folders[0];
     expect(folder).toBeDefined();
 
@@ -493,7 +496,9 @@ describe("drive store", () => {
 
   it("resets page on query change", async () => {
     const { useDriveStore } = await import("@/lib/stores/drive");
-    await useDriveStore.getState().load();
+    const { DRIVE_FILES, DRIVE_FOLDERS } = await import("@/lib/mock/drive");
+    const { cloneFiles, cloneFolders } = await import("@/lib/drive-utils");
+    useDriveStore.setState({ files: cloneFiles(DRIVE_FILES), folders: cloneFolders(DRIVE_FOLDERS), loading: false });
     useDriveStore.getState().loadMore();
     expect(useDriveStore.getState().page).toBe(2);
     useDriveStore.getState().setQuery("test");

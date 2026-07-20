@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { db } from "@/lib/db/poly";
+import { graph, putNode, putNodes, getNodes, clearNodes, contactSearchText } from "@/lib/db/poly";
 import { npubEncode } from "nostr-tools/nip19";
 import { fetchContactList, batchFetchProfiles } from "@post/nostr-core";
 import { useRelaysStore } from "@/lib/stores/relays";
@@ -41,7 +41,7 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
   loading: false,
 
   async loadContacts() {
-    const stored = await db.contacts.toArray();
+    const stored = await getNodes<any>('contact');
     if (stored.length === 0) return;
     set({
       contacts: stored.map((contact) => ({
@@ -116,8 +116,13 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       };
     });
 
-    await db.contacts.clear();
-    await db.contacts.bulkPut(contacts);
+    await clearNodes('contact');
+    await putNodes(contacts.map((c: any) => ({
+      type: 'contact',
+      id: c.pubkey ?? c.id,
+      data: c as any,
+      searchText: contactSearchText(c as any),
+    })));
     set({ contacts, loading: false });
   },
 
@@ -126,7 +131,7 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
     set({ contacts });
     const contact = contacts.find((item) => item.id === id);
     if (contact) {
-      await db.contacts.put(contact);
+      await putNode('contact', contact.pubkey ?? contact.id, contact as any, contactSearchText(contact as any));
     }
   },
 }));

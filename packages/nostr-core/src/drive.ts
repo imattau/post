@@ -101,7 +101,6 @@ export function createFileMetadataEvent(file: DriveFile): {
     ["x", file.sha256 ?? ""],
     ["size", String(file.sizeBytes)],
   ];
-  if (file.folderId) tags.push(["folder", file.folderId]);
   if (file.encrypted) tags.push(["encrypted", "true"]);
   tags.push(["client", "Post"]);
 
@@ -124,7 +123,6 @@ export function createFolderEvent(folder: DriveFolder): {
     tags: [
       ["d", folder.id],
       ["title", folder.name],
-      ...(folder.parentId ? [["parent", folder.parentId]] : []),
       ["client", "Post"],
     ],
     content: folder.name,
@@ -148,7 +146,6 @@ export function parseFileMetadataEvent(event: {
   const mime = tagValue(event.tags, "m") ?? "application/octet-stream";
   const sha256 = tagValue(event.tags, "x") ?? null;
   const sizeStr = tagValue(event.tags, "size") ?? "0";
-  const folderId = tagValue(event.tags, "folder") ?? null;
   const encrypted = tagValue(event.tags, "encrypted") === "true";
   const contentEncrypted = tagValue(event.tags, "content-encryption") != null;
   const createdAt = event.created_at * 1000;
@@ -159,7 +156,6 @@ export function parseFileMetadataEvent(event: {
   return {
     id: sha256 ?? event.id,
     name,
-    folderId,
     fileKind: "other",
     mimeType: mime,
     sizeBytes: parseInt(sizeStr, 10) || 0,
@@ -196,12 +192,10 @@ export function parseFolderEvent(event: {
   const d = tagValue(event.tags, "d") ?? event.id;
   const contentEncrypted = tagValue(event.tags, "content-encryption") != null;
   const title = contentEncrypted ? "Encrypted folder" : (tagValue(event.tags, "title") ?? event.content);
-  const parentId = tagValue(event.tags, "parent") ?? null;
 
   return {
     id: d,
     name: title,
-    parentId,
     fileCount: 0,
     color: "var(--color-brand)",
     updatedAt: event.created_at * 1000,

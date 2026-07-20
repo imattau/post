@@ -7,8 +7,7 @@ import { Search, CircleHelp, Settings, X } from "lucide-react";
 import { Command } from "cmdk";
 import { Dialog } from "@base-ui/react/dialog";
 import { useIdentityStore } from "@/lib/stores/identity";
-import { useMessagesStore } from "@/lib/stores/messages";
-import { createMessageSearch } from "@/lib/search";
+import { searchMessages } from "@/lib/search";
 import type { Message } from "@post/nostr-core";
 import AppSwitcher from "./AppSwitcher";
 import IdentityDialog from "./IdentityDialog";
@@ -60,26 +59,25 @@ export default function IconDock() {
     [activeLetter]
   );
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const search = useMemo(() => createMessageSearch(), []);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    if (!searchOpen) {
-      setMessages([]);
+    if (!query.trim()) {
+      setSearchResults([]);
       return;
     }
-    const state = useMessagesStore.getState();
-    setMessages(state.ids.map((id) => state.byId[id]).filter(Boolean));
-    const unsub = useMessagesStore.subscribe((s) => {
-      setMessages(s.ids.map((id) => s.byId[id]).filter(Boolean));
-    });
-    return unsub;
-  }, [searchOpen]);
-
-  const searchResults = useMemo(() => {
-    if (!query.trim()) return [];
-    return search.search(query, messages).slice(0, 5);
-  }, [messages, query, search]);
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const nodes = await searchMessages(query, 5);
+        setSearchResults(nodes.map((n: any) => n.data ?? n));
+      } finally {
+        setSearching(false);
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const handleSelect = useCallback((message: Message) => {
     const mailbox = message.mailbox === "archive" ? "archive" : message.mailbox;

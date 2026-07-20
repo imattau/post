@@ -4,7 +4,7 @@ import type { Message } from "@post/nostr-core";
 import { nip17 } from "nostr-tools";
 import type { NostrEvent } from "nostr-tools";
 import { decode } from "nostr-tools/nip19";
-import { db, addEdge, ensureConversation, EDGE } from "./db/poly";
+import { graph, putNode, getNodesOrdered, addEdge, ensureConversation, EDGE, messageSearchText } from "./db/poly";
 import { useMessagesStore } from "./stores/messages";
 import { useRelaysStore } from "./stores/relays";
 import { useGroupsStore } from "./stores/groups";
@@ -19,7 +19,6 @@ function buildMessage(
   subject: string | undefined,
   attachments: Message["attachments"],
   isGiftWrapped: boolean,
-  conversationId?: string | null,
   recipientPubkey?: string,
 ): Message {
   return {
@@ -39,15 +38,20 @@ function buildMessage(
     snoozedUntil: null,
     spam: false,
     mailbox: "inbox",
-    labelIds: [],
-    replyTo: source.tags.find((t) => t[0] === "e")?.[1] ?? null,
-    conversationId: conversationId ?? source.tags.find((t) => t[0] === "conversation")?.[1] ?? null,
     relayUrls: [],
     attachments,
     isEncrypted: true,
     isGiftWrapped,
     deliveryStatus: "delivered",
   };
+}
+
+function getReplyTo(tags: string[][]): string | null {
+  return tags.find((t) => t[0] === "e")?.[1] ?? null;
+}
+
+function getConversationId(tags: string[][]): string | null {
+  return tags.find((t) => t[0] === "conversation")?.[1] ?? null;
 }
 
 async function loadSk(): Promise<Uint8Array | null> {
@@ -105,17 +109,20 @@ async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
     const parsed = sk
       ? parseMessagePayloadAndUnwrap(plaintext, sk, event.pubkey)
       : { body: plaintext, subject: undefined, attachments: [], conversationId: undefined, groupKey: undefined };
-    const { body, subject, attachments, conversationId } = parsed;
-    const msg = buildMessage(event, identity, body, subject, attachments, false, conversationId);
+    const { body, subject, attachments } = parsed;
+    const msg = buildMessage(event, identity, body, subject, attachments, false);
 
     await saveGroupKeyIfPresent(parsed, event.tags);
 
     useMessagesStore.getState().ingestFromRelay(msg);
-    await db.messages.put(msg);
-    if (msg.replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, msg.replyTo);
-    if (msg.conversationId) {
-      await ensureConversation(msg.conversationId);
-      await addEdge(msg.id, EDGE.PART_OF, msg.conversationId);
+    await putNode('message', msg.id, msg as any, messageSearchText(msg as any));
+
+    const replyTo = getReplyTo(event.tags);
+    const convId = getConversationId(event.tags) ?? null;
+    if (replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, replyTo);
+    if (convId) {
+      await ensureConversation(convId);
+      await addEdge(msg.id, EDGE.PART_OF, convId);
     }
   } catch {
     // Skip events that fail to decrypt
@@ -162,18 +169,20 @@ async function handleKind1059(event: NostrEvent, identity: { pubkey: string }) {
       subject,
       attachments,
       true,
-      conversationId,
       isGroup ? groupPubkey : undefined,
     );
 
     await saveGroupKeyIfPresent({ groupKey, conversationId }, rumor.tags);
 
     useMessagesStore.getState().ingestFromRelay(msg);
-    await db.messages.put(msg);
-    if (msg.replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, msg.replyTo);
-    if (msg.conversationId) {
-      await ensureConversation(msg.conversationId);
-      await addEdge(msg.id, EDGE.PART_OF, msg.conversationId);
+    await putNode('message', msg.id, msg as any, messageSearchText(msg as any));
+
+    const replyTo = getReplyTo(rumor.tags);
+    const convId = conversationId ?? getConversationId(rumor.tags) ?? null;
+    if (replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, replyTo);
+    if (convId) {
+      await ensureConversation(convId);
+      await addEdge(msg.id, EDGE.PART_OF, convId);
     }
   } catch {
     // Skip events that fail to decrypt
@@ -237,7 +246,7 @@ export function stopSync() {
 }
 
 export async function loadCachedMessages(): Promise<void> {
-  const messages = await db.messages.orderBy("createdAt").reverse().toArray();
+  const messages = await getNodesOrdered<any>('message', 'createdAt');
   if (messages.length === 0) return;
 
   const byId: Record<string, Message> = {};

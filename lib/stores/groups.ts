@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { nip17 } from "nostr-tools";
 import type { GroupInbox, RecipientEntry } from "@post/nostr-core";
-import { db } from "@/lib/db/poly";
+import { graph, putNode, getNodes } from "@/lib/db/poly";
 
 interface GroupsState {
   byConversationId: Record<string, GroupInbox>;
@@ -28,7 +28,7 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
   loaded: false,
 
   async loadFromCache() {
-    const rows = await db.groupInboxes.toArray();
+    const rows = await getNodes<GroupInbox>('group_inbox');
     const byConversationId: Record<string, GroupInbox> = {};
     const byPubkey: Record<string, GroupInbox> = {};
     for (const g of rows) {
@@ -49,7 +49,7 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
     const pubkey = getPublicKey(sk);
     const privkeyHex = Buffer.from(sk).toString("hex");
     const inbox: GroupInbox = { id: conversationId, pubkey, privkey: privkeyHex, members, createdAt: Date.now() };
-    db.groupInboxes.put(inbox);
+    putNode('group_inbox', conversationId, inbox as any);
     set({
       byConversationId: { ...get().byConversationId, [conversationId]: inbox },
       byPubkey: { ...get().byPubkey, [pubkey]: inbox },
@@ -59,7 +59,7 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
 
   async saveReceivedGroupKey(conversationId: string, pubkey: string, privkeyHex: string, members: RecipientEntry[]) {
     const inbox: GroupInbox = { id: conversationId, pubkey, privkey: privkeyHex, members, createdAt: Date.now() };
-    await db.groupInboxes.put(inbox);
+    await putNode('group_inbox', conversationId, inbox as any);
     set({
       byConversationId: { ...get().byConversationId, [conversationId]: inbox },
       byPubkey: { ...get().byPubkey, [pubkey]: inbox },

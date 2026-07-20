@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createRelayPool, DEFAULT_RELAYS, fetchRelayList } from "@post/nostr-core";
 import type { RelayPool } from "@post/nostr-core";
-import { db } from "@/lib/db/poly";
+import { graph, putNode, deleteNode, getNodes, clearNodes, putNodes } from "@/lib/db/poly";
 import { useSettingsStore } from "@/lib/stores/settings";
 import type { RelayConfig, RelayStatus } from "@/lib/types";
 
@@ -31,16 +31,16 @@ export const useRelaysStore = create<RelaysState>((set, get) => ({
 
   addRelay: (config: RelayConfig) => {
     set((state) => ({ relays: [...state.relays, config] }));
-    void db.relayConfigs.put(config);
+    void putNode('relay_config', config.url, config as any);
   },
 
   removeRelay: (url: string) => {
     set((state) => ({ relays: state.relays.filter((r) => r.url !== url) }));
-    void db.relayConfigs.delete(url);
+    void deleteNode(url);
   },
 
   loadRelayConfigs: async () => {
-    const saved = await db.relayConfigs.toArray();
+    const saved = await getNodes<RelayConfig>('relay_config');
     if (saved.length > 0) set({ relays: saved });
   },
 
@@ -62,8 +62,8 @@ export const useRelaysStore = create<RelaysState>((set, get) => ({
     }
 
     set({ relays: merged });
-    await db.relayConfigs.clear();
-    await db.relayConfigs.bulkAdd(merged);
+    await clearNodes('relay_config');
+    await putNodes(merged.map((r: any) => ({ type: 'relay_config', id: r.url, data: r as any })));
   },
 
   connect: async () => {

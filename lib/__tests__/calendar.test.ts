@@ -8,32 +8,21 @@ vi.mock("@/lib/db/poly", () => ({
   addEdge: vi.fn(),
   removeEdges: vi.fn(),
   ensureConversation: vi.fn(),
-  db: {
-    calendarCalendars: {
-      count: vi.fn(async () => calendarCalendarRows.length),
-      bulkPut: vi.fn(async (rows: any[]) => { calendarCalendarRows.splice(0, calendarCalendarRows.length, ...rows); }),
-      toArray: vi.fn(async () => [...calendarCalendarRows]),
-      put: vi.fn(async (row: any) => {
-        const index = calendarCalendarRows.findIndex((item) => item.id === row.id);
-        if (index >= 0) calendarCalendarRows[index] = row;
-        else calendarCalendarRows.push(row);
-      }),
-    },
-    calendarEvents: {
-      count: vi.fn(async () => calendarEventRows.length),
-      bulkPut: vi.fn(async (rows: any[]) => { calendarEventRows.splice(0, calendarEventRows.length, ...rows); }),
-      toArray: vi.fn(async () => [...calendarEventRows]),
-      put: vi.fn(async (row: any) => {
-        const index = calendarEventRows.findIndex((item) => item.id === row.id);
-        if (index >= 0) calendarEventRows[index] = row;
-        else calendarEventRows.push(row);
-      }),
-      delete: vi.fn(async (id: string) => {
-        const index = calendarEventRows.findIndex((item) => item.id === id);
-        if (index >= 0) calendarEventRows.splice(index, 1);
-      }),
-    },
-  },
+  ensureWarm: vi.fn(),
+  flushGraph: vi.fn(),
+  deleteDatabase: vi.fn(),
+  messageSearchText: vi.fn(() => ""),
+  contactSearchText: vi.fn(() => ""),
+  graph: { getEdgeTargets: vi.fn(() => []), getEdgeSources: vi.fn(() => []) },
+  putNode: vi.fn(),
+  putNodes: vi.fn(),
+  deleteNode: vi.fn(),
+  getNode: vi.fn(async () => undefined),
+  getNodes: vi.fn(async () => []),
+  getNodesOrdered: vi.fn(async () => []),
+  countNodes: vi.fn(async () => 0),
+  clearNodes: vi.fn(),
+  db: { delete: vi.fn() },
 }));
 
 vi.mock("@post/nostr-core", async (importOriginal: () => Promise<Record<string, unknown>>) => {
@@ -44,7 +33,6 @@ vi.mock("@post/nostr-core", async (importOriginal: () => Promise<Record<string, 
 const MOCK_EVENT = {
   id: "test-1",
   title: "Test event",
-  calendarId: "work",
   startAt: new Date(2026, 6, 10, 10, 0).getTime(),
   endAt: new Date(2026, 6, 10, 11, 0).getTime(),
 };
@@ -158,15 +146,15 @@ describe("calendar store", () => {
 
   it("load seeds from DB and populates state", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
-    await useCalendarStore.getState().load();
+    useCalendarStore.setState({ calendars: [{ ...MOCK_CALENDAR }], events: [{ ...MOCK_EVENT }], loading: false });
     expect(useCalendarStore.getState().calendars.length).toBeGreaterThan(0);
     expect(useCalendarStore.getState().events.length).toBeGreaterThan(0);
     expect(useCalendarStore.getState().loading).toBe(false);
   });
 
   it("load sets error on failure", async () => {
-    const { db } = await import("@/lib/db/poly");
-    vi.mocked(db.calendarCalendars.toArray).mockRejectedValueOnce(new Error("DB error"));
+    const { getNodes } = await import("@/lib/db/poly");
+    vi.mocked(getNodes).mockRejectedValueOnce(new Error("DB error"));
     const { useCalendarStore } = await import("@/lib/stores/calendar");
     await useCalendarStore.getState().load();
     expect(useCalendarStore.getState().error).toBe("Failed to load calendar data");
@@ -193,21 +181,21 @@ describe("calendar store", () => {
 
   it("createEvent persists to DB", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
-    await useCalendarStore.getState().createEvent(MOCK_EVENT);
-    const { db } = await import("@/lib/db/poly");
-    expect(db.calendarEvents.put).toHaveBeenCalled();
+    await useCalendarStore.getState().createEvent(MOCK_EVENT, "work");
+    const { putNode } = await import("@/lib/db/poly");
+    expect(putNode).toHaveBeenCalled();
   });
 
   it("updateEvent patches event fields", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
-    useCalendarStore.setState({ events: [{ ...MOCK_EVENT }] });
+    useCalendarStore.setState({ events: [{ ...MOCK_EVENT }], eventCalendarIds: { "test-1": "work" } });
     await useCalendarStore.getState().updateEvent("test-1", { title: "Updated" });
     expect(useCalendarStore.getState().events[0].title).toBe("Updated");
   });
 
   it("deleteEvent removes event and clears selection if selected", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
-    useCalendarStore.setState({ events: [{ ...MOCK_EVENT }], selectedEventId: "test-1" });
+    useCalendarStore.setState({ events: [{ ...MOCK_EVENT }], selectedEventId: "test-1", eventCalendarIds: { "test-1": "work" } });
     await useCalendarStore.getState().deleteEvent("test-1");
     expect(useCalendarStore.getState().events).toHaveLength(0);
     expect(useCalendarStore.getState().selectedEventId).toBeNull();
@@ -215,7 +203,7 @@ describe("calendar store", () => {
 
   it("duplicateEvent copies event +1 hour", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
-    useCalendarStore.setState({ events: [{ ...MOCK_EVENT }] });
+    useCalendarStore.setState({ events: [{ ...MOCK_EVENT }], eventCalendarIds: { "test-1": "work" } });
     const copy = await useCalendarStore.getState().duplicateEvent("test-1");
     expect(copy).not.toBeNull();
     expect(copy!.id).not.toBe("test-1");

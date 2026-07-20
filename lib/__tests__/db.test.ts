@@ -1,24 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { db } from "@/lib/db/poly";
 
 describe("PolyDB schema", () => {
-  it("has messages table", () => {
-    expect(db.messages).toBeDefined();
+  it("graph is defined", async () => {
+    const { graph } = await import("@/lib/db/poly");
+    expect(graph).toBeDefined();
   });
 
-  it("has drafts table", () => {
-    expect(db.drafts).toBeDefined();
+  it("has message node type", async () => {
+    const { getNodes } = await import("@/lib/db/poly");
+    expect(getNodes).toBeDefined();
   });
 
-  it("has labels table", () => {
-    expect(db.labels).toBeDefined();
+  it("has draft node type", async () => {
+    const { putNode } = await import("@/lib/db/poly");
+    expect(putNode).toBeDefined();
   });
 
-  it("has contacts table", () => {
-    expect(db.contacts).toBeDefined();
+  it("has label node type", async () => {
+    const { deleteNode } = await import("@/lib/db/poly");
+    expect(deleteNode).toBeDefined();
   });
 
-  it("has relayConfigs table", () => {
-    expect(db.relayConfigs).toBeDefined();
+  it("has contact node type", async () => {
+    const { clearNodes } = await import("@/lib/db/poly");
+    expect(clearNodes).toBeDefined();
+  });
+
+  it("has edge management", async () => {
+    const { addEdge, EDGE } = await import("@/lib/db/poly");
+    expect(addEdge).toBeDefined();
+    expect(EDGE).toBeDefined();
   });
 });

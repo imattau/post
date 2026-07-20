@@ -1,9 +1,9 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState, useEffect } from "react";
 import { Command, useCommandState } from "cmdk";
 import { useContactsStore } from "@/lib/stores/contacts";
-import { createContactSearch } from "@/lib/search";
+import { searchContacts } from "@/lib/search";
 
 export const ContactSuggestions = memo(function ContactSuggestions({
   recipientText,
@@ -15,10 +15,22 @@ export const ContactSuggestions = memo(function ContactSuggestions({
   highlightedRef: React.RefObject<boolean>;
 }) {
   const contacts = useContactsStore((s) => s.contacts);
-  const search = useMemo(() => createContactSearch(), []);
+  const [vectorResults, setVectorResults] = useState<any[]>([]);
   const selectedItemId = useCommandState((state) => state.selectedItemId);
 
   highlightedRef.current = !!selectedItemId;
+
+  useEffect(() => {
+    if (!recipientText.trim()) {
+      setVectorResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const nodes = await searchContacts(recipientText, 6);
+      setVectorResults(nodes.map((n: any) => n.data ?? n));
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [recipientText]);
 
   const suggestions = useMemo(() => {
     if (!recipientText.trim()) {
@@ -26,8 +38,13 @@ export const ContactSuggestions = memo(function ContactSuggestions({
         .sort((a, b) => b.lastMessageAt - a.lastMessageAt)
         .slice(0, 6);
     }
-    return search.search(recipientText, contacts).slice(0, 6);
-  }, [contacts, recipientText, search]);
+    if (vectorResults.length > 0) return vectorResults;
+    // fallback: filter locally while vector search is in flight
+    const q = recipientText.toLowerCase();
+    return contacts
+      .filter((c) => c.name.toLowerCase().includes(q) || c.handle.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [contacts, recipientText, vectorResults]);
 
   if (suggestions.length === 0) return null;
 

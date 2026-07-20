@@ -50,13 +50,12 @@ export function modifiedLabel(date = new Date()): string {
   return format(date, "cccc, MMM d");
 }
 
-export function buildFileFromUpload(file: File, encryptedBlob: Blob, blobUrl: string, sha256: string, folderId: string | null): DriveFile {
+export function buildFileFromUpload(file: File, encryptedBlob: Blob, blobUrl: string, sha256: string): DriveFile {
   const kind = guessFileKind(file);
   const now = Date.now();
   return {
     id: generateId(),
     name: file.name,
-    folderId,
     fileKind: kind,
     mimeType: file.type || "application/octet-stream",
     sizeBytes: file.size,

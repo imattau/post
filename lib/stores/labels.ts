@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { generateId } from "@/lib/utils";
-import { db, addEdge, removeEdges, EDGE } from "@/lib/db/poly";
+import { graph, putNode, deleteNode, addEdge, removeEdges, EDGE } from "@/lib/db/poly";
 import type { Label } from "@/lib/types";
 
 interface LabelsState {
@@ -19,8 +19,8 @@ export const useLabelsStore = create<LabelsState>()(immer((set, get) => ({
 
   async createLabel(name: string, color: string): Promise<string> {
     const id = generateId();
-    const label: Label = { id, name, color, messageIds: [] };
-    await db.labels.put(label);
+    const label: Label = { id, name, color };
+    await putNode('label', id, label as any);
     set((state) => { state.byId[id] = label; state.allIds.push(id); });
     return id;
   },
@@ -28,26 +28,22 @@ export const useLabelsStore = create<LabelsState>()(immer((set, get) => ({
   async deleteLabel(id: string) {
     const { byId, allIds } = get();
     const { [id]: _, ...rest } = byId;
-    await db.labels.delete(id);
+    await deleteNode(id);
     set({ byId: rest, allIds: allIds.filter((i) => i !== id) });
   },
 
   async assignLabel(messageId: string, labelId: string) {
     const label = get().byId[labelId];
-    if (!label || label.messageIds.includes(messageId)) return;
-    const updated = { ...label, messageIds: [...label.messageIds, messageId] };
-    await db.labels.put(updated);
+    if (!label) return;
+    await putNode('label', labelId, label as any);
     await addEdge(messageId, EDGE.HAS_LABEL, labelId);
-    set((state) => { state.byId[labelId] = updated; });
   },
 
   async removeLabel(messageId: string, labelId: string) {
     const { byId } = get();
     const label = byId[labelId];
     if (!label) return;
-    const updated = { ...label, messageIds: label.messageIds.filter((id) => id !== messageId) };
-    await db.labels.put(updated);
+    await putNode('label', labelId, label as any);
     await removeEdges(messageId, EDGE.HAS_LABEL, labelId);
-    set({ byId: { ...byId, [labelId]: updated } });
   },
 })));

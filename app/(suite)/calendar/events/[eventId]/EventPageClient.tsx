@@ -15,6 +15,7 @@ import GuestsRow from "../../_components/GuestsRow";
 export default function EventPageClient() {
   const params = useParams<{ eventId: string }>();
   const events = useCalendarStore((s) => s.events);
+  const eventCalendarIds = useCalendarStore((s) => s.eventCalendarIds);
   const calendars = useCalendarStore((s) => s.calendars);
   const activeMonth = useCalendarStore((s) => s.activeMonth);
   const load = useCalendarStore((s) => s.load);
@@ -31,7 +32,7 @@ export default function EventPageClient() {
     () => events.find((item) => item.id === params.eventId) ?? null,
     [events, params.eventId]
   );
-  const calendar = event ? (calendarById.get(event.calendarId) ?? null) : null;
+  const calendar = event ? (calendarById.get(eventCalendarIds[event.id] ?? "") ?? null) : null;
 
   useEffect(() => {
     if (event) selectEvent(event.id);

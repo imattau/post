@@ -16,6 +16,7 @@ export default function CalendarWeekPage() {
   const activeMonth = useCalendarStore((s) => s.activeMonth);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const events = useCalendarStore((s) => s.events);
+  const eventCalendarIds = useCalendarStore((s) => s.eventCalendarIds);
   const calendars = useCalendarStore((s) => s.calendars);
   const loading = useCalendarStore((s) => s.loading);
   const error = useCalendarStore((s) => s.error);
@@ -114,7 +115,7 @@ export default function CalendarWeekPage() {
                 <div className="mt-3 space-y-2">
                   {dayEvents.length === 0 && <div className="text-[11px] text-text-tertiary">No events</div>}
                   {dayEvents.map((event) => {
-                    const calendar = calendarById.get(event.calendarId);
+                    const calendar = calendarById.get(eventCalendarIds[event.id] ?? "");
                     return (
                       <Link
                         key={event.id}

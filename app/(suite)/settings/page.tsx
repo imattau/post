@@ -8,7 +8,7 @@ import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useBlossomStore } from "@/lib/stores/blossom";
 import { useSettingsStore, SETTING_DEFAULTS, type SettingKey } from "@/lib/stores/settings";
-import { db, graph } from "@/lib/db/poly";
+import { deleteDatabase, graph } from "@/lib/db/poly";
 import IdentityDialog from "@/components/IdentityDialog";
 import { ToggleRow } from "./_components/ToggleRow";
 import { SectionHeader } from "./_components/SectionHeader";
@@ -968,7 +968,7 @@ function AdvancedContent() {
   const clearLocalData = async () => {
     useSettingsStore.getState().reset();
     try {
-      await db.delete();
+      await deleteDatabase();
     } catch { /* ignore */ }
     try {
       localStorage.clear();

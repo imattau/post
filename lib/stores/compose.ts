@@ -3,7 +3,7 @@ import { immer } from "zustand/middleware/immer";
 import { sendMessage, createKeyStore } from "@post/nostr-core";
 import { decode } from "nostr-tools/nip19";
 import { generateId, draftHasContent } from "@/lib/utils";
-import { db, addEdge, ensureConversation, EDGE } from "@/lib/db/poly";
+import { graph, putNode, deleteNode, getNode, getNodesOrdered, addEdge, ensureConversation, EDGE, messageSearchText } from "@/lib/db/poly";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useMessagesStore } from "@/lib/stores/messages";
 import type { Draft, RecipientEntry, AttachmentUpload, SendResult } from "@/lib/types";
@@ -79,7 +79,10 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
     let conversationId = base.conversationId;
     if (draft?.replyTo) {
       const parent = useMessagesStore.getState().byId[draft.replyTo];
-      if (parent?.conversationId) conversationId = parent.conversationId;
+      if (parent) {
+        const parentConvId = graph.getEdgeTargets(parent.id, EDGE.PART_OF)[0] ?? null;
+        if (parentConvId) conversationId = parentConvId;
+      }
     }
     const next = { ...base, conversationId, ...draft, updatedAt: Date.now() };
     set({
@@ -92,7 +95,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
   },
 
   async openSavedDraft(id: string) {
-    const draft = await db.drafts.get(id);
+    const draft = await getNode<Draft>(id);
     if (!draft) return;
     set({ status: "composing", draft, uploads: draft.attachments, relayOverrides: draft.relayOverrides, error: null });
   },
@@ -227,21 +230,18 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
           snoozedUntil: null,
           spam: false,
           mailbox: "sent" as const,
-          labelIds: [],
-          replyTo: draft.replyTo,
-          conversationId: draft.conversationId,
           relayUrls: relayOverrides,
           attachments,
           isEncrypted: encrypted,
           isGiftWrapped: isGiftWrapped ?? kind === 1059,
           deliveryStatus,
         };
-        await db.messages.put(msg);
+        await putNode('message', msg.id, msg as any, messageSearchText(msg as any));
         await useMessagesStore.getState().upsertMessage(msg);
-        if (msg.replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, msg.replyTo);
-        if (msg.conversationId) {
-          await ensureConversation(msg.conversationId);
-          await addEdge(msg.id, EDGE.PART_OF, msg.conversationId);
+        if (draft.replyTo) await addEdge(msg.id, EDGE.REPLIES_TO, draft.replyTo);
+        if (draft.conversationId) {
+          await ensureConversation(draft.conversationId);
+          await addEdge(msg.id, EDGE.PART_OF, draft.conversationId);
         }
       }
 
@@ -298,7 +298,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         await saveSent(result.eventId, recipient.pubkey, 14, result.delivered > 0 ? "delivered" : "failed");
       }
 
-      await db.drafts.delete(draft.id);
+      await deleteNode(draft.id);
 
       set({ status: "sent", draft: emptyDraft(), uploads: [] });
       return { eventId: "", published: new Map(), delivered: overallDelivered };
@@ -315,23 +315,23 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
 
   async scheduleSend(at: number) {
     set((state) => { state.status = "scheduled"; state.draft.scheduledFor = at; });
-    await db.drafts.put({ ...get().draft, attachments: get().uploads, scheduledFor: at, savedAt: Date.now() });
+    await putNode('draft', get().draft.id, { ...get().draft, attachments: get().uploads, scheduledFor: at, savedAt: Date.now() } as any);
   },
 
   async autosave() {
     const { draft, uploads } = get();
-    await db.drafts.put({ ...draft, attachments: uploads, savedAt: Date.now(), updatedAt: Date.now() });
+    await putNode('draft', draft.id, { ...draft, attachments: uploads, savedAt: Date.now(), updatedAt: Date.now() } as any);
     set((state) => { state.draft.savedAt = Date.now(); state.draftVersion += 1; });
   },
 
   async listDrafts() {
-    return db.drafts.orderBy("updatedAt").reverse().toArray();
+    return getNodesOrdered<any>('draft', 'updatedAt');
   },
 
   discard: () => {
     const { draft } = get();
     (async () => {
-      await db.drafts.delete(draft.id);
+      await deleteNode(draft.id);
     })();
     set((state) => { state.status = "closed"; state.draft = emptyDraft(); state.uploads = []; state.error = null; state.draftVersion += 1; });
   },
@@ -359,7 +359,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
       if (!pool) throw new Error("Cannot send message");
 
       const conversationId = replyTo
-        ? (useMessagesStore.getState().byId[replyTo]?.conversationId ?? generateId())
+        ? (graph.getEdgeTargets(replyTo, EDGE.PART_OF)[0] ?? generateId())
         : generateId();
 
       let overallDelivered = 0;
@@ -397,16 +397,13 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
           snoozedUntil: null,
           spam: false,
           mailbox: "sent" as const,
-          labelIds: [],
-          replyTo,
-          conversationId,
           relayUrls: [],
           attachments: [],
           isEncrypted: true,
           isGiftWrapped: false,
           deliveryStatus: result.delivered > 0 ? "delivered" as const : "failed" as const,
         };
-        await db.messages.put(sentMessage);
+        await putNode('message', sentMessage.id, sentMessage as any, messageSearchText(sentMessage as any));
         await useMessagesStore.getState().upsertMessage(sentMessage);
         if (replyTo) await addEdge(sentMessage.id, EDGE.REPLIES_TO, replyTo);
         if (conversationId) {

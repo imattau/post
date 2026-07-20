@@ -49,11 +49,145 @@ export const graph = new PolyGraph(adapter, 1_000_000);
 
 let initialized = false;
 
-async function ensureWarm() {
+export async function ensureWarm() {
   if (!initialized) {
     await graph.warm();
     initialized = true;
   }
+}
+
+export async function flushGraph() {
+  await graph.flush();
+}
+
+export async function deleteDatabase() {
+  await graph.dispose();
+  initialized = false;
+  blobStore.clear();
+  fileStore.clear();
+}
+
+export async function addEdge(
+  source: string,
+  type: string,
+  target: string,
+) {
+  graph.addEdge(source, type, target, undefined, "reference");
+  await graph.flush();
+}
+
+export async function removeEdges(
+  source: string,
+  type?: string,
+  target?: string,
+) {
+  graph.removeEdges(source, type, target);
+  await graph.flush();
+}
+
+export async function ensureConversation(conversationId: string) {
+  const existing = await graph.getNodeSafe(conversationId);
+  if (!existing) {
+    const now = Date.now();
+    graph.addNode({
+      id: conversationId,
+      type: "conversation",
+      data: { id: conversationId, messageIds: [] },
+      insertedAt: now,
+      updatedAt: now,
+    });
+    await graph.flush();
+  }
+}
+
+export async function putNode(
+  type: string,
+  id: string,
+  data: Record<string, unknown>,
+  searchText?: string,
+) {
+  stripNonCloneable(data);
+  const now = Date.now();
+  if (searchText) {
+    await graph.addNodeWithEmbedding(
+      { id, type, data, insertedAt: now, updatedAt: now },
+      searchText,
+    );
+  } else {
+    graph.addNode({ id, type, data, insertedAt: now, updatedAt: now });
+  }
+  await graph.flush();
+}
+
+export async function putNodes(
+  items: Array<{ type: string; id: string; data: Record<string, unknown>; searchText?: string }>,
+) {
+  const now = Date.now();
+  for (const item of items) {
+    stripNonCloneable(item.data);
+    if (item.searchText) {
+      await graph.addNodeWithEmbedding(
+        { id: item.id, type: item.type, data: item.data, insertedAt: now, updatedAt: now },
+        item.searchText,
+      );
+    } else {
+      graph.addNode({ id: item.id, type: item.type, data: item.data, insertedAt: now, updatedAt: now });
+    }
+  }
+  await graph.flush();
+}
+
+export async function deleteNode(id: string) {
+  await graph.removeNodeSafe(id);
+  await graph.flush();
+  deleteBlob(id);
+  deleteUploadFiles(id);
+}
+
+export async function getNode<T>(id: string): Promise<T | undefined> {
+  await ensureWarm();
+  const node = await graph.getNodeSafe(id);
+  if (!node) return undefined;
+  return restoreNonCloneable(node.data as T);
+}
+
+export async function getNodes<T>(type: string): Promise<T[]> {
+  await ensureWarm();
+  await graph.flush();
+  const nodes = await graph.queryPersisted().whereNodeType(type).toArray();
+  return nodes.map((n) => restoreNonCloneable(n.data as T));
+}
+
+export async function getNodesOrdered<T>(type: string, field: string, desc = true): Promise<T[]> {
+  await ensureWarm();
+  await graph.flush();
+  const nodes = await graph
+    .queryPersisted()
+    .whereNodeType(type)
+    .orderBy(field, desc ? "desc" : "asc")
+    .toArray();
+  return nodes.map((n) => restoreNonCloneable(n.data as T));
+}
+
+export async function countNodes(type: string): Promise<number> {
+  await ensureWarm();
+  await graph.flush();
+  return graph.queryPersisted().whereNodeType(type).count();
+}
+
+export async function clearNodes(type: string) {
+  await ensureWarm();
+  const ids = await graph.queryPersisted().whereNodeType(type).ids();
+  for (const id of ids) {
+    await graph.removeNodeSafe(id);
+    deleteBlob(id);
+    deleteUploadFiles(id);
+  }
+  await graph.flush();
+}
+
+function entityId(item: Record<string, unknown>): string {
+  return (item.id ?? item.pubkey ?? item.url) as string;
 }
 
 function stripNonCloneable(item: Record<string, unknown>) {
@@ -95,163 +229,28 @@ function restoreNonCloneable<T>(item: T): T {
   return item;
 }
 
-function entityId(item: Record<string, unknown>): string {
-  return (item.id ?? item.pubkey ?? item.url) as string;
+export function messageSearchText(raw: Record<string, unknown>): string {
+  const subject = (raw.subject as string) ?? "";
+  const content = (raw.content as string) ?? "";
+  const preview = (raw.preview as string) ?? "";
+  const pubkey = (raw.pubkey as string) ?? "";
+  return `${subject} ${subject} ${subject} ${content} ${preview} ${pubkey}`;
 }
 
-class PolyTable<T> {
-  constructor(private type: string) {}
-
-  async put(item: T) {
-    const raw = item as Record<string, unknown>;
-    const id = entityId(raw);
-    const data = { ...raw };
-    stripNonCloneable(data);
-    const now = Date.now();
-    graph.addNode({
-      id,
-      type: this.type,
-      data,
-      insertedAt: now,
-      updatedAt: now,
-    });
-    await graph.flush();
-  }
-
-  async bulkPut(items: T[]) {
-    const now = Date.now();
-    for (const item of items) {
-      const raw = item as Record<string, unknown>;
-      const id = entityId(raw);
-      const data = { ...raw };
-      stripNonCloneable(data);
-      graph.addNode({
-        id,
-        type: this.type,
-        data,
-        insertedAt: now,
-        updatedAt: now,
-      });
-    }
-    await graph.flush();
-  }
-
-  bulkAdd(items: T[]) {
-    return this.bulkPut(items);
-  }
-
-  async get(id: string): Promise<T | undefined> {
-    await ensureWarm();
-    const node = await graph.getNodeSafe(id);
-    if (!node) return undefined;
-    return restoreNonCloneable(node.data as T);
-  }
-
-  async delete(id: string) {
-    await graph.removeNodeSafe(id);
-    await graph.flush();
-    deleteBlob(id);
-    deleteUploadFiles(id);
-  }
-
-  async toArray(): Promise<T[]> {
-    await ensureWarm();
-    await graph.flush();
-    const nodes = await graph
-      .queryPersisted()
-      .whereNodeType(this.type)
-      .toArray();
-    return nodes.map((n) => restoreNonCloneable(n.data as T));
-  }
-
-  async count(): Promise<number> {
-    await ensureWarm();
-    await graph.flush();
-    return graph.queryPersisted().whereNodeType(this.type).count();
-  }
-
-  async clear() {
-    await ensureWarm();
-    const ids = await graph
-      .queryPersisted()
-      .whereNodeType(this.type)
-      .ids();
-    for (const id of ids) {
-      await graph.removeNodeSafe(id);
-      deleteBlob(id);
-      deleteUploadFiles(id);
-    }
-    await graph.flush();
-  }
-
-  orderBy(field: string) {
-    return {
-      reverse: () => ({
-        toArray: async (): Promise<T[]> => {
-          await ensureWarm();
-          await graph.flush();
-          const nodes = await graph
-            .queryPersisted()
-            .whereNodeType(this.type)
-            .orderBy(field, "desc")
-            .toArray();
-          return nodes.map((n) => restoreNonCloneable(n.data as T));
-        },
-      }),
-    };
-  }
+export function contactSearchText(raw: Record<string, unknown>): string {
+  const name = (raw.name as string) ?? "";
+  const handle = (raw.handle as string) ?? "";
+  const npub = (raw.npub as string) ?? "";
+  const pubkey = (raw.pubkey as string) ?? "";
+  const bio = (raw.bio as string) ?? "";
+  return `${name} ${name} ${name} ${handle} ${handle} ${npub} ${pubkey} ${bio}`;
 }
 
+// DEPRECATED: Use graph/helpers directly instead. Kept for migration compat.
 export const db = {
   async delete() {
-    await graph.dispose();
-    initialized = false;
-    blobStore.clear();
-    fileStore.clear();
-    // re-create adapter and graph for fresh start after reload
+    await deleteDatabase();
   },
-  messages: new PolyTable<import("@/lib/types").Message>("message"),
-  drafts: new PolyTable<import("@/lib/types").Draft>("draft"),
-  labels: new PolyTable<import("@/lib/types").Label>("label"),
-  contacts: new PolyTable<import("@/lib/types").Contact>("contact"),
-  relayConfigs: new PolyTable<import("@/lib/types").RelayConfig>("relay_config"),
-  driveFiles: new PolyTable<import("@/lib/types").DriveFile>("drive_file"),
-  driveFolders: new PolyTable<import("@/lib/types").DriveFolder>("drive_folder"),
-  calendarCalendars: new PolyTable<import("@/lib/types").CalendarCalendar>("calendar"),
-  calendarEvents: new PolyTable<import("@/lib/types").CalendarEvent>("calendar_event"),
-  groupInboxes: new PolyTable<import("@post/nostr-core").GroupInbox>("group_inbox"),
-  conversations: new PolyTable<{ id: string; messageIds: string[] }>("conversation"),
 };
 
-export async function addEdge(
-  source: string,
-  type: string,
-  target: string,
-) {
-  graph.addEdge(source, type, target, undefined, "reference");
-  await graph.flush();
-}
-
-export async function removeEdges(
-  source: string,
-  type?: string,
-  target?: string,
-) {
-  graph.removeEdges(source, type, target);
-  await graph.flush();
-}
-
-export async function ensureConversation(conversationId: string) {
-  const existing = await graph.getNodeSafe(conversationId);
-  if (!existing) {
-    const now = Date.now();
-    graph.addNode({
-      id: conversationId,
-      type: "conversation",
-      data: { id: conversationId, messageIds: [] },
-      insertedAt: now,
-      updatedAt: now,
-    });
-    await graph.flush();
-  }
-}
+export { PolyGraph, IndexedDBAdapter, MemoryAdapter };

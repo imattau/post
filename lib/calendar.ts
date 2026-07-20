@@ -84,6 +84,7 @@ export function weekStartFromSetting(setting: string | undefined): number {
 
 export function publishCalendarEvent(
   event: CalendarEvent,
+  calendarId: string,
   identity: { nsec: string | null; pubkey: string },
   pool: { publish: (evt: any) => Promise<Map<string, boolean>> },
 ): Promise<Map<string, boolean>> {
@@ -98,7 +99,7 @@ export function publishCalendarEvent(
     ["title", event.title],
     ["start", String(Math.floor(event.startAt / 1000))],
     ["end", String(Math.floor(event.endAt / 1000))],
-    ["calendar", event.calendarId],
+    ["calendar", calendarId],
     ["client", "Post"],
   ];
   if (event.location) tags.push(["location", event.location]);
@@ -159,7 +160,6 @@ export function parseCalendarEventFromNostr(event: {
   const title = tagMap.get("title")?.[0];
   const startTag = tagMap.get("start")?.[0];
   const endTag = tagMap.get("end")?.[0];
-  const calendarId = tagMap.get("calendar")?.[0] ?? "personal";
 
   if (!title || !startTag || !endTag) return null;
 
@@ -173,7 +173,6 @@ export function parseCalendarEventFromNostr(event: {
   return {
     id: event.id,
     title,
-    calendarId,
     startAt,
     endAt,
     allDay: event.kind === 31922,
@@ -190,12 +189,16 @@ export function parseCalendarEventFromNostr(event: {
   };
 }
 
+export function getNostrCalendarId(tags: string[][]): string {
+  return tags.find((t) => t[0] === "calendar")?.[1] ?? "personal";
+}
+
 export async function syncCalendarFromRelays(
   pool: RelayPool,
   pubkey: string,
   existingEventIds: Set<string>,
-): Promise<CalendarEvent[]> {
-  const newEvents: CalendarEvent[] = [];
+): Promise<{ event: CalendarEvent; calendarId: string }[]> {
+  const newEvents: { event: CalendarEvent; calendarId: string }[] = [];
 
   const rawEvents = await subscribeAccumulate<{
     id: string;
@@ -226,7 +229,7 @@ export async function syncCalendarFromRelays(
     if (existingEventIds.has(raw.id)) continue;
     const parsed = parseCalendarEventFromNostr(raw);
     if (parsed) {
-      newEvents.push(parsed);
+      newEvents.push({ event: parsed, calendarId: getNostrCalendarId(raw.tags) });
     }
   }
 

@@ -10,6 +10,7 @@ import { useCalendarStore } from "@/lib/stores/calendar";
 
 export default function CalendarInvitationsPage() {
   const events = useCalendarStore((s) => s.events);
+  const eventCalendarIds = useCalendarStore((s) => s.eventCalendarIds);
   const calendars = useCalendarStore((s) => s.calendars);
   const activeMonth = useCalendarStore((s) => s.activeMonth);
   const loading = useCalendarStore((s) => s.loading);
@@ -79,7 +80,7 @@ export default function CalendarInvitationsPage() {
           </div>
         )}
         {invitations.map((event) => {
-          const calendar = calendarById.get(event.calendarId);
+          const calendar = calendarById.get(eventCalendarIds[event.id] ?? "");
           return (
             <div key={event.id} className="rounded-[14px] border border-border bg-[#10151D] p-4">
               <div className="flex items-start justify-between gap-4">

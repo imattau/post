@@ -4,7 +4,6 @@ export const DRIVE_FOLDERS: DriveFolder[] = [
   {
     id: "folder-projects",
     name: "Projects",
-    parentId: null,
     fileCount: 14,
     color: "var(--color-brand)",
     updatedAt: Date.now() - 1000 * 60 * 60 * 5,
@@ -14,7 +13,6 @@ export const DRIVE_FOLDERS: DriveFolder[] = [
   {
     id: "folder-photos",
     name: "Photos",
-    parentId: null,
     fileCount: 328,
     color: "var(--color-info)",
     updatedAt: Date.now() - 1000 * 60 * 60 * 20,
@@ -24,7 +22,6 @@ export const DRIVE_FOLDERS: DriveFolder[] = [
   {
     id: "folder-docs",
     name: "Documents",
-    parentId: null,
     fileCount: 62,
     color: "var(--color-ok)",
     updatedAt: Date.now() - 1000 * 60 * 90,
@@ -33,11 +30,21 @@ export const DRIVE_FOLDERS: DriveFolder[] = [
   },
 ];
 
+export const DRIVE_FILE_FOLDER_IDS: Record<string, string | null> = {
+  "drive-file-figma": "folder-projects",
+  "drive-file-planning": "folder-projects",
+  "drive-file-photo-1": "folder-photos",
+  "drive-file-note": "folder-docs",
+  "drive-file-speech": "folder-projects",
+  "drive-file-results": "folder-docs",
+  "drive-file-paper": "folder-docs",
+  "drive-file-doc": "folder-docs",
+};
+
 export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-figma",
     name: "Nostr-suite-flow.fig",
-    folderId: "folder-projects",
     fileKind: "figma",
     mimeType: "application/x-figma",
     sizeBytes: 2_400_000,
@@ -65,7 +72,6 @@ export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-planning",
     name: "Quarterly-planning.pdf",
-    folderId: "folder-projects",
     fileKind: "pdf",
     mimeType: "application/pdf",
     sizeBytes: 8_100_000,
@@ -93,7 +99,6 @@ export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-winter",
     name: "Winter Streets",
-    folderId: "folder-photos",
     fileKind: "album",
     mimeType: "application/vnd.nostr.album",
     sizeBytes: 328_000,
@@ -121,7 +126,6 @@ export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-relay",
     name: "Relay performance.csv",
-    folderId: "folder-docs",
     fileKind: "spreadsheet",
     mimeType: "text/csv",
     sizeBytes: 924_000,
@@ -149,7 +153,6 @@ export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-video",
     name: "Product demo.mp4",
-    folderId: "folder-projects",
     fileKind: "video",
     mimeType: "video/mp4",
     sizeBytes: 284_000_000,
@@ -177,7 +180,6 @@ export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-notes",
     name: "Notes export.md",
-    folderId: "folder-docs",
     fileKind: "markdown",
     mimeType: "text/markdown",
     sizeBytes: 84_000,
@@ -205,7 +207,6 @@ export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-backup",
     name: "Identity backup.json",
-    folderId: "folder-docs",
     fileKind: "json",
     mimeType: "application/json",
     sizeBytes: 18_000,
@@ -233,7 +234,6 @@ export const DRIVE_FILES: DriveFile[] = [
   {
     id: "drive-file-trash",
     name: "Old draft.md",
-    folderId: "folder-docs",
     fileKind: "markdown",
     mimeType: "text/markdown",
     sizeBytes: 42_000,

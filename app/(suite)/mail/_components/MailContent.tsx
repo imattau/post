@@ -14,6 +14,7 @@ import { useIdentityStore } from "@/lib/stores/identity";
 import { useGroupsStore } from "@/lib/stores/groups";
 import { useMailboxMessages } from "../_components/useMailboxMessages";
 import { getThreadMessages } from "@/lib/thread";
+import { graph, EDGE } from "@/lib/db/poly";
 import Sidebar from "./Sidebar";
 import RelayBanner from "./RelayBanner";
 import ReadingPane from "@/components/ReadingPane";
@@ -112,8 +113,11 @@ export default function MailContent({ children }: { children: React.ReactNode })
     if (!selectedMessage) return;
 
     const realMsg = useMessagesStore.getState().byId[selectedMessage.id];
-    const conversationId = realMsg?.conversationId;
-    const groupInbox = conversationId ? useGroupsStore.getState().getGroupInbox(conversationId) : null;
+    const groupInbox = (() => {
+      const targets = graph.getEdgeTargets(selectedMessage.id, EDGE.PART_OF);
+      const conversationId = targets.length > 0 ? targets[0] : null;
+      return conversationId ? useGroupsStore.getState().getGroupInbox(conversationId) : null;
+    })();
 
     if (groupInbox) {
       const myPubkey = useIdentityStore.getState().identity?.pubkey ?? null;

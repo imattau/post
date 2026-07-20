@@ -6,14 +6,21 @@ vi.mock("@/lib/db/poly", () => ({
   addEdge: vi.fn(),
   removeEdges: vi.fn(),
   ensureConversation: vi.fn(),
-  db: {
-    messages: {
-      orderBy: vi.fn(() => ({ reverse: vi.fn(() => ({ toArray: vi.fn(async () => []), first: vi.fn() })) })),
-      put: vi.fn(),
-      delete: vi.fn(),
-      where: vi.fn(() => ({ count: vi.fn(async () => 0), equals: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })),
-    },
-  },
+  ensureWarm: vi.fn(),
+  flushGraph: vi.fn(),
+  deleteDatabase: vi.fn(),
+  messageSearchText: vi.fn(() => ""),
+  contactSearchText: vi.fn(() => ""),
+  graph: { getEdgeTargets: vi.fn(() => []), getEdgeSources: vi.fn(() => []) },
+  putNode: vi.fn(),
+  putNodes: vi.fn(),
+  deleteNode: vi.fn(),
+  getNode: vi.fn(async () => undefined),
+  getNodes: vi.fn(async () => []),
+  getNodesOrdered: vi.fn(async () => []),
+  countNodes: vi.fn(async () => 0),
+  clearNodes: vi.fn(),
+  db: { delete: vi.fn() },
 }));
 
 const mockSubscribe = vi.fn(() => vi.fn());

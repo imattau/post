@@ -20,6 +20,7 @@ function formatRelativeTime(updatedAt: number): string {
 export default function CalendarWorkspace() {
   const calendars = useCalendarStore((s) => s.calendars);
   const events = useCalendarStore((s) => s.events);
+  const eventCalendarIds = useCalendarStore((s) => s.eventCalendarIds);
   const sync = useCalendarStore((s) => s.sync);
   const activeMonth = useCalendarStore((s) => s.activeMonth);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
@@ -45,8 +46,11 @@ export default function CalendarWorkspace() {
 
   const calendarById = useMemo(() => new Map(calendars.map((calendar) => [calendar.id, calendar])), [calendars]);
   const visibleEvents = useMemo(
-    () => events.filter((event) => calendarById.get(event.calendarId)?.enabled !== false).sort((a, b) => a.startAt - b.startAt),
-    [events, calendarById]
+    () => events.filter((event) => {
+      const calId = eventCalendarIds[event.id];
+      return calId ? calendarById.get(calId)?.enabled !== false : true;
+    }).sort((a, b) => a.startAt - b.startAt),
+    [events, calendarById, eventCalendarIds]
   );
   const weekStartsOn = weekStartFromSetting(weekStartSetting);
   const weeks = useMemo(() => buildMonthGrid(activeMonth, weekStartsOn), [activeMonth, weekStartsOn]);
@@ -55,7 +59,7 @@ export default function CalendarWorkspace() {
     [selectedEventId, visibleEvents]
   );
 
-  const selectedEventCalendar = selectedEvent ? calendarById.get(selectedEvent.calendarId) : null;
+  const selectedEventCalendar = selectedEvent ? calendarById.get(eventCalendarIds[selectedEvent.id] ?? "") : null;
   const today = new Date();
 
   if (loading && events.length === 0) {
@@ -233,7 +237,7 @@ export default function CalendarWorkspace() {
 
                           <div className="mt-1 space-y-0.5">
                             {dayMultiDay.map((event) => {
-                              const calendar = calendarById.get(event.calendarId);
+                              const calendar = calendarById.get(eventCalendarIds[event.id] ?? "");
                               const eventStart = new Date(event.startAt);
                               const isStart = isSameDay(eventStart, day);
                               return (
@@ -262,7 +266,7 @@ export default function CalendarWorkspace() {
 
                           <div className="mt-1 space-y-1">
                             {dayRegular.map((event) => {
-                              const calendar = calendarById.get(event.calendarId);
+                              const calendar = calendarById.get(eventCalendarIds[event.id] ?? "");
                               const subtitle = event.allDay
                                 ? "All day"
                                 : formatTimeRange(event.startAt, event.endAt).replace(" to ", " - ");

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useDebounce } from "use-debounce";
 import { useDropzone } from "react-dropzone";
 import prettyBytes from "pretty-bytes";
-import { db } from "@/lib/db/poly";
+import { putNode } from "@/lib/db/poly";
 import UploadProgress from "@/components/UploadProgress";
 import DriveSidebar from "@/components/DriveSidebar";
 import DrivePreview from "@/components/DrivePreview";
@@ -323,7 +323,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
     const file = st.files.find((f) => f.id === renameFileId);
     if (!file) return;
     const updated = { ...file, name: renameValue.trim(), updatedAt: Date.now() };
-    await db.driveFiles.put(updated);
+    await putNode('drive_file', file.id, updated as any);
     useDriveStore.setState({ files: st.files.map((f) => (f.id === renameFileId ? updated : f)) });
     setRenameFileId(null);
     setRenameValue("");

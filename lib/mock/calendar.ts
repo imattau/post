@@ -18,6 +18,20 @@ export const CALENDARS: CalendarCalendar[] = [
   { id: "public", name: "Public events", color: "var(--color-danger)", enabled: true, availability: "free" },
 ];
 
+export const CALENDAR_EVENT_CALENDAR_IDS: Record<string, string> = {
+  "design-review": "work",
+  "school-pickup": "family",
+  "swimming-lesson": "personal",
+  "suite-planning": "work",
+  "relay-call": "public",
+  dentist: "personal",
+  "product-demo": "work",
+  "monthly-review": "personal",
+  "annual-leave": "work",
+  "family-dinner": "family",
+  "photo-walk": "birthdays",
+};
+
 const guests: CalendarGuest[] = [
   { id: "alice", initials: "AL", name: "Alice Nguyen", accepted: true },
   { id: "jonas", initials: "JB", name: "Jonas Berg", accepted: true },
@@ -31,7 +45,6 @@ export const CALENDAR_EVENTS: CalendarEvent[] = [
   {
     id: "design-review",
     title: "Design review",
-    calendarId: "work",
     startAt: at(1, 10, 0),
     endAt: at(1, 11, 0),
     description: "Review the latest UI direction and confirm the shared surface language.",
@@ -40,21 +53,18 @@ export const CALENDAR_EVENTS: CalendarEvent[] = [
   {
     id: "school-pickup",
     title: "School pickup",
-    calendarId: "family",
     startAt: at(2, 15, 30),
     endAt: at(2, 16, 0),
   },
   {
     id: "swimming-lesson",
     title: "Swimming lesson",
-    calendarId: "personal",
     startAt: at(4, 17, 0),
     endAt: at(4, 18, 0),
   },
   {
     id: "suite-planning",
     title: "Suite planning",
-    calendarId: "work",
     startAt: at(7, 11, 0),
     endAt: at(7, 12, 0),
     location: "Nostr Room",
@@ -71,35 +81,30 @@ export const CALENDAR_EVENTS: CalendarEvent[] = [
   {
     id: "relay-call",
     title: "Relay community call",
-    calendarId: "public",
     startAt: at(9, 9, 0),
     endAt: at(9, 10, 0),
   },
   {
     id: "dentist",
     title: "Dentist",
-    calendarId: "personal",
     startAt: at(14, 14, 15),
     endAt: at(14, 15, 0),
   },
   {
     id: "product-demo",
     title: "Product demo",
-    calendarId: "work",
     startAt: at(16, 11, 0),
     endAt: at(16, 12, 0),
   },
   {
     id: "monthly-review",
     title: "Monthly review",
-    calendarId: "personal",
     startAt: at(21, 10, 0),
     endAt: at(21, 11, 0),
   },
   {
     id: "annual-leave",
     title: "Annual leave",
-    calendarId: "work",
     startAt: at(22, 9, 0),
     endAt: at(24, 17, 0),
     allDay: true,
@@ -107,14 +112,12 @@ export const CALENDAR_EVENTS: CalendarEvent[] = [
   {
     id: "family-dinner",
     title: "Family dinner",
-    calendarId: "family",
     startAt: at(24, 18, 0),
     endAt: at(24, 20, 0),
   },
   {
     id: "photo-walk",
     title: "Photo walk",
-    calendarId: "birthdays",
     startAt: at(29, 8, 0),
     endAt: at(29, 9, 30),
   },

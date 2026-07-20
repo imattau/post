@@ -72,13 +72,12 @@ export default function CalendarNewEventPage() {
     const endAt = new Date(y, m - 1, d, endHour, endMinute).getTime();
     const created = await createEvent({
       title: data.title,
-      calendarId: data.calendarId,
       startAt,
       endAt,
       description: data.description ?? "",
       location: data.location ?? "",
       meetingLabel: data.location ? `Meeting: ${data.location}` : undefined,
-    });
+    }, data.calendarId);
     router.push(`/calendar/events/${created.id}`);
   }
 

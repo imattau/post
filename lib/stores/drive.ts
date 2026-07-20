@@ -6,13 +6,13 @@ import { encryptDriveBlob, uploadBlob, deleteBlob, createFileMetadataEvent, encr
 import type { BlossomServer } from "@post/nostr-core";
 import { decode } from "nostr-tools/nip19";
 import { finalizeEvent } from "nostr-tools/pure";
-import { db, addEdge, EDGE } from "@/lib/db/poly";
+import { graph, putNode, putNodes, deleteNode, getNodes, countNodes, clearNodes, addEdge, EDGE } from "@/lib/db/poly";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useBlossomStore } from "@/lib/stores/blossom";
 import { syncDriveFromRelays } from "@/lib/drive-sync";
-import { DRIVE_FILES, DRIVE_FOLDERS } from "@/lib/mock/drive";
+import { DRIVE_FILES, DRIVE_FOLDERS, DRIVE_FILE_FOLDER_IDS } from "@/lib/mock/drive";
 import { generateId } from "@/lib/utils";
 import { cloneFiles, cloneFolders, guessFileKind, guessFileKindFromMime, fileLetter, colorForKind, modifiedLabel, buildFileFromUpload, matchesFilter, sortFiles, matchesScreen } from "@/lib/drive-utils";
 import type {
@@ -97,17 +97,20 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     set({ loading: true, error: null });
 
 
-    const [folderCount, fileCount] = await Promise.all([db.driveFolders.count(), db.driveFiles.count()]);
+    const [folderCount, fileCount] = await Promise.all([countNodes('drive_folder'), countNodes('drive_file')]);
     if (folderCount === 0) {
-      await db.driveFolders.bulkPut(cloneFolders(DRIVE_FOLDERS));
+      await putNodes(cloneFolders(DRIVE_FOLDERS).map((f: any) => ({ type: 'drive_folder', id: f.id, data: f as any })));
     }
     if (fileCount === 0) {
-      await db.driveFiles.bulkPut(cloneFiles(DRIVE_FILES));
+      await putNodes(cloneFiles(DRIVE_FILES).map((f: any) => ({ type: 'drive_file', id: f.id, data: f as any })));
+      for (const [fileId, folderId] of Object.entries(DRIVE_FILE_FOLDER_IDS)) {
+        if (folderId) await addEdge(fileId, EDGE.IN_FOLDER, folderId);
+      }
     }
-    const [folders, files] = await Promise.all([db.driveFolders.toArray(), db.driveFiles.toArray()]);
+    const [folders, files] = await Promise.all([getNodes<any>('drive_folder'), getNodes<any>('drive_file')]);
     const countedFolders = folders.map((folder) => ({
       ...folder,
-      fileCount: files.filter((file) => file.folderId === folder.id && !file.trashed).length,
+      fileCount: files.filter((file) => !file.trashed && graph.getEdgeTargets(file.id, EDGE.IN_FOLDER)[0] === folder.id).length,
     }));
     const selectedFileId = get().selectedFileId ?? files[0]?.id ?? null;
     set({
@@ -125,10 +128,10 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
   async refresh() {
 
 
-    const [folders, files] = await Promise.all([db.driveFolders.toArray(), db.driveFiles.toArray()]);
+    const [folders, files] = await Promise.all([getNodes<any>('drive_folder'), getNodes<any>('drive_file')]);
     const countedFolders = folders.map((folder) => ({
       ...folder,
-      fileCount: files.filter((file) => file.folderId === folder.id && !file.trashed).length,
+      fileCount: files.filter((file) => !file.trashed && graph.getEdgeTargets(file.id, EDGE.IN_FOLDER)[0] === folder.id).length,
     }));
     set({ folders: countedFolders, files });
   },
@@ -182,7 +185,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
       files.filter((file) => {
         if (!matchesScreen(file, "my-files")) return false;
         if (!matchesFilter(file, filter)) return false;
-        if (selectedFolderId && file.folderId !== selectedFolderId) return false;
+        if (selectedFolderId && graph.getEdgeTargets(file.id, EDGE.IN_FOLDER)[0] !== selectedFolderId) return false;
         if (!query) return true;
         const haystack = [file.name, file.preview, file.modifiedLabel, file.ownerName, file.tags.join(" "), file.sharedWith.join(" ")].join(" ").toLowerCase();
         return haystack.includes(query.trim().toLowerCase());
@@ -206,7 +209,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, starred: !file.starred, updatedAt: Date.now() };
-    await db.driveFiles.put(updated);
+    await putNode('drive_file', id, updated as any);
     set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
   },
 
@@ -216,7 +219,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, trashed: !file.trashed, updatedAt: Date.now() };
-    await db.driveFiles.put(updated);
+    await putNode('drive_file', id, updated as any);
     set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
   },
 
@@ -226,7 +229,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, offlineAvailable: !file.offlineAvailable, updatedAt: Date.now() };
-    await db.driveFiles.put(updated);
+    await putNode('drive_file', id, updated as any);
     set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
   },
 
@@ -234,7 +237,6 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const folder: DriveFolder = {
       id: generateId(),
       name,
-      parentId: null,
       fileCount: 0,
       color: "var(--color-brand)",
       updatedAt: Date.now(),
@@ -243,7 +245,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     };
 
 
-    await db.driveFolders.put(folder);
+    await putNode('drive_folder', folder.id, folder as any);
     set({ folders: [...get().folders, folder] });
     void publishFolderEvent(folder);
     return folder.id;
@@ -316,11 +318,11 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
           }));
         }, controller.signal);
         const blobContent = encrypted ? encrypted.ciphertext : new Blob([]);
-        const driveFile = buildFileFromUpload(file, blobContent, ref.url, ref.sha256, targetFolderId);
+        const driveFile = buildFileFromUpload(file, blobContent, ref.url, ref.sha256);
         const fileRecord = { ...driveFile, encrypted: encryptSetting, encryption: encrypted?.metadata ?? null, encryptedBlob: blobContent };
     
 
-        await db.driveFiles.put(fileRecord);
+        await putNode('drive_file', fileRecord.id, fileRecord as any);
         if (targetFolderId) await addEdge(driveFile.id, EDGE.IN_FOLDER, targetFolderId);
         set((state) => ({
           files: [driveFile, ...state.files],
@@ -389,7 +391,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const file = get().files.find((item) => item.id === id);
     if (!file) return;
     const updated = { ...file, sharedWith, updatedAt: Date.now() };
-    await db.driveFiles.put(updated);
+    await putNode('drive_file', id, updated as any);
     set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
   },
 
@@ -413,12 +415,12 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
       }
     }
 
-    await db.driveFiles.delete(id);
+    await deleteNode(id);
     const state = get();
     set({
       files: state.files.filter((item) => item.id !== id),
       folders: state.folders.map((folder) =>
-        file.folderId && folder.id === file.folderId
+        graph.getEdgeTargets(file.id, EDGE.IN_FOLDER)[0] === folder.id
           ? { ...folder, fileCount: Math.max(0, folder.fileCount - 1), updatedAt: Date.now() }
           : folder
       ),
@@ -433,7 +435,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const folder = get().folders.find((item) => item.id === id);
     if (!folder) return;
     const updated = { ...folder, name, updatedAt: Date.now() };
-    await db.driveFolders.put(updated);
+    await putNode('drive_folder', id, updated as any);
     set({ folders: get().folders.map((item) => (item.id === id ? updated : item)) });
   },
 
@@ -443,7 +445,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const folder = get().folders.find((item) => item.id === id);
     if (!folder) return;
     const updated = { ...folder, starred: !folder.starred, updatedAt: Date.now() };
-    await db.driveFolders.put(updated);
+    await putNode('drive_folder', id, updated as any);
     set({ folders: get().folders.map((item) => (item.id === id ? updated : item)) });
   },
 
@@ -453,7 +455,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const folder = get().folders.find((item) => item.id === id);
     if (!folder) return;
     const updated = { ...folder, trashed: !folder.trashed, updatedAt: Date.now() };
-    await db.driveFolders.put(updated);
+    await putNode('drive_folder', id, updated as any);
     set({ folders: get().folders.filter((item) => (item.id === id ? false : true)) });
     if (get().selectedFolderId === id) get().selectFolder(null);
   },
@@ -465,7 +467,6 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     const file: DriveFile = {
       id: generateId(),
       name: attachment.fileName,
-      folderId: null,
       fileKind: kind,
       mimeType: attachment.mimeType || "application/octet-stream",
       sizeBytes: attachment.sizeBytes,
@@ -492,7 +493,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     };
 
 
-    await db.driveFiles.put(file);
+    await putNode('drive_file', file.id, file as any);
     set((state) => ({ files: [file, ...state.files] }));
     return file.id;
   },
@@ -557,7 +558,7 @@ async function syncFromRelays(): Promise<void> {
     const { files, folders } = await syncDriveFromRelays(pool, identity.pubkey, sk);
     const countedFolders = folders.map((folder) => ({
       ...folder,
-      fileCount: files.filter((file) => file.folderId === folder.id && !file.trashed).length,
+      fileCount: files.filter((file) => !file.trashed && graph.getEdgeTargets(file.id, EDGE.IN_FOLDER)[0] === folder.id).length,
     }));
     useDriveStore.setState({ files, folders: countedFolders });
   } catch {
@@ -571,7 +572,7 @@ export function getVisibleDriveFiles(state = useDriveStore.getState(), screen: D
     state.files.filter((file) => {
       if (!matchesScreen(file, screen)) return false;
       if (!matchesFilter(file, state.filter)) return false;
-      if (state.selectedFolderId && file.folderId !== state.selectedFolderId) return false;
+      if (state.selectedFolderId && graph.getEdgeTargets(file.id, EDGE.IN_FOLDER)[0] !== state.selectedFolderId) return false;
       if (!query) return true;
       const haystack = [
         file.name,

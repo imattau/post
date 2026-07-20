@@ -5,6 +5,7 @@ import { useComposeStore } from "@/lib/stores/compose";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useGroupsStore } from "@/lib/stores/groups";
 import { useMemo, useEffect, useState, useRef } from "react";
+import { graph, EDGE } from "@/lib/db/poly";
 import type { MockMessage, MockContact } from "@/lib/mock/threads";
 import type { AttachmentRef, Draft } from "@/lib/types";
 import type { Message, Profile } from "@post/nostr-core";
@@ -165,22 +166,21 @@ export function realToMock(
     starred: real.starred,
     archived: real.archived,
     spam: real.spam,
-    labels: (real.labelIds ?? []).map((id) => labels[id]?.name ?? id),
+    labels: graph.getEdgeTargets(real.id, EDGE.HAS_LABEL).map((id) => labels[id]?.name ?? id),
     attachments: real.attachments ?? [],
     encrypted: real.isEncrypted ?? true,
     isGiftWrapped: real.isGiftWrapped,
     relayCount: real.relayUrls?.length ?? 3,
     threadLength: 1,
     deliveryStatus: real.deliveryStatus,
-    conversationId: real.conversationId,
-    replyTo: real.replyTo,
+    conversationId: graph.getEdgeTargets(real.id, EDGE.PART_OF)[0] ?? null,
+    replyTo: graph.getEdgeTargets(real.id, EDGE.REPLIES_TO)[0] ?? null,
     kind: real.kind,
     pubkey: real.pubkey,
     recipientPubkey: real.recipientPubkey,
     tags: real.tags,
     snoozedUntil: real.snoozedUntil,
     mailbox: real.mailbox,
-    labelIds: real.labelIds,
     relayUrls: real.relayUrls,
   };
 }

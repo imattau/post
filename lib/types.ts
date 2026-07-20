@@ -21,7 +21,6 @@ export interface CalendarGuest {
 export interface CalendarEvent {
   id: string;
   title: string;
-  calendarId: string;
   startAt: number;
   endAt: number;
   allDay?: boolean;

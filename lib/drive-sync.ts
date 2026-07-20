@@ -1,7 +1,11 @@
 import type { RelayPool } from "@post/nostr-core";
 import { parseFileMetadataEvent, parseFolderEvent, decryptContentForOwner, subscribeAccumulate } from "@post/nostr-core";
 import type { DriveFile, DriveFolder } from "@/lib/types";
-import { db, addEdge, EDGE } from "@/lib/db/poly";
+import { graph, putNodes, getNodes, addEdge, EDGE } from "@/lib/db/poly";
+
+function getFolderId(tags: string[][]): string | null {
+  return tags.find((t) => t[0] === "folder")?.[1] ?? null;
+}
 
 export async function syncDriveFromRelays(
   pool: RelayPool,
@@ -14,9 +18,10 @@ export async function syncDriveFromRelays(
     queryEvents(pool, [{ kinds: [30063], authors: [pubkey], limit: 100 }]),
   ]);
 
-  const existingFiles = await db.driveFiles.toArray();
+  const existingFiles = await getNodes<DriveFile>('drive_file');
   const existingFileIds = new Set(existingFiles.map((f) => f.id));
   const newFiles: DriveFile[] = [];
+  const fileFolderIds: Record<string, string | null> = {};
 
   for (const event of fileEvents) {
     const file = parseFileMetadataEvent(event);
@@ -29,17 +34,19 @@ export async function syncDriveFromRelays(
     }
     if (!existingFileIds.has(file.id)) {
       newFiles.push(file);
+      fileFolderIds[file.id] = getFolderId(event.tags);
     }
   }
 
   if (newFiles.length > 0) {
-    await db.driveFiles.bulkPut(newFiles);
+    await putNodes(newFiles.map((f: any) => ({ type: 'drive_file', id: f.id, data: f as any })));
     for (const f of newFiles) {
-      if (f.folderId) await addEdge(f.id, EDGE.IN_FOLDER, f.folderId);
+      const folderId = fileFolderIds[f.id];
+      if (folderId) await addEdge(f.id, EDGE.IN_FOLDER, folderId);
     }
   }
 
-  const existingFolders = await db.driveFolders.toArray();
+  const existingFolders = await getNodes<DriveFolder>('drive_folder');
   const existingFolderIds = new Set(existingFolders.map((f) => f.id));
   const newFolders: DriveFolder[] = [];
 
@@ -58,12 +65,12 @@ export async function syncDriveFromRelays(
   }
 
   if (newFolders.length > 0) {
-    await db.driveFolders.bulkPut(newFolders);
+    await putNodes(newFolders.map((f: any) => ({ type: 'drive_folder', id: f.id, data: f as any })));
   }
 
   const [allFiles, allFolders] = await Promise.all([
-    db.driveFiles.toArray(),
-    db.driveFolders.toArray(),
+    getNodes<DriveFile>('drive_file'),
+    getNodes<DriveFolder>('drive_folder'),
   ]);
 
   return { files: allFiles, folders: allFolders };

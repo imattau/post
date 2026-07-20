@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
 import { useDebounce } from "use-debounce";
-import type { SearchResult } from "minisearch";
 
 export function useSearch<T extends { id: string }>({
   items,
@@ -9,7 +8,7 @@ export function useSearch<T extends { id: string }>({
   minQueryLength = 1,
 }: {
   items: T[];
-  searchFn: (query: string, items: T[]) => SearchResult[];
+  searchFn: (query: string, items: T[]) => any[];
   debounceMs?: number;
   minQueryLength?: number;
 }) {

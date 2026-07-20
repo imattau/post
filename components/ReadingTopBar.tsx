@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowLeft, Star, EllipsisVertical, BadgeCheck, Check } from "lucide-react";
+import { graph, EDGE } from "@/lib/db/poly";
 import { useLabelsStore } from "@/lib/stores/labels";
 import { Menu } from "@base-ui/react/menu";
 
@@ -120,7 +121,7 @@ export default function ReadingTopBar({
               {allIds.map((labelId) => {
                 const label = byId[labelId];
                 if (!label) return null;
-                const assigned = label.messageIds.includes(messageId);
+                const assigned = graph.getEdgeSources(labelId, EDGE.HAS_LABEL).includes(messageId);
                 return (
                   <Menu.Item
                     key={labelId}

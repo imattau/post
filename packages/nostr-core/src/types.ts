@@ -66,7 +66,6 @@ export interface EncryptedBlobMetadata {
 export interface DriveFolder {
   id: string;
   name: string;
-  parentId: string | null;
   fileCount: number;
   color: string;
   updatedAt: number;
@@ -77,7 +76,6 @@ export interface DriveFolder {
 export interface DriveFile {
   id: string;
   name: string;
-  folderId: string | null;
   fileKind: DriveFileKind;
   mimeType: string;
   sizeBytes: number;
@@ -138,9 +136,6 @@ export interface Message {
   snoozedUntil: number | null;
   spam: boolean;
   mailbox: MailboxKind;
-  labelIds: string[];
-  replyTo: string | null;
-  conversationId: string | null;
   relayUrls: string[];
   attachments: AttachmentRef[];
   isEncrypted: boolean;
@@ -152,7 +147,6 @@ export interface Label {
   id: string;
   name: string;
   color: string;
-  messageIds: string[];
 }
 
 export interface RecipientEntry {

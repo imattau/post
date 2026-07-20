@@ -16,6 +16,7 @@ const PAGE_SIZE = 12;
 
 export default function CalendarAgendaPage() {
   const events = useCalendarStore((s) => s.events);
+  const eventCalendarIds = useCalendarStore((s) => s.eventCalendarIds);
   const calendars = useCalendarStore((s) => s.calendars);
   const loading = useCalendarStore((s) => s.loading);
   const error = useCalendarStore((s) => s.error);
@@ -78,7 +79,7 @@ export default function CalendarAgendaPage() {
             </div>
             <div className="space-y-3">
               {group.events.map((event) => {
-                const calendar = calendarById.get(event.calendarId);
+                const calendar = calendarById.get(eventCalendarIds[event.id] ?? "");
                 return (
                   <Link
                     key={event.id}
