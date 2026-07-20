@@ -1,5 +1,6 @@
-import { nip44, nip17, nip59, finalizeEvent } from "nostr-tools";
+import { nip44, nip59, finalizeEvent } from "nostr-tools";
 import { decode } from "nostr-tools/nip19";
+import { generateSecretKey, getPublicKey, getEventHash } from "nostr-tools/pure";
 import type { NostrEvent } from "nostr-tools";
 import type { RelayPool } from "./relays";
 import type { KeyStore } from "./keys";
@@ -28,14 +29,20 @@ export interface SendResult {
   delivered: number;
 }
 
-function buildMessagePayload(content: string, subject: string | undefined, attachments: AttachmentRef[] | undefined, sk: Uint8Array, to: string, conversationId?: string, groupKey?: { pubkey: string; privkey: string }): string {
+export interface SignerKey {
+  pubkey: string;
+  signEvent(event: { kind: number; tags: string[][]; content: string; created_at: number }): Promise<{ sig: string }>;
+  nip44Encrypt(recipientPubkey: string, plaintext: string): Promise<string>;
+}
+
+function buildMessagePayload(content: string, subject: string | undefined, attachments: AttachmentRef[] | undefined, sk: Uint8Array | null, to: string, conversationId?: string, groupKey?: { pubkey: string; privkey: string }): string {
   if (!attachments?.length && !subject && !conversationId && !groupKey) return content;
 
   const payload: Record<string, any> = { body: content, v: 1 };
 
   if (attachments?.length) {
     payload.attachments = attachments.map((att) => {
-      const encryptedKey = att.encrypted && att.fileKey
+      const encryptedKey = att.encrypted && att.fileKey && sk
         ? wrapFileKey(fromBase64Key(att.fileKey), sk, to)
         : undefined;
       return {
@@ -98,17 +105,89 @@ export function parseMessagePayloadAndUnwrap(plaintext: string, sk: Uint8Array, 
   return { body: plaintext, subject: undefined, attachments: [], conversationId: undefined, groupKey: undefined };
 }
 
+function isSignerKey(keys: KeyStore | SignerKey): keys is SignerKey {
+  return "signEvent" in keys;
+}
+
+async function signEventWithNsec(template: { kind: number; tags: string[][]; content: string; created_at: number }, sk: Uint8Array): Promise<Event> {
+  return finalizeEvent(template, sk) as Event;
+}
+
+async function signEventWithSigner(
+  template: { kind: number; tags: string[][]; content: string; created_at: number },
+  signer: SignerKey
+): Promise<Event> {
+  const signed = await signer.signEvent(template);
+  const id = getEventHash({ ...template, pubkey: signer.pubkey } as any);
+  return { ...template, pubkey: signer.pubkey, sig: signed.sig, id } as unknown as Event;
+}
+
+async function nip44Encrypt(payload: string, sk: Uint8Array, to: string): Promise<string> {
+  const conversationKey = nip44.v2.utils.getConversationKey(sk, to);
+  return nip44.v2.encrypt(payload, conversationKey);
+}
+
+async function nip44EncryptWithSigner(payload: string, signer: SignerKey, to: string): Promise<string> {
+  return signer.nip44Encrypt(to, payload);
+}
+
+async function wrapEventNsec(rumor: { kind: number; content: string; created_at: number; tags: string[][] }, sk: Uint8Array, recipientPubkey: string): Promise<Event> {
+  return nip59.wrapEvent(rumor, sk, recipientPubkey) as Event;
+}
+
+async function wrapEventWithSigner(
+  rumor: { kind: number; content: string; created_at: number; tags: string[][] },
+  signer: SignerKey,
+  recipientPubkey: string
+): Promise<Event> {
+  const rumorWithPubkey = { ...rumor, pubkey: signer.pubkey };
+  const rumorJson = JSON.stringify(rumorWithPubkey);
+  const sealContent = await signer.nip44Encrypt(recipientPubkey, rumorJson);
+  const sealTemplate = { kind: 13, content: sealContent, created_at: Math.floor(Date.now() / 1000), tags: [] };
+  const sealEvent = await signEventWithSigner(sealTemplate, signer);
+
+  const randomKey = generateSecretKey();
+  const sealJson = JSON.stringify(sealEvent);
+  const randomPubkey = getPublicKey(randomKey);
+  const conversationKey = nip44.v2.utils.getConversationKey(randomKey, recipientPubkey);
+  const wrapContent = nip44.v2.encrypt(sealJson, conversationKey);
+  const wrapTemplate = { kind: 1059, content: wrapContent, created_at: Math.floor(Date.now() / 1000), tags: [["p", recipientPubkey]] };
+  return finalizeEvent(wrapTemplate, randomKey) as Event;
+}
+
 export async function sendMessage(
   pool: RelayPool,
-  keys: KeyStore,
+  keys: KeyStore | SignerKey,
   opts: SendOptions
 ): Promise<SendResult> {
-  const identity = await keys.load();
-  if (!identity || !identity.nsec) throw new Error("Cannot send message");
+  const useSigner = isSignerKey(keys);
+  let pubkey: string;
+  let sk: Uint8Array | null = null;
+  let signer: SignerKey | null = null;
 
-  const nsecDecoded = decode(identity.nsec);
-  if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
-  const sk = nsecDecoded.data;
+  if (useSigner) {
+    signer = keys;
+    pubkey = keys.pubkey;
+  } else {
+    const identity = await keys.load();
+    if (!identity || !identity.nsec) throw new Error("Cannot send message");
+    const nsecDecoded = decode(identity.nsec);
+    if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
+    sk = nsecDecoded.data;
+    pubkey = identity.pubkey;
+  }
+
+  const encrypt = useSigner
+    ? (payload: string, to: string) => nip44EncryptWithSigner(payload, signer!, to)
+    : (payload: string, to: string) => nip44Encrypt(payload, sk!, to);
+
+  const sign = useSigner
+    ? (template: { kind: number; tags: string[][]; content: string; created_at: number }) => signEventWithSigner(template, signer!)
+    : (template: { kind: number; tags: string[][]; content: string; created_at: number }) => signEventWithNsec(template, sk!);
+
+  const wrap = useSigner
+    ? (rumor: { kind: number; content: string; created_at: number; tags: string[][] }, to: string) => wrapEventWithSigner(rumor, signer!, to)
+    : (rumor: { kind: number; content: string; created_at: number; tags: string[][] }, to: string) => wrapEventNsec(rumor, sk!, to);
 
   let event: NostrEvent;
 
@@ -130,7 +209,7 @@ export async function sendMessage(
       created_at: Math.floor(Date.now() / 1000),
       tags: rumorTags,
     };
-    event = nip59.wrapEvent(rumorEvent, sk, opts.groupPubkey);
+    event = await wrap(rumorEvent, opts.groupPubkey);
   } else {
     const baseTags: string[][] = [["p", opts.to]];
     if (opts.subject) baseTags.push(["subject", opts.subject]);
@@ -145,22 +224,27 @@ export async function sendMessage(
         created_at: Math.floor(Date.now() / 1000),
         tags: baseTags,
       };
-      event = nip59.wrapEvent(rumorEvent, sk, opts.to);
+      event = await wrap(rumorEvent, opts.to);
     } else {
-      const conversationKey = nip44.v2.utils.getConversationKey(sk, opts.to);
       const payload = buildMessagePayload(opts.content, opts.subject, opts.attachments, sk, opts.to, opts.conversationId, opts.groupKey);
-      const encrypted = nip44.v2.encrypt(payload, conversationKey);
-
-      event = finalizeEvent({
+      const encrypted = await encrypt(payload, opts.to);
+      const eventTemplate = {
         kind: 14,
         content: encrypted,
         created_at: Math.floor(Date.now() / 1000),
         tags: baseTags,
-      }, sk);
+      };
+      event = await sign(eventTemplate);
     }
   }
 
-  const published = await pool.publish(event, opts.relayOverrides);
+  let published: Map<string, boolean>;
+  try {
+    published = await pool.publish(event, opts.relayOverrides);
+  } catch (err) {
+    console.error("sendMessage publish error:", err);
+    published = new Map();
+  }
   let delivered = 0;
   for (const ok of published.values()) if (ok) delivered++;
 

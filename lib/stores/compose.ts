@@ -1,11 +1,14 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { sendMessage, createKeyStore } from "@post/nostr-core";
+import type { SignerKey, KeyStore } from "@post/nostr-core";
+import { nip44 } from "nostr-tools";
 import { decode } from "nostr-tools/nip19";
 import { generateId, draftHasContent } from "@/lib/utils";
 import { graph, putNode, deleteNode, getNode, getNodesOrdered, addEdge, ensureConversation, EDGE, messageSearchText } from "@/lib/db/poly";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useMessagesStore } from "@/lib/stores/messages";
+import { useIdentityStore } from "@/lib/stores/identity";
 import type { Draft, RecipientEntry, AttachmentUpload, SendResult } from "@/lib/types";
 import { useSettingsStore } from "@/lib/stores/settings";
 
@@ -187,17 +190,52 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
     set({ status: "sending", error: null });
     try {
       const { draft, encrypted, giftWrap, relayOverrides, uploads } = get();
-      const keyStore = createKeyStore();
-      const identity = await keyStore.load();
-      if (!identity?.nsec) throw new Error("Cannot send message");
 
       if (draft.to.length === 0 && draft.cc.length === 0) throw new Error("Cannot send message");
 
-      const nsecDecoded = decode(identity.nsec);
-      if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
-
       const pool = useRelaysStore.getState().pool;
       if (!pool) throw new Error("Cannot send message");
+
+      const identityState = useIdentityStore.getState();
+      const identity = identityState.identity;
+      if (!identity) throw new Error("Cannot send message");
+
+      let senderKey: KeyStore | SignerKey;
+      let pubkey: string;
+
+      if (identity.nsec) {
+        const nsecDecoded = decode(identity.nsec);
+        if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
+        senderKey = createKeyStore();
+        pubkey = identity.pubkey;
+      } else if (identityState.usingNip07 && typeof window !== "undefined" && window.nostr) {
+        pubkey = identity.pubkey;
+        senderKey = {
+          pubkey,
+          signEvent: async (e) => window.nostr!.signEvent(e),
+          nip44Encrypt: async (to, content) => window.nostr!.nip44!.encrypt(to, content),
+        };
+      } else if (identityState.usingNip46 && identityState.nip46Signer) {
+        pubkey = identity.pubkey;
+        senderKey = {
+          pubkey,
+          signEvent: async (e) => identityState.nip46Signer!.signEvent(e),
+          nip44Encrypt: async (to, content) => identityState.nip46Signer!.nip44Encrypt(to, content),
+        };
+      } else if (identityState.usingPasskey && identityState.passkeySigner && identityState.passkeySecretKey) {
+        pubkey = identity.pubkey;
+        const sk = Uint8Array.from(atob(identityState.passkeySecretKey), c => c.charCodeAt(0));
+        senderKey = {
+          pubkey,
+          signEvent: async (e) => identityState.passkeySigner!.signEvent(e),
+          nip44Encrypt: async (to, content) => {
+            const conversationKey = nip44.v2.utils.getConversationKey(sk, to);
+            return nip44.v2.encrypt(content, conversationKey);
+          },
+        };
+      } else {
+        throw new Error("Cannot send message");
+      }
 
       const attachments = uploads
         .filter((u): u is AttachmentUpload & { result: NonNullable<AttachmentUpload["result"]> } => u.status === "uploaded" && u.result !== null)
@@ -259,7 +297,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
             await addEdge(draft.conversationId, EDGE.HAS_PARTICIPANT, member.pubkey);
           }
         }
-        const result = await sendMessage(pool, keyStore, {
+        const result = await sendMessage(pool, senderKey, {
           to: groupInbox.pubkey,
           content: draft.body,
           subject: draft.subject || undefined,
@@ -277,7 +315,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         await resubscribeGroupPubkeys();
       } else {
         for (const recipient of toCcRecipients) {
-          const result = await sendMessage(pool, keyStore, {
+          const result = await sendMessage(pool, senderKey, {
             to: recipient.pubkey,
             content: draft.body,
             subject: draft.subject || undefined,
@@ -294,7 +332,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
       }
 
       for (const recipient of draft.bcc) {
-        const result = await sendMessage(pool, keyStore, {
+        const result = await sendMessage(pool, senderKey, {
           to: recipient.pubkey,
           content: draft.body,
           subject: draft.subject || undefined,
@@ -309,11 +347,16 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
 
       await deleteNode(draft.id);
 
-      set({ status: "sent", draft: emptyDraft(), uploads: [] });
+      if (overallDelivered > 0) {
+        set({ status: "sent", draft: emptyDraft(), uploads: [] });
+      } else {
+        set({ status: "failed", error: "Message was not accepted by any relay (kind 14/1059 may not be supported)" });
+      }
       return { eventId: "", published: new Map(), delivered: overallDelivered };
     } catch (err) {
-      console.error("Send failed:", err);
-      set({ status: "failed", error: "Send failed" });
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("Send failed:", message);
+      set({ status: "failed", error: message });
       return { eventId: "", published: new Map(), delivered: 0 };
     }
   },
@@ -355,17 +398,51 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
 
   async sendDirect(to: RecipientEntry[], subject: string, body: string, replyTo: string | null): Promise<boolean> {
     try {
-      const keyStore = createKeyStore();
-      const identity = await keyStore.load();
-      if (!identity?.nsec) throw new Error("Cannot send message");
-
       if (to.length === 0) throw new Error("Cannot send message");
-
-      const nsecDecoded = decode(identity.nsec);
-      if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
 
       const pool = useRelaysStore.getState().pool;
       if (!pool) throw new Error("Cannot send message");
+
+      const identityState = useIdentityStore.getState();
+      const identity = identityState.identity;
+      if (!identity) throw new Error("Cannot send message");
+
+      let senderKey: KeyStore | SignerKey;
+      let pubkey: string;
+
+      if (identity.nsec) {
+        const nsecDecoded = decode(identity.nsec);
+        if (nsecDecoded.type !== "nsec") throw new Error("Cannot send message");
+        senderKey = createKeyStore();
+        pubkey = identity.pubkey;
+      } else if (identityState.usingNip07 && typeof window !== "undefined" && window.nostr) {
+        pubkey = identity.pubkey;
+        senderKey = {
+          pubkey,
+          signEvent: async (e) => window.nostr!.signEvent(e),
+          nip44Encrypt: async (to, content) => window.nostr!.nip44!.encrypt(to, content),
+        };
+      } else if (identityState.usingNip46 && identityState.nip46Signer) {
+        pubkey = identity.pubkey;
+        senderKey = {
+          pubkey,
+          signEvent: async (e) => identityState.nip46Signer!.signEvent(e),
+          nip44Encrypt: async (to, content) => identityState.nip46Signer!.nip44Encrypt(to, content),
+        };
+      } else if (identityState.usingPasskey && identityState.passkeySigner && identityState.passkeySecretKey) {
+        pubkey = identity.pubkey;
+        const sk = Uint8Array.from(atob(identityState.passkeySecretKey), c => c.charCodeAt(0));
+        senderKey = {
+          pubkey,
+          signEvent: async (e) => identityState.passkeySigner!.signEvent(e),
+          nip44Encrypt: async (to, content) => {
+            const conversationKey = nip44.v2.utils.getConversationKey(sk, to);
+            return nip44.v2.encrypt(content, conversationKey);
+          },
+        };
+      } else {
+        throw new Error("Cannot send message");
+      }
 
       const conversationId = replyTo
         ? (graph.getEdgeTargets(replyTo, EDGE.PART_OF)[0] ?? generateId())
@@ -375,7 +452,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
       const now = Date.now();
 
       for (const recipient of to) {
-        const result = await sendMessage(pool, keyStore, {
+        const result = await sendMessage(pool, senderKey, {
           to: recipient.pubkey,
           content: body,
           subject: subject || undefined,
@@ -388,7 +465,7 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         const sentMessage = {
           id: result.eventId,
           kind: 14,
-          pubkey: identity.pubkey,
+          pubkey,
           recipientPubkey: recipient.pubkey,
           content: body,
           raw: "",
@@ -418,10 +495,10 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         if (conversationId) {
           await ensureConversation(conversationId);
           await addEdge(sentMessage.id, EDGE.PART_OF, conversationId);
-          await addEdge(conversationId, EDGE.HAS_PARTICIPANT, identity.pubkey);
+          await addEdge(conversationId, EDGE.HAS_PARTICIPANT, pubkey);
           await addEdge(conversationId, EDGE.HAS_PARTICIPANT, recipient.pubkey);
         }
-        await addEdge(sentMessage.id, EDGE.SENT_BY, identity.pubkey);
+        await addEdge(sentMessage.id, EDGE.SENT_BY, pubkey);
         await addEdge(sentMessage.id, EDGE.SENT_TO, recipient.pubkey);
       }
 

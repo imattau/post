@@ -93,14 +93,18 @@ export function createRelayPool(relays: RelayConfig[]): RelayPool {
     async publish(event: Event, targetRelays?: string[]): Promise<Map<string, boolean>> {
       const urls = targetRelays ?? writeUrls;
       const results = new Map<string, boolean>();
-      const promises = simplePool.publish(urls, event);
-      for (let i = 0; i < urls.length; i++) {
-        try {
-          await promises[i];
-          results.set(urls[i], true);
-        } catch {
-          results.set(urls[i], false);
+      try {
+        const promises = simplePool.publish(urls, event);
+        for (let i = 0; i < urls.length; i++) {
+          try {
+            await promises[i];
+            results.set(urls[i], true);
+          } catch {
+            results.set(urls[i], false);
+          }
         }
+      } catch {
+        for (const url of urls) results.set(url, false);
       }
       return results;
     },

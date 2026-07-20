@@ -16,9 +16,9 @@ function draftToMessage(draft: Draft): MockMessage {
     id: draft.id,
     sender: {
       id: "me",
-      name: "Me",
+      name: recipientNames,
       npub: "",
-      avatarInitials: "ME",
+      avatarInitials: recipientNames.slice(0, 2).toUpperCase() || "DR",
       verified: false,
     },
     recipientName: recipientNames,
@@ -146,10 +146,10 @@ export function realToMock(
 
   const contact: MockContact = {
     id: targetPubkey,
-    name: isSent ? "Me" : displayName,
-    npub: isSent ? "" : `${targetPubkey.slice(0, 10)}…`,
-    avatarInitials: isSent ? "ME" : initials,
-    verified: isSent ? false : (profile?.nip05 ? true : false),
+    name: displayName,
+    npub: `${targetPubkey.slice(0, 10)}…`,
+    avatarInitials: initials,
+    verified: profile?.nip05 ? true : false,
   };
 
   const recipientName = isSent ? displayName : "me";
