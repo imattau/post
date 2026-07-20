@@ -242,7 +242,11 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         if (draft.conversationId) {
           await ensureConversation(draft.conversationId);
           await addEdge(msg.id, EDGE.PART_OF, draft.conversationId);
+          await addEdge(draft.conversationId, EDGE.HAS_PARTICIPANT, identity!.pubkey);
+          await addEdge(draft.conversationId, EDGE.HAS_PARTICIPANT, recipientPubkey);
         }
+        await addEdge(msg.id, EDGE.SENT_BY, identity!.pubkey);
+        await addEdge(msg.id, EDGE.SENT_TO, recipientPubkey);
       }
 
       if (hasMultipleToCc) {
@@ -250,6 +254,11 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         const groupsStore = useGroupsStore.getState();
         const allMembers = toCcRecipients.map((r) => ({ pubkey: r.pubkey, npub: r.npub, name: r.name, avatarUrl: r.avatarUrl, isGroup: false }));
         const groupInbox = groupsStore.createGroupInbox(draft.conversationId, allMembers);
+        if (draft.conversationId) {
+          for (const member of allMembers) {
+            await addEdge(draft.conversationId, EDGE.HAS_PARTICIPANT, member.pubkey);
+          }
+        }
         const result = await sendMessage(pool, keyStore, {
           to: groupInbox.pubkey,
           content: draft.body,
@@ -409,7 +418,11 @@ export const useComposeStore = create<ComposeState>()(immer((set, get) => ({
         if (conversationId) {
           await ensureConversation(conversationId);
           await addEdge(sentMessage.id, EDGE.PART_OF, conversationId);
+          await addEdge(conversationId, EDGE.HAS_PARTICIPANT, identity.pubkey);
+          await addEdge(conversationId, EDGE.HAS_PARTICIPANT, recipient.pubkey);
         }
+        await addEdge(sentMessage.id, EDGE.SENT_BY, identity.pubkey);
+        await addEdge(sentMessage.id, EDGE.SENT_TO, recipient.pubkey);
       }
 
       return overallDelivered > 0;

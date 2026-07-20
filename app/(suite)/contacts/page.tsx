@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { type ContactStatus, type ContactView, useContactsStore } from "@/lib/stores/contacts";
 import { useSearchSimple } from "@/lib/useSearch";
+import { graph, EDGE } from "@/lib/db/poly";
 
 type ContactsTab = "Overview" | "Following" | "Muted" | "Blocked";
 
@@ -48,7 +49,7 @@ export default function ContactsPage() {
     { label: "Following", value: contacts.filter((contact) => contact.status === "Following").length },
     { label: "Muted", value: contacts.filter((contact) => contact.status === "Muted").length },
     { label: "Blocked", value: contacts.filter((contact) => contact.status === "Blocked").length },
-    { label: "Groups", value: 0 },
+    { label: "Groups", value: contacts.filter((c) => graph.getEdgeSources(c.pubkey, EDGE.HAS_MEMBER).length > 0).reduce((sum) => sum + 1, 0) },
   ];
 
   const updateStatus = async (contact: ContactView, status: ContactStatus) => {
@@ -184,9 +185,24 @@ export default function ContactsPage() {
                   </div>
                 </div>
 
-                {/* Message timeline */}
-                <div className="border border-border rounded-pill bg-sidebar p-6 text-center max-w-xl">
-                  <p className="text-text-tertiary text-[13px]">Message history will appear here</p>
+                {/* Connection stats from graph */}
+                <div className="border border-border rounded-pill bg-sidebar p-6 max-w-xl">
+                  <p className="text-[12px] font-semibold text-text-near-white mb-3">Connections</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Conversations", value: graph.getEdgeSources(selectedContact.pubkey, EDGE.HAS_PARTICIPANT).length },
+                      { label: "Messages sent", value: graph.getEdgeSources(selectedContact.pubkey, EDGE.SENT_BY).length },
+                      { label: "Messages received", value: graph.getEdgeSources(selectedContact.pubkey, EDGE.SENT_TO).length },
+                      { label: "Shared files", value: graph.getEdgeSources(selectedContact.pubkey, EDGE.SHARED_WITH).length },
+                      { label: "Event invites", value: graph.getEdgeSources(selectedContact.pubkey, EDGE.HAS_GUEST).length },
+                      { label: "Group memberships", value: graph.getEdgeSources(selectedContact.pubkey, EDGE.HAS_MEMBER).length },
+                    ].map((s) => (
+                      <div key={s.label} className="rounded-[10px] border border-border bg-canvas px-3 py-2.5 text-center">
+                        <p className="text-[18px] font-semibold text-text-primary">{s.value}</p>
+                        <p className="text-[10px] text-text-tertiary mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <button

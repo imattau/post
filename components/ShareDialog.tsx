@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
+import { graph, EDGE } from "@/lib/db/poly";
 import Avatar from "./Avatar";
 import { Button } from "@/components/ui/button";
 import type { DriveFile } from "@/lib/types";
@@ -33,7 +34,7 @@ interface ShareDialogProps {
 }
 
 export default function ShareDialog({ file, onClose, onUpdate }: ShareDialogProps) {
-  const [sharedWith, setSharedWith] = useState<string[]>([...file.sharedWith]);
+  const [sharedWith, setSharedWith] = useState<string[]>(() => [...graph.getEdgeTargets(file.id, EDGE.SHARED_WITH)]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 

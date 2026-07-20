@@ -1,3 +1,4 @@
+import { graph, EDGE } from "@/lib/db/poly";
 import { generateId } from "@/lib/utils";
 import { format } from "date-fns";
 import type { DriveFile, DriveFileKind, DriveFilter, DriveFolder, DriveScreen, DriveSort } from "@/lib/types";
@@ -111,7 +112,7 @@ export function matchesScreen(file: DriveFile, screen: DriveScreen): boolean {
     case "starred":
       return !file.trashed && file.starred;
     case "shared":
-      return !file.trashed && file.sharedWith.length > 0;
+      return !file.trashed && graph.getEdgeTargets(file.id, EDGE.SHARED_WITH).length > 0;
     case "offline":
       return !file.trashed && file.offlineAvailable;
     case "from-post":

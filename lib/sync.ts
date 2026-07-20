@@ -123,7 +123,11 @@ async function handleKind14(event: NostrEvent, identity: { pubkey: string }) {
     if (convId) {
       await ensureConversation(convId);
       await addEdge(msg.id, EDGE.PART_OF, convId);
+      await addEdge(convId, EDGE.HAS_PARTICIPANT, msg.pubkey);
+      await addEdge(convId, EDGE.HAS_PARTICIPANT, msg.recipientPubkey);
     }
+    await addEdge(msg.id, EDGE.SENT_BY, msg.pubkey);
+    await addEdge(msg.id, EDGE.SENT_TO, msg.recipientPubkey);
   } catch {
     // Skip events that fail to decrypt
   }
@@ -183,7 +187,11 @@ async function handleKind1059(event: NostrEvent, identity: { pubkey: string }) {
     if (convId) {
       await ensureConversation(convId);
       await addEdge(msg.id, EDGE.PART_OF, convId);
+      await addEdge(convId, EDGE.HAS_PARTICIPANT, msg.pubkey);
+      await addEdge(convId, EDGE.HAS_PARTICIPANT, msg.recipientPubkey);
     }
+    await addEdge(msg.id, EDGE.SENT_BY, msg.pubkey);
+    await addEdge(msg.id, EDGE.SENT_TO, msg.recipientPubkey);
   } catch {
     // Skip events that fail to decrypt
   }

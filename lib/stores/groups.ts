@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { nip17 } from "nostr-tools";
 import type { GroupInbox, RecipientEntry } from "@post/nostr-core";
-import { graph, putNode, getNodes } from "@/lib/db/poly";
+import { graph, putNode, getNodes, addEdge, EDGE } from "@/lib/db/poly";
 
 interface GroupsState {
   byConversationId: Record<string, GroupInbox>;
@@ -50,6 +50,9 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
     const privkeyHex = Buffer.from(sk).toString("hex");
     const inbox: GroupInbox = { id: conversationId, pubkey, privkey: privkeyHex, members, createdAt: Date.now() };
     putNode('group_inbox', conversationId, inbox as any);
+    for (const member of members) {
+      addEdge(conversationId, EDGE.HAS_MEMBER, member.pubkey);
+    }
     set({
       byConversationId: { ...get().byConversationId, [conversationId]: inbox },
       byPubkey: { ...get().byPubkey, [pubkey]: inbox },
@@ -60,6 +63,9 @@ export const useGroupsStore = create<GroupsState>((set, get) => ({
   async saveReceivedGroupKey(conversationId: string, pubkey: string, privkeyHex: string, members: RecipientEntry[]) {
     const inbox: GroupInbox = { id: conversationId, pubkey, privkey: privkeyHex, members, createdAt: Date.now() };
     await putNode('group_inbox', conversationId, inbox as any);
+    for (const member of members) {
+      await addEdge(conversationId, EDGE.HAS_MEMBER, member.pubkey);
+    }
     set({
       byConversationId: { ...get().byConversationId, [conversationId]: inbox },
       byPubkey: { ...get().byPubkey, [pubkey]: inbox },

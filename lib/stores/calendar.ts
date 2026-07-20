@@ -91,6 +91,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
             await putNodes(relayEvents.map((r: any) => ({ type: 'calendar_event', id: r.event.id, data: r.event as any })));
             for (const r of relayResults) {
               await addEdge(r.event.id, EDGE.BELONGS_TO, r.calendarId);
+              if (r.event.guests) {
+                for (const guest of r.event.guests) {
+                  await addEdge(r.event.id, EDGE.HAS_GUEST, guest.id);
+                }
+              }
               mergedCalendarIds[r.event.id] = r.calendarId;
             }
             mergedEvents = [...events, ...relayEvents].sort((a, b) => a.startAt - b.startAt);
@@ -176,6 +181,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       };
       const events = [...get().events, created].sort((a, b) => a.startAt - b.startAt);
       await addEdge(created.id, EDGE.BELONGS_TO, calendarId);
+      if (created.guests) {
+        for (const guest of created.guests) {
+          await addEdge(created.id, EDGE.HAS_GUEST, guest.id);
+        }
+      }
       set({
         events,
         eventCalendarIds: { ...get().eventCalendarIds, [created.id]: calendarId },

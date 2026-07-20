@@ -7,6 +7,12 @@ export const EDGE = {
   BELONGS_TO: "BELONGS_TO",
   REPLIES_TO: "REPLIES_TO",
   PART_OF: "PART_OF",
+  SENT_BY: "SENT_BY",
+  SENT_TO: "SENT_TO",
+  HAS_PARTICIPANT: "HAS_PARTICIPANT",
+  HAS_MEMBER: "HAS_MEMBER",
+  HAS_GUEST: "HAS_GUEST",
+  SHARED_WITH: "SHARED_WITH",
 } as const;
 
 const blobStore = new Map<string, Blob>();

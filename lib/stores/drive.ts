@@ -6,7 +6,7 @@ import { encryptDriveBlob, uploadBlob, deleteBlob, createFileMetadataEvent, encr
 import type { BlossomServer } from "@post/nostr-core";
 import { decode } from "nostr-tools/nip19";
 import { finalizeEvent } from "nostr-tools/pure";
-import { graph, putNode, putNodes, deleteNode, getNodes, countNodes, clearNodes, addEdge, EDGE } from "@/lib/db/poly";
+import { graph, putNode, putNodes, deleteNode, getNodes, countNodes, clearNodes, addEdge, removeEdges, EDGE } from "@/lib/db/poly";
 import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useSettingsStore } from "@/lib/stores/settings";
@@ -187,7 +187,7 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
         if (!matchesFilter(file, filter)) return false;
         if (selectedFolderId && graph.getEdgeTargets(file.id, EDGE.IN_FOLDER)[0] !== selectedFolderId) return false;
         if (!query) return true;
-        const haystack = [file.name, file.preview, file.modifiedLabel, file.ownerName, file.tags.join(" "), file.sharedWith.join(" ")].join(" ").toLowerCase();
+        const haystack = [file.name, file.preview, file.modifiedLabel, file.ownerName, file.tags.join(" "), graph.getEdgeTargets(file.id, EDGE.SHARED_WITH).join(" ")].join(" ").toLowerCase();
         return haystack.includes(query.trim().toLowerCase());
       }),
       sort
@@ -392,6 +392,10 @@ export const useDriveStore = create<DriveState>()(immer((set, get) => ({
     if (!file) return;
     const updated = { ...file, sharedWith, updatedAt: Date.now() };
     await putNode('drive_file', id, updated as any);
+    await removeEdges(id, EDGE.SHARED_WITH);
+    for (const pubkey of sharedWith) {
+      await addEdge(id, EDGE.SHARED_WITH, pubkey);
+    }
     set({ files: get().files.map((item) => (item.id === id ? updated : item)) });
   },
 
@@ -580,7 +584,7 @@ export function getVisibleDriveFiles(state = useDriveStore.getState(), screen: D
         file.modifiedLabel,
         file.ownerName,
         file.tags.join(" "),
-        file.sharedWith.join(" "),
+        graph.getEdgeTargets(file.id, EDGE.SHARED_WITH).join(" "),
       ].join(" ").toLowerCase();
       return haystack.includes(query);
     }),

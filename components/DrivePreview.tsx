@@ -1,5 +1,6 @@
 "use client";
 
+import { graph, EDGE } from "@/lib/db/poly";
 import Avatar from "./Avatar";
 import FilePreview from "./FilePreview";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export default function DrivePreview({
   onToggleOffline,
   onDeletePermanently,
 }: DrivePreviewProps) {
+  const sharedWith = graph.getEdgeTargets(file.id, EDGE.SHARED_WITH);
   return (
     <aside className="flex min-h-0 flex-col overflow-y-auto bg-dock px-6 pt-[22px] pb-5">
       <div className="flex items-center justify-between">
@@ -127,23 +129,23 @@ export default function DrivePreview({
               year: "numeric",
             })}
           />
-          <DetailRow label="Storage" value={file.sharedWith.length > 0 ? `${file.sharedWith.length} replicas` : "1 provider"} />
+          <DetailRow label="Storage" value={sharedWith.length > 0 ? `${sharedWith.length} replicas` : "1 provider"} />
           <DetailRow label="Access" value={file.trashed ? "In trash" : file.storedInDrive ? "Private" : "Shared"} />
         </div>
       </div>
 
-      {file.sharedWith.length > 0 && (
+      {sharedWith.length > 0 && (
         <div className="mt-6 border-t border-border pt-5">
           <p className="text-[12px] font-semibold text-text-near-white">Shared with</p>
           <div className="mt-4 flex items-center">
-            {file.sharedWith.slice(0, 3).map((entry, index) => (
+            {sharedWith.slice(0, 3).map((entry, index) => (
               <div key={`${file.id}-${entry}-${index}`} className={`relative ${index > 0 ? "-ml-[10px]" : ""}`}>
                 <Avatar initials={displayInitials(entry)} size={34} />
               </div>
             ))}
-            {file.sharedWith.length > 3 && (
+            {sharedWith.length > 3 && (
               <div className="-ml-[10px] flex h-[34px] w-[34px] items-center justify-center rounded-full bg-pill-subtle text-[10px] font-semibold text-text-secondary">
-                +{file.sharedWith.length - 3}
+                +{sharedWith.length - 3}
               </div>
             )}
           </div>
