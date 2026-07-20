@@ -21,17 +21,5 @@ export function getThreadMessages(
     return thread.sort((a, b) => a.createdAt - b.createdAt);
   }
 
-  const thread: Message[] = [];
-  let walk = byId[messageId];
-  while (walk) {
-    const parentEdges = graph.getEdgeTargets(walk.id, EDGE.REPLIES_TO);
-    if (parentEdges.length === 0) break;
-    const parentId = parentEdges[0];
-    const parent = byId[parentId];
-    if (!parent) break;
-    if (thread.some((m) => m.id === parent.id)) break;
-    thread.unshift(parent);
-    walk = parent;
-  }
-  return thread;
+  return graph.walkAncestors(messageId, EDGE.REPLIES_TO) as unknown as Message[];
 }
