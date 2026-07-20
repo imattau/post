@@ -172,7 +172,7 @@ describe("calendar store", () => {
 
   it("createEvent adds event and selects it", async () => {
     const { useCalendarStore } = await import("@/lib/stores/calendar");
-    const created = await useCalendarStore.getState().createEvent(MOCK_EVENT);
+    const created = await useCalendarStore.getState().createEvent(MOCK_EVENT, "work");
     expect(created.id).toBeTruthy();
     expect(created.title).toBe("Test event");
     expect(useCalendarStore.getState().events).toHaveLength(1);

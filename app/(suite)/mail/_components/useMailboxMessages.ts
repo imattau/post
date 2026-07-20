@@ -137,17 +137,17 @@ export function realToMock(
   const profile = isGroupTarget ? null : profiles[targetPubkey];
   const displayName = isGroupTarget
     ? `Group (${groupData?.members.length ?? 0})`
-    : profile?.name || profile?.displayName || targetPubkey.slice(0, 8);
+    : profile?.name || profile?.displayName || targetPubkey?.slice(0, 8) || "Unknown";
   const initials = isGroupTarget
     ? "GR"
     : profile?.name
       ? profile.name.slice(0, 2).toUpperCase()
-      : targetPubkey.slice(0, 2).toUpperCase();
+      : targetPubkey?.slice(0, 2).toUpperCase() ?? "??";
 
   const contact: MockContact = {
     id: targetPubkey,
     name: displayName,
-    npub: `${targetPubkey.slice(0, 10)}…`,
+    npub: targetPubkey ? `${targetPubkey.slice(0, 10)}…` : "Unknown…",
     avatarInitials: initials,
     verified: profile?.nip05 ? true : false,
   };
@@ -159,7 +159,7 @@ export function realToMock(
     sender: contact,
     recipientName,
     subject: real.subject || "(no subject)",
-    preview: real.preview || real.content.slice(0, 120),
+    preview: real.preview || real.content?.slice(0, 120) || "",
     body: real.content,
     createdAt: real.createdAt,
     read: real.read,
