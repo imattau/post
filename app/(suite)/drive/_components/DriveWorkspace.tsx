@@ -593,6 +593,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
             onViewModeChange={setViewMode}
           />
 
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {meta.showFolders && (
             <DriveFolderGrid
               folders={folders}
@@ -644,7 +645,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
               : "Your main Drive view includes folders, uploads, and recent files."}
           </div>
 
-          <div className="mt-6 min-h-0 flex-1 overflow-y-auto">
+          <div className="mt-6 min-h-0 flex-1">
             {visibleFiles.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-[340px] rounded-pill border border-border bg-sidebar p-6 text-center">
@@ -713,6 +714,7 @@ export default function DriveWorkspace({ screen }: { screen: DriveScreen }) {
               </Button>
             </div>
           )}
+        </div>
         </main>
 
         {selectedFile ? (

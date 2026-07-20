@@ -3,6 +3,7 @@ import { graph, putNode, putNodes, getNodes, clearNodes, contactSearchText } fro
 import { npubEncode } from "nostr-tools/nip19";
 import { fetchContactList, batchFetchProfiles } from "@post/nostr-core";
 import { useRelaysStore } from "@/lib/stores/relays";
+import { useIdentityStore } from "@/lib/stores/identity";
 import type { Contact } from "@/lib/types";
 
 export type ContactStatus = "Following" | "Muted" | "Blocked";
@@ -71,7 +72,7 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
 
     set({ loading: true });
 
-    const myPubkey = (await (await import("@/lib/stores/identity")).useIdentityStore.getState().identity)?.pubkey;
+    const myPubkey = useIdentityStore.getState().identity?.pubkey;
     if (!myPubkey) {
       set({ loading: false });
       return;
