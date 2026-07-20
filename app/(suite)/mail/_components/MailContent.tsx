@@ -18,6 +18,7 @@ import { graph, EDGE } from "@/lib/db/poly";
 import Sidebar from "./Sidebar";
 import RelayBanner from "./RelayBanner";
 import ReadingPane from "@/components/ReadingPane";
+import ThreadView from "@/components/ThreadView";
 const ComposeModal = dynamic(() => import("@/components/ComposeModal"), {
   ssr: false,
   loading: () => null,
@@ -40,10 +41,17 @@ export default function MailContent({ children }: { children: React.ReactNode })
     : currentMessages[0] ?? null;
 
   const messagesById = useMessagesStore((s) => s.byId);
+  const conversationView = useSettingsStore((s) => (s.values["conversation-view"] ?? false) as boolean);
   const threadMessages = useMemo(
     () => (selectedMessage ? getThreadMessages(selectedMessage.id, messagesById) : []),
     [selectedMessage, messagesById]
   );
+  const allThreadMessages = useMemo(() => {
+    if (!selectedId || !selectedMessage || !conversationView) return [];
+    const realSelected = messagesById[selectedMessage.id];
+    if (!realSelected) return threadMessages;
+    return [realSelected, ...threadMessages].sort((a, b) => a.createdAt - b.createdAt);
+  }, [selectedId, selectedMessage, messagesById, threadMessages, conversationView]);
 
   const draftCount = useMailboxStore((s) => s.unreadCounts.drafts);
   const startSnoozeWatcher = useMessagesStore((s) => s.startSnoozeWatcher);
@@ -225,7 +233,24 @@ export default function MailContent({ children }: { children: React.ReactNode })
         />
 
         <div className="bg-canvas flex flex-col min-h-0 overflow-hidden">
-          {children}
+          {conversationView && selectedId && selectedMessage && allThreadMessages.length > 1 ? (
+            <div className="flex flex-col h-full min-h-0">
+              <div className="flex items-center gap-2 px-4 pt-[25px] pb-2 flex-shrink-0">
+                <button
+                  onClick={clearSelection}
+                  className="h-7 px-3 rounded-pill text-[11px] font-medium border border-border text-text-secondary hover:border-brand/50 transition-all duration-150 cursor-pointer"
+                >
+                  ← Back
+                </button>
+                <span className="text-[11px] text-text-tertiary">{allThreadMessages.length} messages</span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2">
+                <ThreadView messages={allThreadMessages} onSelect={handleThreadSelect} />
+              </div>
+            </div>
+          ) : (
+            children
+          )}
         </div>
 
         {selectedMessage ? (
@@ -246,6 +271,8 @@ export default function MailContent({ children }: { children: React.ReactNode })
             onForward={handleForward}
             threadMessages={threadMessages}
             onThreadSelect={handleThreadSelect}
+            conversationView={conversationView}
+            allThreadMessages={allThreadMessages}
           />
         ) : (
           <div className="bg-dock flex items-center justify-center">

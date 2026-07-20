@@ -520,6 +520,8 @@ function PostReadingContent() {
       <ToggleRow settingKey="show-images-inline" label="Show images inline" description="Display image attachments directly in the post." defaultOn />
       <hr className="border-border" />
       <ToggleRow settingKey="mark-read-scroll" label="Mark as read on scroll" description="Automatically mark posts as read when scrolling past them." defaultOn />
+      <hr className="border-border" />
+      <ToggleRow settingKey="conversation-view" label="Conversation view" description="Group threaded messages into conversations in the message list." />
     </>
   );
 }

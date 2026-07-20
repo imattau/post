@@ -22,6 +22,7 @@ export const SETTING_DEFAULTS = {
   // Post > Reading
   "show-images-inline": true,
   "mark-read-scroll": true,
+  "conversation-view": false,
   // Drive > Uploads
   "encrypt-private-uploads": true,
   "background-uploads": true,

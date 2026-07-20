@@ -7,9 +7,43 @@ import { useDebounce } from "use-debounce";
 import { Search, Inbox, SearchX } from "lucide-react";
 import type { MockMessage } from "@/lib/mock/threads";
 import MessageRow from "@/components/MessageRow";
+import ConversationRow, { type ConversationGroup } from "@/components/ConversationRow";
 import EmptyState from "@/components/EmptyState";
 import { useKeyboardNav } from "@/lib/useKeyboard";
 import { useMessagesStore } from "@/lib/stores/messages";
+import { useSettingsStore } from "@/lib/stores/settings";
+
+type DisplayItem =
+  | { type: "message"; message: MockMessage }
+  | { type: "group"; group: ConversationGroup };
+
+function groupByConversation(messages: MockMessage[]): DisplayItem[] {
+  const groups = new Map<string, MockMessage[]>();
+  const singles: DisplayItem[] = [];
+
+  for (const m of messages) {
+    if (m.conversationId) {
+      const existing = groups.get(m.conversationId) ?? [];
+      existing.push(m);
+      groups.set(m.conversationId, existing);
+    } else {
+      singles.push({ type: "message", message: m });
+    }
+  }
+
+  for (const [conversationId, msgs] of groups) {
+    msgs.sort((a, b) => b.createdAt - a.createdAt);
+    singles.push({ type: "group", group: { conversationId, messages: msgs } });
+  }
+
+  singles.sort((a, b) => {
+    const aTime = a.type === "group" ? a.group.messages[0].createdAt : a.message.createdAt;
+    const bTime = b.type === "group" ? b.group.messages[0].createdAt : b.message.createdAt;
+    return bTime - aTime;
+  });
+
+  return singles;
+}
 
 function SkeletonCard() {
   return (
@@ -81,16 +115,6 @@ export default function MessageListView({
     setBatchSelection(new Set());
   }, []);
 
-  const handleSelect = useCallback(
-    (id: string) => {
-      router.push(`${pathname}?c=${id}`, { scroll: false });
-    },
-    [router, pathname]
-  );
-
-  const filteredIds = useMemo(() => messages.map((m) => m.id), [messages]);
-  useKeyboardNav(filteredIds, effectiveSelectedId, handleSelect, [filteredIds, effectiveSelectedId]);
-
   const listRef = useRef<HTMLDivElement>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,8 +140,28 @@ export default function MessageListView({
     return result;
   }, [messages, activeFilter, debouncedQuery]);
 
+  const conversationView = useSettingsStore((s) => (s.values["conversation-view"] ?? false) as boolean);
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      router.push(`${pathname}?c=${id}`, { scroll: false });
+    },
+    [router, pathname]
+  );
+
+  const displayItems = useMemo<DisplayItem[]>(() => {
+    if (!conversationView) return filtered.map((m) => ({ type: "message" as const, message: m }));
+    return groupByConversation(filtered);
+  }, [filtered, conversationView]);
+
+  const navIds = useMemo(() => displayItems.map((item) => {
+    if (item.type === "group") return item.group.messages[0].id;
+    return item.message.id;
+  }), [displayItems]);
+  useKeyboardNav(navIds, effectiveSelectedId, handleSelect, [navIds, effectiveSelectedId]);
+
   const virtualizer = useVirtualizer({
-    count: filtered.length,
+    count: displayItems.length,
     getScrollElement: () => listRef.current,
     estimateSize: () => 112,
     measureElement,
@@ -179,10 +223,10 @@ export default function MessageListView({
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-2 relative" role="list" aria-label="Message list">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
-        ) : filtered.length > 0 ? (
+        ) : displayItems.length > 0 ? (
           <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
             {virtualizer.getVirtualItems().map((virtualItem) => {
-              const message = filtered[virtualItem.index];
+              const item = displayItems[virtualItem.index];
               return (
                 <div
                   key={virtualItem.key}
@@ -196,14 +240,22 @@ export default function MessageListView({
                     transform: `translateY(${virtualItem.start}px)`,
                   }}
                 >
-                  <MessageRow
-                    message={message}
-                    selected={effectiveSelectedId === message.id}
-                    onClick={() => handleSelect(message.id)}
-                    batchMode={batchMode}
-                    batchSelected={batchSelection.has(message.id)}
-                    onBatchToggle={() => handleBatchToggle(message.id)}
-                  />
+                  {item.type === "group" ? (
+                    <ConversationRow
+                      group={item.group}
+                      selected={effectiveSelectedId === item.group.messages[0].id}
+                      onClick={() => handleSelect(item.group.messages[0].id)}
+                    />
+                  ) : (
+                    <MessageRow
+                      message={item.message}
+                      selected={effectiveSelectedId === item.message.id}
+                      onClick={() => handleSelect(item.message.id)}
+                      batchMode={batchMode}
+                      batchSelected={batchSelection.has(item.message.id)}
+                      onBatchToggle={() => handleBatchToggle(item.message.id)}
+                    />
+                  )}
                 </div>
               );
             })}
