@@ -1,7 +1,8 @@
 import {
-  PolyGraph, defineEdges, buildEmbeddingText, BinaryStoreAdapter,
+  PolyGraph, defineEdges, buildEmbeddingText,
 } from "@0xx0lostcause0xx0/polypack";
 import type { DataTransform } from "@0xx0lostcause0xx0/polypack";
+import { BinaryStoreAdapter } from "@0xx0lostcause0xx0/polypack/persistence/opfs";
 
 export const EDGE = defineEdges({
   HAS_LABEL: "HAS_LABEL",
