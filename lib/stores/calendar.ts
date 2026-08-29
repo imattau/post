@@ -79,7 +79,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       ]);
 
       let mergedEvents = events;
-      let mergedCalendarIds = await loadEventCalendarIds();
+      const mergedCalendarIds = await loadEventCalendarIds();
 
       if (identity?.pubkey) {
         const pool = useRelaysStore.getState().pool;

@@ -1,14 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render } from "@testing-library/react";
+import React from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 vi.mock("next/dynamic", () => ({
   default: () => {
-    const PlainRenderer = ({ body, components }: { body: string; components?: any }) => {
-      const React = require("react");
-      const ReactMarkdown = require("react-markdown").default;
-      const remarkGfm = require("remark-gfm").default;
-      return React.createElement(ReactMarkdown, { children: body, components, remarkPlugins: [remarkGfm] });
-    };
+    const PlainRenderer = ({ body, components }: { body: string; components?: Components }) =>
+      React.createElement(ReactMarkdown, { components, remarkPlugins: [remarkGfm] }, body);
     PlainRenderer.displayName = "DynamicMarkdownRenderer";
     return PlainRenderer;
   },

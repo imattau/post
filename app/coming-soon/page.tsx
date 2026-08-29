@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 function ComingSoonContent() {
@@ -13,12 +14,12 @@ function ComingSoonContent() {
           {app || "?"}
         </h1>
         <p className="text-text-secondary text-[15px]">Coming soon</p>
-        <a
+        <Link
           href="/mail/inbox"
           className="inline-block mt-6 text-brand-light text-[13px] font-medium hover:brightness-110"
         >
           ← Back to Post
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -58,6 +58,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.1.6",
     "@tauri-apps/api": "^2.11.1",
@@ -69,6 +70,8 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^6.0.3",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.24",
     "jsdom": "^29.1.1",
     "msw": "^2.14.6",
     "postcss": "^8.5.3",
