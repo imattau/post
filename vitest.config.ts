@@ -12,7 +12,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     include: ["**/*.test.{ts,tsx}"],
-    exclude: ["node_modules", ".next"],
+    exclude: ["**/node_modules/**", "**/.next/**", ".opencode/**"],
   },
   resolve: {
     alias: {
