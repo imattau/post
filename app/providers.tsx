@@ -5,6 +5,7 @@ import { useIdentityStore } from "@/lib/stores/identity";
 import { useRelaysStore } from "@/lib/stores/relays";
 import { useMailboxStore } from "@/lib/stores/mailboxes";
 import { startSync, loadCachedMessages } from "@/lib/sync";
+import { reembedIfNeeded } from "@/lib/db/poly";
 import { loadBlossomConfig, useBlossomStore } from "@/lib/stores/blossom";
 import { useContactsStore } from "@/lib/stores/contacts";
 import { useSettingsStore } from "@/lib/stores/settings";
@@ -83,6 +84,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       if (downloadMetadata) {
         useContactsStore.getState().fetchNostrContacts();
       }
+
+      // Downloads the embedding model on first run; runs in the background
+      // so it never blocks boot.
+      reembedIfNeeded().catch((err) => console.error("Failed to re-embed for new embedding model:", err));
     })();
   }, [identity]);
 

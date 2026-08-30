@@ -2,6 +2,8 @@ packages:
   - 'packages/*'
 allowBuilds:
   msw: true
+  onnxruntime-node: false
+  protobufjs: false
   sharp: true
   unrs-resolver: true
 minimumReleaseAge: 0

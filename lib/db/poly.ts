@@ -3,6 +3,7 @@ import {
 } from "@0xx0lostcause0xx0/polypack";
 import type { DataTransform } from "@0xx0lostcause0xx0/polypack";
 import { BinaryStoreAdapter } from "@0xx0lostcause0xx0/polypack/persistence/opfs";
+import { semanticEmbedding } from "@/lib/embeddings";
 
 export const EDGE = defineEdges({
   HAS_LABEL: "HAS_LABEL",
@@ -90,7 +91,7 @@ const dataTransform: DataTransform = {
 
 const adapter = new BinaryStoreAdapter({ storeDir: "PostDB-Poly" });
 
-export const graph = new PolyGraph(adapter, 1_000_000, undefined, dataTransform);
+export const graph = new PolyGraph(adapter, 1_000_000, semanticEmbedding, dataTransform);
 
 export async function ensureWarm() {
   await graph.warm();
@@ -243,6 +244,52 @@ export function contactSearchText(raw: Record<string, unknown>): string {
     },
     { name: 3, handle: 2 },
   );
+}
+
+const EMBEDDING_MODEL_VERSION_KEY = "poly-embedding-model-version";
+const EMBEDDING_MODEL_VERSION = "minilm-l6-v2-v1";
+
+/**
+ * Re-embeds every message and contact once after a switch to a new embedding
+ * provider (e.g. lexical feature-hash -> semantic MiniLM). Old vectors were
+ * computed in a different vector space and are silently meaningless for
+ * cosine similarity against fresh query embeddings, so a stale node that
+ * never gets touched again would never get corrected without this. Gated by
+ * a localStorage flag so it only runs once per browser per model version.
+ */
+export async function reembedIfNeeded(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    if (localStorage.getItem(EMBEDDING_MODEL_VERSION_KEY) === EMBEDDING_MODEL_VERSION) return;
+  } catch {
+    return;
+  }
+
+  const [messages, contacts] = await Promise.all([
+    getNodes<Record<string, unknown>>("message"),
+    getNodes<Record<string, unknown>>("contact"),
+  ]);
+
+  await putNodes(
+    messages.map((msg) => ({
+      type: "message",
+      id: msg.id as string,
+      data: msg,
+      searchText: messageSearchText(msg),
+    })),
+  );
+  await putNodes(
+    contacts.map((contact) => ({
+      type: "contact",
+      id: (contact.pubkey ?? contact.id) as string,
+      data: contact,
+      searchText: contactSearchText(contact),
+    })),
+  );
+
+  try {
+    localStorage.setItem(EMBEDDING_MODEL_VERSION_KEY, EMBEDDING_MODEL_VERSION);
+  } catch {}
 }
 
 export const db = {

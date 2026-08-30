@@ -21,6 +21,7 @@
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@hookform/resolvers": "^5.9.1",
+    "@huggingface/transformers": "^4.2.0",
     "@post/nostr-core": "workspace:*",
     "@tanstack/react-virtual": "^3.14.10",
     "@tauri-apps/plugin-store": "^2.4.4",
