@@ -25,37 +25,55 @@ pub fn run() {
             {
                 use tauri::tray::TrayIconBuilder;
                 use tauri::menu::{Menu, MenuItem};
+                use std::panic::{catch_unwind, AssertUnwindSafe};
 
                 let show = MenuItem::with_id(app, "show", "Show Post", true, None::<&str>)?;
                 let compose = MenuItem::with_id(app, "compose", "Compose", true, None::<&str>)?;
                 let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
                 let menu = Menu::with_items(app, &[&show, &compose, &quit])?;
 
-                let _tray = TrayIconBuilder::new()
-                    .menu(&menu)
-                    .show_menu_on_left_click(false)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.unminimize();
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                // libappindicator/libayatana-appindicator isn't present in every Linux
+                // environment (e.g. the Flatpak GNOME runtime, or a minimal distro), and
+                // tray-icon's Linux backend panics on dlopen failure rather than
+                // returning an error. Catch that so a missing tray library degrades to
+                // "no tray icon" instead of taking down the whole app.
+                let tray_result = catch_unwind(AssertUnwindSafe(|| {
+                    TrayIconBuilder::new()
+                        .menu(&menu)
+                        .show_menu_on_left_click(false)
+                        .on_menu_event(|app, event| match event.id.as_ref() {
+                            "show" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.unminimize();
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
                             }
-                        }
-                        "compose" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.unminimize();
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                let _ = window.eval("window.location.href = '/mail/inbox?compose=true'");
+                            "compose" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.unminimize();
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                    let _ = window.eval("window.location.href = '/mail/inbox?compose=true'");
+                                }
                             }
-                        }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
-                    })
-                    .build(app)?;
+                            "quit" => {
+                                app.exit(0);
+                            }
+                            _ => {}
+                        })
+                        .build(app)
+                }));
+
+                match tray_result {
+                    Ok(Ok(_tray)) => {}
+                    Ok(Err(err)) => log::warn!("Tray icon unavailable: {err}"),
+                    Err(_) => log::warn!(
+                        "Tray icon unavailable: the platform's status-notifier library \
+                         (libayatana-appindicator3 / libappindicator3) failed to load. \
+                         Continuing without a tray icon."
+                    ),
+                }
             }
 
             Ok(())

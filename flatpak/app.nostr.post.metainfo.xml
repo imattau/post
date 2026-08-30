@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.nostr.post</id>
+  <name>Post</name>
+  <summary>Private messaging for Nostr</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>
+      Post is a Nostr-based, email-styled private messaging app -- NIP-17
+      direct messages with NIP-44 encryption, relay health monitoring, and
+      Blossom attachments.
+    </p>
+  </description>
+  <launchable type="desktop-id">app.nostr.post.desktop</launchable>
+  <url type="homepage">https://github.com/imattau/post</url>
+  <content_rating type="oars-1.1"/>
+</component>

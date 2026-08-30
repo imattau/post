@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Post
+Comment=Private messaging for Nostr
+Exec=post
+Icon=app.nostr.post
+Terminal=false
+Categories=Network;Chat;Email;
+StartupWMClass=post

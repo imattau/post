@@ -1,0 +1,126 @@
+name: Publish apt/rpm repo
+
+on:
+  workflow_run:
+    workflows: ["Tauri Build"]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-22.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install repo tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils createrepo-c gnupg
+
+      - name: Import signing key
+        run: |
+          echo "${{ secrets.REPO_SIGNING_KEY }}" | gpg --batch --import
+          KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; exit}')
+          echo "KEYID=$KEYID" >> "$GITHUB_ENV"
+
+      - name: Download all release .deb/.rpm assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p assets
+          for tag in $(gh release list --limit 100 --json tagName -q '.[].tagName'); do
+            gh release download "$tag" --dir "assets/$tag" --pattern '*.deb' --pattern '*.rpm' --clobber 2>/dev/null || true
+          done
+          find assets -type f \( -name '*.deb' -o -name '*.rpm' \) | sort
+
+      - name: Assemble apt repo
+        run: |
+          set -e
+          mkdir -p site/apt/pool/main/p/post
+          mkdir -p site/apt/dists/stable/main/binary-amd64
+          find assets -name '*.deb' -exec cp -n {} site/apt/pool/main/p/post/ \;
+
+          cd site/apt
+          dpkg-scanpackages --multiversion pool /dev/null > dists/stable/main/binary-amd64/Packages
+          gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
+
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin="Post" \
+            -o APT::FTPArchive::Release::Label="Post" \
+            -o APT::FTPArchive::Release::Suite="stable" \
+            -o APT::FTPArchive::Release::Codename="stable" \
+            -o APT::FTPArchive::Release::Architectures="amd64" \
+            -o APT::FTPArchive::Release::Components="main" \
+            -o APT::FTPArchive::Release::Description="Post -- Private messaging for Nostr" \
+            release dists/stable > dists/stable/Release
+
+          gpg --local-user "$KEYID" --batch --yes --detach-sign --armor -o dists/stable/Release.gpg dists/stable/Release
+          gpg --local-user "$KEYID" --batch --yes --clearsign -o dists/stable/InRelease dists/stable/Release
+
+      - name: Assemble rpm repo
+        run: |
+          set -e
+          mkdir -p site/rpm
+          find assets -name '*.rpm' -exec cp -n {} site/rpm/ \;
+          createrepo_c site/rpm
+          gpg --local-user "$KEYID" --batch --yes --detach-sign --armor -o site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
+
+      - name: Add public key and landing page
+        run: |
+          mkdir -p site/keys
+          cp packaging/keys/post-release-signing-key.asc site/keys/
+          gpg --dearmor < packaging/keys/post-release-signing-key.asc > site/keys/post-release-signing-key.gpg
+          cat > site/post.repo <<EOF
+          [post]
+          name=Post
+          baseurl=https://imattau.github.io/post/rpm
+          enabled=1
+          gpgcheck=1
+          repo_gpgcheck=1
+          gpgkey=https://imattau.github.io/post/keys/post-release-signing-key.asc
+          EOF
+          cat > site/index.html <<'EOF'
+          <!doctype html>
+          <html>
+          <head><meta charset="utf-8"><title>Post package repository</title></head>
+          <body style="font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; line-height: 1.5;">
+            <h1>Post -- package repository</h1>
+            <p>Private messaging for Nostr. Unsigned code, signed repo metadata.</p>
+
+            <h2>Debian / Ubuntu (apt)</h2>
+            <pre>curl -fsSL https://imattau.github.io/post/keys/post-release-signing-key.asc | sudo gpg --dearmor -o /usr/share/keyrings/post.gpg
+          echo "deb [signed-by=/usr/share/keyrings/post.gpg] https://imattau.github.io/post/apt stable main" | sudo tee /etc/apt/sources.list.d/post.list
+          sudo apt update
+          sudo apt install post</pre>
+
+            <h2>Fedora / RHEL (dnf)</h2>
+            <pre>sudo dnf config-manager --add-repo https://imattau.github.io/post/post.repo
+          sudo dnf install post</pre>
+
+            <h2>Signing key</h2>
+            <p>Fingerprint published alongside each release. Public key: <a href="keys/post-release-signing-key.asc">post-release-signing-key.asc</a></p>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

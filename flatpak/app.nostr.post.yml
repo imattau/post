@@ -1,0 +1,30 @@
+app-id: app.nostr.post
+runtime: org.gnome.Platform
+runtime-version: "49"
+sdk: org.gnome.Sdk
+command: post
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --share=network
+  - --device=dri
+  - --filesystem=xdg-download
+
+modules:
+  - name: post
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 post /app/bin/post
+      - install -Dm644 app.nostr.post.desktop /app/share/applications/app.nostr.post.desktop
+      - install -Dm644 app.nostr.post.png /app/share/icons/hicolor/128x128/apps/app.nostr.post.png
+      - install -Dm644 app.nostr.post.metainfo.xml /app/share/metainfo/app.nostr.post.metainfo.xml
+    sources:
+      - type: file
+        path: post
+      - type: file
+        path: app.nostr.post.desktop
+      - type: file
+        path: app.nostr.post.png
+      - type: file
+        path: app.nostr.post.metainfo.xml
